@@ -1,4 +1,4 @@
-export type Screen = "auth" | "home" | "kyc" | "transfer" | "activity" | "profile";
+export type Screen = "auth" | "otp" | "home" | "kyc" | "transfer" | "activity" | "profile";
 export type AuthMode = "signup" | "signin";
 export type KycStep = "intro" | "front" | "back" | "liveness" | "processing" | "success";
 export type TransferRole = "send" | "receive";
@@ -45,6 +45,7 @@ export interface SquadState {
   screen: Screen;
   authMode: AuthMode;
   phoneInput: string;
+  otpInput: string;
   verified: boolean;
   kycStep: KycStep;
   kycSessionId: string;

@@ -19,6 +19,7 @@ const initialState: SquadState = {
   screen: "auth",
   authMode: "signup",
   phoneInput: "",
+  otpInput: "",
   verified: false,
   kycStep: "intro",
   kycSessionId: "D7X29K",
@@ -95,7 +96,9 @@ export function useSquadApp() {
   const setSignup = useCallback(() => dispatch({ authMode: "signup" }), []);
   const setSignin = useCallback(() => dispatch({ authMode: "signin" }), []);
   const onPhoneChange = useCallback((value: string) => dispatch({ phoneInput: value }), []);
-  const continueAuth = useCallback(() => dispatch({ screen: "home" }), []);
+  const onOtpChange = useCallback((value: string) => dispatch({ otpInput: value }), []);
+  const continueAuth = useCallback(() => dispatch({ screen: "otp" }), []);
+  const verifyOtp = useCallback(() => dispatch({ screen: "home" }), []);
 
   // ---------- Nav ----------
   const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false }), []);
@@ -242,6 +245,7 @@ export function useSquadApp() {
         screen: "auth",
         authMode: "signup",
         phoneInput: "",
+        otpInput: "",
         verified: false,
         kycStep: "intro",
         linkOpen: false,
@@ -267,7 +271,9 @@ export function useSquadApp() {
       setSignup,
       setSignin,
       onPhoneChange,
+      onOtpChange,
       continueAuth,
+      verifyOtp,
       goHome,
       goActivity,
       goProfile,

@@ -2,6 +2,7 @@ import { ChevronRight, IdCard, Loader2, Settings, X } from "lucide-react";
 import { alpha, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
 import { BottomNav } from "@/features/squad/components/bottom-nav";
+import { WalletIcon } from "@/features/squad/components/wallet-icon";
 
 export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { state, derived, actions } = squadApp;
@@ -102,7 +103,7 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
                     className="flex size-8 items-center justify-center rounded-[9px] text-[11px] font-extrabold"
                     style={{ background: alpha(wallet.color, 0.14), color: wallet.color }}
                   >
-                    {wallet.initials}
+                    <WalletIcon id={wallet.id} initials={wallet.initials} color={wallet.color} className="size-4.5" />
                   </div>
                   <div>
                     <div className="text-[13.5px] font-bold">{wallet.name}</div>
@@ -171,7 +172,7 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
                       className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] text-[11px] font-extrabold"
                       style={{ background: alpha(provider.color, 0.14), color: provider.color }}
                     >
-                      {provider.initials}
+                      <WalletIcon id={provider.id} initials={provider.initials} color={provider.color} className="size-[18px]" />
                     </div>
                     <div className="flex-1">
                       <div className="text-[13px] font-bold">{provider.name}</div>

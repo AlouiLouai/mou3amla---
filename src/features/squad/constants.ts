@@ -60,6 +60,51 @@ export const PROVIDERS: Provider[] = [
     subtitle: "Mobile Wallet · TUNPAY",
     mockBalance: 34.9,
   },
+  {
+    id: "d17",
+    name: "D17 (La Poste)",
+    initials: "D17",
+    color: "#ECA310", // La Poste Yellow
+    network: "La Poste · TUNPAY",
+    subtitle: "Mobile Wallet · La Poste",
+    mockBalance: 145.2,
+  },
+  {
+    id: "zitounapay",
+    name: "Zitouna Pay",
+    initials: "ZP",
+    color: "#006747", // Zitouna green
+    network: "Banque Zitouna · TUNPAY",
+    subtitle: "Mobile Wallet · TUNPAY",
+    mockBalance: 320.0,
+  },
+  {
+    id: "orangemoney",
+    name: "Orange Money",
+    initials: "ORG",
+    color: "#FF7900", // Orange
+    network: "Orange · TUNPAY",
+    subtitle: "Mobile Wallet · TUNPAY",
+    mockBalance: 59.9,
+  },
+  {
+    id: "attijari",
+    name: "Attijari Real Time",
+    initials: "ART",
+    color: "#B41F3B",
+    network: "Attijari Bank · TUNPAY",
+    subtitle: "Mobile Wallet · TUNPAY",
+    mockBalance: 810.0,
+  },
+  {
+    id: "sobflous",
+    name: "SobFlous",
+    initials: "SF",
+    color: "#2C3E50",
+    network: "SobFlous · TUNPAY",
+    subtitle: "Payment Gateway",
+    mockBalance: 25.5,
+  }
 ];
 
 export const INITIAL_WALLETS: Wallet[] = [

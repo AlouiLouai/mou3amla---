@@ -3,6 +3,7 @@
 import { useSquadApp } from "@/features/squad/hooks/use-squad-app";
 import { squad } from "@/features/squad/constants";
 import { AuthScreen } from "@/features/squad/components/screens/auth-screen";
+import { OtpScreen } from "@/features/squad/components/screens/otp-screen";
 import { HomeScreen } from "@/features/squad/components/screens/home-screen";
 import { KycScreen } from "@/features/squad/components/screens/kyc-screen";
 import { TransferScreen } from "@/features/squad/components/screens/transfer-screen";
@@ -20,11 +21,12 @@ export function SquadApp() {
 
   return (
     <div
-      className="min-h-dvh w-full font-sans antialiased"
+      className="h-[100dvh] w-full font-sans antialiased overflow-hidden"
       style={{ background: squad.bg, color: squad.text }}
     >
-      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col" style={{ background: squad.surface }}>
+      <div className="mx-auto flex h-[100dvh] w-full max-w-md flex-col overflow-hidden" style={{ background: squad.surface }}>
         {screen === "auth" && <AuthScreen squadApp={squadApp} />}
+        {screen === "otp" && <OtpScreen squadApp={squadApp} />}
         {screen === "home" && <HomeScreen squadApp={squadApp} />}
         {screen === "kyc" && <KycScreen squadApp={squadApp} />}
         {screen === "transfer" && <TransferScreen squadApp={squadApp} />}

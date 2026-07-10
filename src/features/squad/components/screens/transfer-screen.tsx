@@ -1,6 +1,7 @@
 import { ArrowRight, ChevronLeft, Delete, ScanFace } from "lucide-react";
 import { alpha, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
+import { WalletIcon } from "@/features/squad/components/wallet-icon";
 
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"];
 
@@ -70,7 +71,7 @@ export function TransferScreen({ squadApp }: { squadApp: UseSquadApp }) {
                         className="flex size-4.5 items-center justify-center rounded-[5px] text-[8px] font-extrabold"
                         style={{ background: alpha(wallet.color, 0.14), color: wallet.color }}
                       >
-                        {wallet.initials}
+                        <WalletIcon id={wallet.id} initials={wallet.initials} color={wallet.color} className="size-[10px]" />
                       </div>
                       <span
                         className="text-xs font-semibold"
