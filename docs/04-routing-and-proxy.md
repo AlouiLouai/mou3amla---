@@ -2,59 +2,52 @@
 
 ## App Router conventions
 
-Standard Next.js App Router: routes live under `src/app/**`, using
-`page.tsx`, `layout.tsx`, `route.ts`, and metadata file conventions
-(`manifest.ts`, `icon.tsx`, etc.). Server Components by default; add
-`"use client"` at the top of a file only when it needs state, effects, or
-browser APIs.
+This repo uses standard Next.js App Router file conventions under `src/app/**`:
+`page.tsx`, `layout.tsx`, `route.ts`, metadata routes, and special files such
+as `manifest.ts`.
 
-Special routes in this app:
+Important app routes in this project:
 
-- `src/app/~offline/page.tsx` — offline fallback (see [03-pwa.md](./03-pwa.md)).
-- `src/app/serwist/[path]/route.ts` — builds/serves the service worker.
-- `src/app/icon-*.png/route.tsx` — generated manifest icons.
+- `/` -> Stage 1 landing screen for `+216` phone + `@username`
+- `/verify` -> Stage 2 6-digit OTP gate
+- `/home` -> authenticated dashboard shell
+- `/verify-identity` -> Didit launch screen
+- `/verify-identity/return` -> post-Didit return/status page
+- `/api/didit/session` -> creates a Didit verification session
+- `/api/didit/webhook` -> receives Didit webhook status updates
+- `/api/qr/mint` -> mints a signed rotating QR payload for the authenticated recipient
+- `/api/qr/resolve` -> verifies a signed QR payload and resolves recipient routing preview
+- `/api/nearby/publish` -> publishes the current recipient's short nearby code
+- `/api/nearby/options` -> loads four nearby code choices for the payer
+- `/api/nearby/claim` -> resolves the chosen nearby code into the same signed recipient payload
+- `/auth/logout` -> destroys the Supabase session
+- `/~offline` -> offline fallback
+- `/serwist/[path]` -> service worker build/serve route
+
+Keep route files thin. They should read session state, call server helpers,
+and render/redirect, not accumulate business logic.
 
 ## `proxy.ts`, not `middleware.ts`
 
-**This project intentionally has no `middleware.ts` file.** Next.js 16
-renamed the "run code before a request completes" file convention from
-`middleware` to `proxy` — same file location (project root or `src/`, next to
-`app/`), same runtime, same `config.matcher` shape. Only the file name and
-exported function name changed:
+This repo intentionally uses `src/proxy.ts`, not `middleware.ts`. Next.js 16
+renamed the convention; do not create both files.
 
-```ts
-// src/proxy.ts
-export function proxy(request: NextRequest) {
-  // ...
-}
+## What `src/proxy.ts` does
 
-export const config = {
-  matcher: [ /* ... */ ],
-};
-```
+- Refreshes the Supabase SSR session using `src/lib/supabase/proxy.ts`
+- Sets `x-request-id` and `x-pathname` response headers
+- Uses a matcher that skips Next internals, the service worker route, the
+  manifest, and static asset extensions
 
-If you see a task or a stale doc/tutorial referencing `middleware.ts`,
-translate it to `proxy.ts` — do not create both files, and do not "restore"
-`middleware.ts` thinking it's missing.
+The proxy is a **network boundary**, not the app's source of truth for access
+control. Protected pages and handlers must still re-check auth in their own
+server code.
 
-### What's already in `src/proxy.ts`
+## Rules for editing it
 
-- Sets `x-request-id` (a fresh UUID per request) and `x-pathname` response
-  headers.
-- Has a commented-out **optimistic auth redirect example** — uncomment and
-  adapt once real authentication exists. Per Next.js's own guidance, this
-  kind of check should stay optimistic (fast, no data fetching); the actual
-  authorization check must still happen in the route/Server Action itself.
-- `matcher` excludes Next internals, the service worker route, the manifest,
-  and static image extensions — so the proxy doesn't run on every asset
-  request.
-
-### Rules for editing it
-
-- Keep it thin. No slow data fetching (`fetch` with `cache`/`revalidate`
-  options is a no-op inside proxy/middleware anyway).
-- If you narrow the `matcher`, double-check you haven't accidentally excluded
-  a path that needs the header/redirect logic — a matcher change silently
-  stops covering a route, it won't error.
-- Don't rely on proxy alone for authorization. It's a network boundary, not
-  an app layer — always re-check auth in the Server Action/route handler too.
+- Keep it thin and fast.
+- Do not put slow data fetching or authorization business logic there.
+- If you change the matcher, verify you did not accidentally exclude auth or
+  app routes that depend on session refresh.
+- If a route needs protection, enforce that in the page, Server Action, or
+  route handler as well.

@@ -25,4 +25,5 @@ export interface LinkedWallet {
   routingType: RoutingType;
   /** Wallet tag, merchant id, or RIB — public routing string only. */
   routingValue: string;
+  isDefault?: boolean;
 }

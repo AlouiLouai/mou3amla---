@@ -1,14 +1,13 @@
 import type { LinkedWallet } from "@/features/wallets/types";
-import type { PaymentIntent, QrToken, ConfettiPiece } from "@/features/payments/types";
+import type { PaymentIntent, QrToken, NearbyHandoff, ConfettiPiece, RecipientPreview } from "@/features/payments/types";
 import type { Invoice } from "@/features/invoices/types";
 import type { ActivityItem } from "@/features/activity/types";
+import type { VerificationStatus } from "@/features/auth/types";
+import type { NotificationItem } from "@/features/notifications/types";
 
 export type { ConfettiPiece };
 
 export type Screen =
-  | "auth"
-  | "otp"
-  | "profile-setup"
   | "home"
   | "wallet-registry"
   | "generate-intent"
@@ -17,53 +16,54 @@ export type Screen =
   | "intent-result"
   | "activity"
   | "invoices"
-  | "profile";
-
-export type AuthMode = "signup" | "signin";
+  | "profile"
+  | "notifications";
 
 export interface UserProfile {
+  phone?: string;
   username: string;
   fullName: string;
   isProfessional: boolean;
+  verificationStatus: VerificationStatus;
+  diditLatestStatus?: string | null;
   matriculeFiscal?: string;
 }
 
-/**
- * There is exactly one real identity per person in production. `AccountId`
- * only exists so this prototype can be demoed as a real two-sided payment —
- * "me" (created via onboarding) and "ahmed" (a pre-seeded counterpart) —
- * without needing a second device or a backend. See docs/06-conventions.md.
- */
-export type AccountId = "me" | "ahmed";
-
-export interface AccountState {
-  profile: UserProfile;
+export interface InitialSquadUser {
+  phone: string;
+  username: string;
+  displayName: string;
+  verificationStatus: VerificationStatus;
+  diditLatestStatus: string | null;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];
+  notifications: NotificationItem[];
   invoices: Invoice[];
 }
 
 export interface SquadState {
   screen: Screen;
-  authMode: AuthMode;
-  phoneInput: string;
-  otpInput: string;
-  onboarded: boolean;
-  fullNameInput: string;
-  matriculeFiscalInput: string;
   linkOpen: boolean;
   linkStep: "provider" | "identifier";
   linkProviderId: string | null;
   linkIdentifierInput: string;
   linkConnectingId: string | null;
   recipientInput: string;
+  recipientPreview: RecipientPreview | null;
   amount: string;
   currentIntent: PaymentIntent | null;
   qrToken: QrToken | null;
+  nearbyHandoff: NearbyHandoff | null;
+  nearbyOptions: string[];
+  isLoadingNearbyOptions: boolean;
   scanManualInput: string;
   confetti: ConfettiPiece[];
-  accounts: Record<AccountId, AccountState>;
-  activeAccountId: AccountId;
-  accountSwitcherOpen: boolean;
+  isSendingPayment: boolean;
+  profile: UserProfile;
+  wallets: LinkedWallet[];
+  sourceWalletId: string;
+  activityLog: ActivityItem[];
+  notifications: NotificationItem[];
+  invoices: Invoice[];
 }

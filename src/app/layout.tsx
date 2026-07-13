@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Plus_Jakarta_Sans, Syne } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
@@ -8,8 +8,13 @@ import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { NetworkStatusToast } from "@/components/pwa/network-status-toast";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  variable: "--font-inter",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
+  subsets: ["latin"],
+});
+
+const syne = Syne({
+  variable: "--font-syne",
   subsets: ["latin"],
 });
 
@@ -40,7 +45,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: siteConfig.themeColor,
-  colorScheme: "dark",
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
 };
@@ -53,12 +58,12 @@ export default function RootLayout({
   return (
     <html
       lang={siteConfig.locale}
-      className={`${inter.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${plusJakartaSans.variable} ${syne.variable} ${ibmPlexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
         <SerwistProvider swUrl="/serwist/sw.js">
-          <ThemeProvider attribute="class" forcedTheme="dark" disableTransitionOnChange>
+          <ThemeProvider attribute="class" forcedTheme="light" disableTransitionOnChange>
             <main className="flex flex-1 flex-col">{children}</main>
             <InstallPrompt />
             <NetworkStatusToast />

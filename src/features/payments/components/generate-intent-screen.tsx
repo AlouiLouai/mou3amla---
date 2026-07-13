@@ -1,34 +1,51 @@
-import { ChevronLeft, Delete } from "lucide-react";
-import { alpha, squad } from "@/features/squad/constants";
+import { ChevronLeft, Delete, ShieldCheck } from "lucide-react";
+import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 
-const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"];
+const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "backspace"];
 
 export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { state, derived, actions } = squadApp;
   const account = derived.account;
   const amountDisplay = state.amount || "0";
-  const canGenerate = parseFloat(state.amount) > 0 && state.recipientInput.trim().length > 0;
+  const canGenerate =
+    derived.hasAnyWallets &&
+    Number.parseFloat(state.amount) > 0 &&
+    state.recipientInput.trim().length > 0 &&
+    !state.isSendingPayment;
 
   return (
-    <div className="flex flex-1 flex-col overflow-auto px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-8">
-      <button
-        type="button"
-        onClick={actions.goHome}
-        className="mb-4.5 flex size-9 items-center justify-center rounded-full border"
-        style={{ background: squad.card, borderColor: squad.border }}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
+    <div className="flex flex-1 flex-col overflow-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
+      <div className="mb-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={actions.goHome}
+          className="flex size-10 items-center justify-center rounded-full border"
+          style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
 
-      <div className="mb-4 font-mono text-[11px]" style={{ color: squad.textFaint }}>
-        Paying as @{account.profile.username}
+        <div>
+          <div className="text-[1.1rem] font-black tracking-tight">New payment</div>
+          <div className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
+            Routed from @{account.profile.username}
+          </div>
+        </div>
       </div>
 
       <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: squad.textMuted }}>
         FROM
       </div>
+      {!derived.hasAnyWallets ? (
+        <div
+          className="mb-4 rounded-2xl border p-4 text-[12px] leading-relaxed"
+          style={{ background: squad.card, borderColor: squad.border, color: squad.textMuted }}
+        >
+          Link at least one account on the dashboard before creating a payment intent.
+        </div>
+      ) : null}
       <div className="mb-4 flex flex-wrap gap-2">
         {account.wallets.map((wallet) => {
           const selected = wallet.id === account.sourceWalletId;
@@ -61,7 +78,7 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
         TO
       </div>
       <div
-        className="mb-4 flex items-center gap-2.5 rounded-2xl border px-4 py-3"
+        className="mb-3 flex items-center gap-2.5 rounded-2xl border px-4 py-3"
         style={{ background: squad.card, borderColor: squad.borderStrong }}
       >
         <span className="font-mono text-[15px]" style={{ color: squad.accent }}>
@@ -79,30 +96,59 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
         </button>
       </div>
 
+      {state.recipientPreview ? (
+        <div
+          className="mb-4 rounded-[22px] border p-4"
+          style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.2), boxShadow: cardShadow }}
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-black">{state.recipientPreview.displayName}</div>
+              <div className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
+                @{state.recipientPreview.username}
+              </div>
+            </div>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black capitalize"
+              style={{ background: alpha(squad.accent, 0.12), color: squad.accent }}
+            >
+              <ShieldCheck className="size-3.5" />
+              {state.recipientPreview.verificationStatus}
+            </span>
+          </div>
+          <div className="text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
+            {state.recipientPreview.primaryRouteLabel ?? "The recipient has no default public route yet."}
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="font-mono text-[44px] font-semibold tracking-tight">
-          {amountDisplay} <span className="text-xl" style={{ color: squad.accent }}>DT</span>
+        <div className="font-mono text-[42px] font-semibold tracking-tight">
+          {amountDisplay}{" "}
+          <span className="text-xl" style={{ color: squad.accent }}>
+            DT
+          </span>
         </div>
         <button
           type="button"
           onClick={actions.quickAmount5}
-          className="mt-3.5 rounded-full border px-3.5 py-1.5 text-xs font-bold"
+          className="mt-3 rounded-full border px-3.5 py-1.5 text-xs font-bold"
           style={{ color: squad.accent, background: alpha(squad.accent, 0.1), borderColor: alpha(squad.accent, 0.3) }}
         >
           +5 DT quick
         </button>
       </div>
 
-      <div className="my-4.5 grid grid-cols-3 gap-2.5">
-        {KEYPAD_KEYS.map((k) => (
+      <div className="my-4 grid grid-cols-3 gap-2">
+        {KEYPAD_KEYS.map((key) => (
           <button
-            key={k}
+            key={key}
             type="button"
-            onClick={() => (k === "⌫" ? actions.keypadBackspace() : actions.keypadPress(k))}
+            onClick={() => (key === "backspace" ? actions.keypadBackspace() : actions.keypadPress(key))}
             className="flex items-center justify-center rounded-2xl border py-3.5 text-lg font-semibold transition-transform active:scale-95"
-            style={{ background: squad.card, borderColor: squad.border }}
+            style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
           >
-            {k === "⌫" ? <Delete className="size-4.5" /> : k}
+            {key === "backspace" ? <Delete className="size-4.5" /> : key}
           </button>
         ))}
       </div>
@@ -112,9 +158,9 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
         onClick={actions.generateIntent}
         disabled={!canGenerate}
         className="rounded-2xl py-3.5 text-[15px] font-bold transition-opacity disabled:opacity-40"
-        style={{ background: squad.accent, color: squad.bg }}
+        style={{ background: squad.accent, color: "#FFFFFF", boxShadow: cardShadow }}
       >
-        Send Payment
+        {state.isSendingPayment ? "Saving..." : "Send via TUNPAY"}
       </button>
     </div>
   );

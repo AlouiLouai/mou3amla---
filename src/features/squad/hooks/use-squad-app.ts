@@ -2,17 +2,20 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { toast } from "sonner";
-import { AHMED_INITIAL_WALLETS, AHMED_PROFILE, ME_INITIAL_WALLETS, PROVIDERS } from "@/features/wallets/constants";
-import type { LinkedWallet, RoutingType } from "@/features/wallets/types";
-import { attemptNativeHandoff } from "@/features/payments/lib/deep-link";
-import { buildTunpayUri, generateRefId } from "@/features/payments/lib/tunpay";
-import { createQrToken, decodeQrToken, isQrTokenExpired } from "@/features/payments/lib/qr-token";
 import { buildInvoice } from "@/features/invoices/lib/el-fatoora";
-import type { ActivityItem } from "@/features/activity/types";
-import type { AccountId, AccountState, SquadState } from "@/features/squad/types";
+import { markAllNotificationsRead, markNotificationRead } from "@/features/notifications/server/actions";
+import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
+import { attemptNativeHandoff } from "@/features/payments/lib/deep-link";
+import { buildTunpayUri } from "@/features/payments/lib/tunpay";
+import { createPaymentIntent } from "@/features/payments/server/actions";
+import type { NearbyHandoff, QrToken } from "@/features/payments/types";
+import type { InitialSquadUser, SquadState } from "@/features/squad/types";
+import { PROVIDERS } from "@/features/wallets/constants";
+import { linkDestination, setPrimaryDestination } from "@/features/wallets/server/actions";
+import type { LinkedWallet } from "@/features/wallets/types";
 
 function makeConfetti() {
-  const colors = ["#FFFFFF", "#C7C7CC", "#8E8E93"];
+  const colors = ["#FF0083", "#FF8D28", "#050505", "#FFC4E3"];
   return Array.from({ length: 24 }, (_, i) => ({
     left: `${(Math.random() * 92 + 2).toFixed(1)}%`,
     delay: `${(Math.random() * 1.2).toFixed(2)}s`,
@@ -21,56 +24,45 @@ function makeConfetti() {
   }));
 }
 
-function otherAccountId(id: AccountId): AccountId {
-  return id === "me" ? "ahmed" : "me";
+function applyDefaultWallet(wallets: LinkedWallet[], selectedId: string) {
+  return wallets.map((wallet) => ({
+    ...wallet,
+    isDefault: wallet.id === selectedId,
+  }));
 }
 
-/** Loose match: "@ahmed_k" or "ahmed_k" both resolve to the same username. */
-function usernamesMatch(input: string, username: string): boolean {
-  return input.replace(/^@/, "").trim().toLowerCase() === username.toLowerCase();
-}
-
-function initialState(): SquadState {
+function initialState(initialUser?: InitialSquadUser): SquadState {
   return {
-    screen: "auth",
-    authMode: "signup",
-    phoneInput: "",
-    otpInput: "",
-    onboarded: false,
-    fullNameInput: "",
-    matriculeFiscalInput: "",
+    screen: "home",
     linkOpen: false,
     linkStep: "provider",
     linkProviderId: null,
     linkIdentifierInput: "",
     linkConnectingId: null,
     recipientInput: "",
+    recipientPreview: null,
     amount: "",
     currentIntent: null,
     qrToken: null,
+    nearbyHandoff: null,
+    nearbyOptions: [],
+    isLoadingNearbyOptions: false,
     scanManualInput: "",
     confetti: makeConfetti(),
-    activeAccountId: "me",
-    accountSwitcherOpen: false,
-    accounts: {
-      me: {
-        profile: { username: "", fullName: "", isProfessional: false },
-        wallets: ME_INITIAL_WALLETS,
-        sourceWalletId: ME_INITIAL_WALLETS[0].id,
-        activityLog: [
-          { id: "a2", type: "receive", counterparty: "Sami R.", wallet: "Ooredoo", amount: 60, date: "1 Jul" },
-          { id: "a1", type: "send", counterparty: "Mariem B.", wallet: "Flouci", amount: 15, date: "28 Jun" },
-        ],
-        invoices: [],
-      },
-      ahmed: {
-        profile: { ...AHMED_PROFILE },
-        wallets: AHMED_INITIAL_WALLETS,
-        sourceWalletId: AHMED_INITIAL_WALLETS[0].id,
-        activityLog: [],
-        invoices: [],
-      },
+    isSendingPayment: false,
+    profile: {
+      phone: initialUser?.phone,
+      username: initialUser?.username ?? "",
+      fullName: initialUser?.displayName || initialUser?.username || "",
+      isProfessional: false,
+      verificationStatus: initialUser?.verificationStatus ?? "unverified",
+      diditLatestStatus: initialUser?.diditLatestStatus ?? null,
     },
+    wallets: initialUser?.wallets ?? [],
+    sourceWalletId: initialUser?.sourceWalletId ?? "",
+    activityLog: initialUser?.activityLog ?? [],
+    notifications: initialUser?.notifications ?? [],
+    invoices: initialUser?.invoices ?? [],
   };
 }
 
@@ -81,45 +73,11 @@ function reducer(state: SquadState, patch: Patch): SquadState {
   return partial ? { ...state, ...partial } : state;
 }
 
-/** Clean slug: lowercase, strip diacritics/spaces/symbols, alphanumeric + underscore. */
-function slugifyUsername(fullName: string): string {
-  return fullName
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 24);
-}
-
-function validateRoutingValue(type: RoutingType, value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return "This field is required.";
-  if (type === "rib" && !/^\d{20}$/.test(trimmed)) {
-    return "A RIB is exactly 20 digits.";
-  }
-  return null;
-}
-
-/** Patch one account slice, leaving the other and everything else untouched. */
-function patchAccount(
-  state: SquadState,
-  id: AccountId,
-  updater: Partial<AccountState> | ((prev: AccountState) => Partial<AccountState>),
-): SquadState["accounts"] {
-  const prev = state.accounts[id];
-  const partial = typeof updater === "function" ? updater(prev) : updater;
-  return { ...state.accounts, [id]: { ...prev, ...partial } };
-}
-
-export function useSquadApp() {
-  const [state, dispatch] = useReducer(reducer, initialState());
+export function useSquadApp(initialUser?: InitialSquadUser) {
+  const [state, dispatch] = useReducer(reducer, initialState(initialUser));
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const stateRef = useRef(state);
 
-  // Ref writes must happen outside render (React Compiler lint rule), so the
-  // "latest state for async callbacks" mirror is kept in sync via effect
-  // rather than during the render body.
   useEffect(() => {
     stateRef.current = state;
   });
@@ -134,136 +92,188 @@ export function useSquadApp() {
     };
   }, []);
 
-  const after = useCallback((ms: number, fn: () => void) => {
-    const id = setTimeout(() => {
-      timers.current.delete(id);
-      fn();
-    }, ms);
-    timers.current.add(id);
-    return id;
-  }, []);
-
-  // ---------- Auth ----------
-  const setSignup = useCallback(() => dispatch({ authMode: "signup" }), []);
-  const setSignin = useCallback(() => dispatch({ authMode: "signin" }), []);
-  const onPhoneChange = useCallback((value: string) => dispatch({ phoneInput: value }), []);
-  const onOtpChange = useCallback((value: string) => dispatch({ otpInput: value }), []);
-  const continueAuth = useCallback(() => dispatch({ screen: "otp" }), []);
-  // TODO(server-action): verify via Twilio Verify (or a local SMS provider).
-  // Needs TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_VERIFY_SERVICE_SID —
-  // see docs/06-conventions.md. Any 4-digit code is accepted for this prototype.
-  const verifyOtp = useCallback(() => {
-    dispatch((s) => ({ screen: s.onboarded ? "home" : "profile-setup" }));
-  }, []);
-
-  // ---------- Profile setup ("me" only — Ahmed is pre-onboarded) ----------
-  const onFullNameChange = useCallback((value: string) => dispatch({ fullNameInput: value }), []);
-  const onMatriculeFiscalChange = useCallback((value: string) => dispatch({ matriculeFiscalInput: value }), []);
-  const toggleProfessional = useCallback(
-    () =>
-      dispatch((s) => ({
-        accounts: patchAccount(s, "me", (a) => ({ profile: { ...a.profile, isProfessional: !a.profile.isProfessional } })),
-      })),
-    [],
-  );
-  const submitProfile = useCallback(() => {
-    const fullName = stateRef.current.fullNameInput.trim();
-    if (!fullName) return;
-    const username = slugifyUsername(fullName) || "squad_user";
-    const isProfessional = stateRef.current.accounts.me.profile.isProfessional;
-    const matriculeFiscal = isProfessional ? stateRef.current.matriculeFiscalInput.trim() : undefined;
-    dispatch((s) => ({
-      accounts: patchAccount(s, "me", { profile: { username, fullName, isProfessional, matriculeFiscal } }),
-      onboarded: true,
-      screen: "home",
-    }));
-  }, []);
-
-  // ---------- Account switcher (demo-only — see types.ts AccountId) ----------
-  const openAccountSwitcher = useCallback(() => dispatch({ accountSwitcherOpen: true }), []);
-  const closeAccountSwitcher = useCallback(() => dispatch({ accountSwitcherOpen: false }), []);
-  const switchAccount = useCallback(
-    (id: AccountId) =>
-      dispatch({
-        activeAccountId: id,
-        accountSwitcherOpen: false,
-        linkOpen: false,
-        screen: "home",
-      }),
-    [],
-  );
-
-  // ---------- Nav ----------
   const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false }), []);
   const goActivity = useCallback(() => dispatch({ screen: "activity" }), []);
   const goProfile = useCallback(() => dispatch({ screen: "profile" }), []);
+  const goNotifications = useCallback(() => dispatch({ screen: "notifications" }), []);
   const goInvoices = useCallback(() => dispatch({ screen: "invoices" }), []);
-  const goGenerateIntent = useCallback(
-    () => dispatch({ screen: "generate-intent", amount: "", recipientInput: "" }),
-    [],
-  );
-  const goReceiveQr = useCallback(() => {
-    dispatch((s) => ({ screen: "receive-qr", qrToken: createQrToken(s.accounts[s.activeAccountId].profile.username) }));
-  }, []);
-  const goScanQr = useCallback(() => dispatch({ screen: "scan-qr", scanManualInput: "" }), []);
+  const goGenerateIntent = useCallback(() => {
+    if (!stateRef.current.wallets.length) {
+      toast.error("Link at least one destination account before sending money.");
+      return;
+    }
 
-  // ---------- QR rotation (receive screen) ----------
+    dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null });
+  }, []);
+  const goReceiveQr = useCallback(() => {
+    if (!stateRef.current.wallets.length) {
+      toast.error("Link an account first so SQUAD knows where to route incoming payments.");
+      return;
+    }
+
+    dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null });
+  }, []);
+  const goScanQr = useCallback(() => {
+    if (!stateRef.current.wallets.length) {
+      toast.error("Link an account first so SQUAD can route your outgoing payment.");
+      return;
+    }
+
+    dispatch({ screen: "scan-qr", scanManualInput: "", nearbyOptions: [], isLoadingNearbyOptions: false });
+  }, []);
+
   const startQrRotation = useCallback(() => {
+    let cancelled = false;
+    let didShowQrError = false;
+    let didShowNearbyError = false;
+
+    const refresh = async () => {
+      const [qrResult, nearbyResult] = await Promise.allSettled([
+        fetch("/api/qr/mint", {
+          method: "POST",
+          cache: "no-store",
+        }),
+        fetch("/api/nearby/publish", {
+          method: "POST",
+          cache: "no-store",
+        }),
+      ]);
+
+      let qrToken: QrToken | null = null;
+      let nearbyHandoff: NearbyHandoff | null = null;
+
+      if (qrResult.status === "fulfilled") {
+        const payload = (await qrResult.value.json()) as { message?: string; qrToken?: QrToken };
+        if (qrResult.value.ok && payload.qrToken) {
+          qrToken = payload.qrToken;
+          didShowQrError = false;
+        }
+      }
+
+      if (nearbyResult.status === "fulfilled") {
+        const payload = (await nearbyResult.value.json()) as { message?: string; handoff?: NearbyHandoff };
+        if (nearbyResult.value.ok && payload.handoff) {
+          nearbyHandoff = payload.handoff;
+          didShowNearbyError = false;
+        }
+      }
+
+      if (!cancelled) {
+        dispatch({ qrToken, nearbyHandoff });
+      }
+
+      if (!qrToken && !didShowQrError) {
+        toast.error("We couldn't mint a secure QR code right now.");
+        didShowQrError = true;
+      }
+
+      if (!nearbyHandoff && !didShowNearbyError) {
+        toast.error("We couldn't publish the nearby 3-digit code right now.");
+        didShowNearbyError = true;
+      }
+    };
+
+    void refresh();
+
     const interval = setInterval(() => {
-      dispatch((s) => ({ qrToken: createQrToken(s.accounts[s.activeAccountId].profile.username) }));
-    }, 60_000);
+      void refresh();
+    }, QR_TOKEN_TTL_MS);
     timers.current.add(interval);
+
     return () => {
+      cancelled = true;
       clearInterval(interval);
       timers.current.delete(interval);
     };
   }, []);
 
-  // ---------- Wallet registry ----------
-  const openLink = useCallback(() => dispatch({ linkOpen: true, linkStep: "provider", linkProviderId: null, linkIdentifierInput: "" }), []);
-  const closeLink = useCallback(() => dispatch({ linkOpen: false, linkConnectingId: null }), []);
-  const selectLinkProvider = useCallback(
-    (providerId: string) => dispatch({ linkProviderId: providerId, linkStep: "identifier", linkIdentifierInput: "" }),
+  const openLink = useCallback(
+    () => dispatch({ linkOpen: true, linkStep: "provider", linkProviderId: null, linkIdentifierInput: "" }),
     [],
   );
+  const closeLink = useCallback(() => dispatch({ linkOpen: false, linkConnectingId: null }), []);
+  const selectLinkProvider = useCallback((providerId: string) => {
+    const provider = PROVIDERS.find((entry) => entry.id === providerId);
+
+    if (!provider) {
+      return;
+    }
+
+    if (provider.acceptedRoutingTypes[0] === "rib" && stateRef.current.profile.verificationStatus !== "verified") {
+      toast.error("Complete digital identity verification before linking a 20-digit RIB.");
+      return;
+    }
+
+    dispatch({ linkProviderId: providerId, linkStep: "identifier", linkIdentifierInput: "" });
+  }, []);
   const backToProviderPick = useCallback(() => dispatch({ linkStep: "provider", linkProviderId: null }), []);
   const onLinkIdentifierChange = useCallback((value: string) => dispatch({ linkIdentifierInput: value }), []);
   const confirmLinkWallet = useCallback(() => {
     const providerId = stateRef.current.linkProviderId;
-    const provider = PROVIDERS.find((p) => p.id === providerId);
-    if (!provider) return;
-    const routingType = provider.acceptedRoutingTypes[0];
-    const error = validateRoutingValue(routingType, stateRef.current.linkIdentifierInput);
-    if (error) {
-      toast.error(error);
+    const provider = PROVIDERS.find((entry) => entry.id === providerId);
+
+    if (!provider) {
       return;
     }
-    dispatch({ linkConnectingId: provider.id });
-    after(900, () => {
-      const wallet: LinkedWallet = {
-        id: `${provider.id}_${Date.now()}`,
-        providerId: provider.id,
-        name: provider.name,
-        network: provider.network.split(" ")[0],
-        color: provider.color,
-        initials: provider.initials,
-        routingType,
-        routingValue: stateRef.current.linkIdentifierInput.trim(),
-      };
-      dispatch((s) => ({
-        accounts: patchAccount(s, s.activeAccountId, (a) => ({ wallets: [...a.wallets, wallet] })),
-        linkConnectingId: null,
-      }));
-      after(400, () => dispatch({ linkOpen: false }));
-    });
-  }, [after]);
 
-  // ---------- Generate payment intent ----------
-  const selectSource = useCallback(
-    (id: string) => dispatch((s) => ({ accounts: patchAccount(s, s.activeAccountId, { sourceWalletId: id }) })),
+    dispatch({ linkConnectingId: provider.id });
+
+    void (async () => {
+      const result = await linkDestination({
+        providerId: provider.id,
+        routingValue: stateRef.current.linkIdentifierInput,
+      });
+
+      if (!result.ok) {
+        dispatch({ linkConnectingId: null });
+        toast.error(result.message);
+        return;
+      }
+
+      dispatch((s) => ({
+        wallets: [...s.wallets, result.wallet],
+        sourceWalletId: result.sourceWalletId || s.sourceWalletId || result.wallet.id,
+        linkConnectingId: null,
+        linkOpen: false,
+        linkIdentifierInput: "",
+        linkProviderId: null,
+        linkStep: "provider",
+      }));
+
+      toast.success(`${result.wallet.name} linked successfully.`);
+    })();
+  }, []);
+
+  const selectSource = useCallback((id: string) => {
+    const previousId = stateRef.current.sourceWalletId;
+    dispatch((s) => ({
+      sourceWalletId: id,
+      wallets: applyDefaultWallet(s.wallets, id),
+    }));
+
+    void (async () => {
+      const result = await setPrimaryDestination({ destinationId: id });
+      if (!result.ok) {
+        dispatch((s) => ({
+          sourceWalletId: previousId,
+          wallets: applyDefaultWallet(s.wallets, previousId),
+        }));
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Primary payment route updated.");
+    })();
+  }, []);
+
+  const onRecipientChange = useCallback(
+    (value: string) =>
+      dispatch({
+        recipientInput: value.replace(/^@+/, "").trim().toLowerCase(),
+        recipientPreview: null,
+      }),
     [],
   );
-  const onRecipientChange = useCallback((value: string) => dispatch({ recipientInput: value }), []);
   const keypadPress = useCallback((digit: string) => {
     dispatch((s) => {
       if (digit === "." && s.amount.includes(".")) return null;
@@ -277,136 +287,246 @@ export function useSquadApp() {
   const generateIntent = useCallback(() => {
     const amount = parseFloat(stateRef.current.amount);
     const recipient = stateRef.current.recipientInput.trim();
-    if (!amount || amount <= 0 || !recipient) return;
 
-    const senderId = stateRef.current.activeAccountId;
-    const sender = stateRef.current.accounts[senderId];
+    if (!stateRef.current.wallets.length || !stateRef.current.sourceWalletId) {
+      toast.error("Link and choose a destination account first.");
+      return;
+    }
 
-    const intent = {
-      id: crypto.randomUUID(),
-      refId: generateRefId(),
-      amount,
-      recipient,
-      sourceWalletId: sender.sourceWalletId,
-      createdAt: Date.now(),
-      status: "building" as const,
-    };
-    dispatch({ currentIntent: intent, screen: "intent-result" });
+    if (!amount || amount <= 0 || !recipient) {
+      toast.error("Enter both a recipient and an amount.");
+      return;
+    }
 
-    attemptNativeHandoff(buildTunpayUri(intent));
-    dispatch((s) => (s.currentIntent ? { currentIntent: { ...s.currentIntent, status: "dispatched" } } : null));
+    dispatch({ isSendingPayment: true });
+    const loadingToast = toast.loading("Saving the payment route...");
 
-    // Simulates the mou3amla://payment-success?ref=... callback a real
-    // banking app would trigger after completing the transfer on its own
-    // rails — SQUAD itself never confirms fund movement.
-    after(2200, () => {
-      dispatch((s) => {
-        if (!s.currentIntent) return null;
-        const confirmed = { ...s.currentIntent, status: "confirmed" as const };
-        const senderAccount = s.accounts[senderId];
-        const sourceWallet = senderAccount.wallets.find((w) => w.id === confirmed.sourceWalletId);
-
-        const senderEntry: ActivityItem = {
-          id: confirmed.id,
-          type: "send",
-          counterparty: confirmed.recipient,
-          wallet: sourceWallet?.name ?? "Wallet",
-          amount: confirmed.amount,
-          date: "Today",
-        };
-
-        let accounts = patchAccount(s, senderId, (a) => ({
-          activityLog: [senderEntry, ...a.activityLog],
-          invoices: a.profile.isProfessional ? [buildInvoice(confirmed, confirmed.recipient), ...a.invoices] : a.invoices,
-        }));
-
-        // If the recipient resolves to the other demo persona, land a
-        // matching "receive" entry (and, if they're a pro account, an
-        // income invoice) on their side too — this is what makes the
-        // account switcher a genuine two-sided demo instead of a one-way
-        // simulation.
-        const recipientId = otherAccountId(senderId);
-        const recipientAccount = accounts[recipientId];
-        if (usernamesMatch(confirmed.recipient, recipientAccount.profile.username)) {
-          const recipientEntry: ActivityItem = {
-            id: `${confirmed.id}-recv`,
-            type: "receive",
-            counterparty: senderAccount.profile.username || "SQUAD user",
-            wallet: recipientAccount.wallets[0]?.name ?? "Wallet",
-            amount: confirmed.amount,
-            date: "Today",
-          };
-          accounts = {
-            ...accounts,
-            [recipientId]: {
-              ...recipientAccount,
-              activityLog: [recipientEntry, ...recipientAccount.activityLog],
-              invoices: recipientAccount.profile.isProfessional
-                ? [buildInvoice(confirmed, senderAccount.profile.username || "SQUAD user"), ...recipientAccount.invoices]
-                : recipientAccount.invoices,
-            },
-          };
-        }
-
-        return { currentIntent: confirmed, accounts, confetti: makeConfetti() };
+    void (async () => {
+      const result = await createPaymentIntent({
+        sourceWalletId: stateRef.current.sourceWalletId,
+        recipientUsername: recipient,
+        amount,
       });
-    });
-  }, [after]);
+
+      toast.dismiss(loadingToast);
+
+      if (!result.ok) {
+        dispatch({ isSendingPayment: false });
+        toast.error(result.message);
+        return;
+      }
+
+      dispatch({
+        isSendingPayment: false,
+        currentIntent: result.intent,
+        screen: "intent-result",
+        confetti: makeConfetti(),
+        amount: "",
+        recipientInput: "",
+        recipientPreview: null,
+        activityLog: [result.activity, ...stateRef.current.activityLog],
+        notifications: [result.senderNotification, ...stateRef.current.notifications],
+        invoices: stateRef.current.profile.isProfessional
+          ? [buildInvoice(result.intent, result.intent.recipient), ...stateRef.current.invoices]
+          : stateRef.current.invoices,
+      });
+
+      toast.success("Payment intent saved and handed off to the bank rail.");
+      attemptNativeHandoff(buildTunpayUri(result.intent));
+    })();
+  }, []);
 
   const doneIntent = useCallback(
-    () => dispatch({ screen: "home", currentIntent: null, amount: "", recipientInput: "" }),
+    () => dispatch({ screen: "home", currentIntent: null, amount: "", recipientInput: "", recipientPreview: null }),
     [],
   );
   const shareReceipt = useCallback(() => toast.success("Receipt shared"), []);
 
-  // ---------- Scan QR ----------
   const onScanManualInputChange = useCallback((value: string) => dispatch({ scanManualInput: value }), []);
+  const loadNearbyOptions = useCallback(() => {
+    dispatch({ isLoadingNearbyOptions: true });
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/nearby/options", {
+          method: "GET",
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as { message?: string; options?: string[] };
+
+        if (!response.ok || !payload.options) {
+          dispatch({ isLoadingNearbyOptions: false, nearbyOptions: [] });
+          toast.error(payload.message ?? "We couldn't load nearby codes right now.");
+          return;
+        }
+
+        dispatch({
+          isLoadingNearbyOptions: false,
+          nearbyOptions: payload.options,
+        });
+      } catch {
+        dispatch({ isLoadingNearbyOptions: false, nearbyOptions: [] });
+        toast.error("We couldn't load nearby codes right now.");
+      }
+    })();
+  }, []);
+  const submitNearbyOption = useCallback((code: string) => {
+    if (!/^\d{3}$/.test(code)) {
+      toast.error("Choose a valid 3-digit nearby code.");
+      return;
+    }
+
+    const loadingToast = toast.loading("Matching the nearby payer...");
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/nearby/claim", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code }),
+        });
+
+        const payload = (await response.json()) as {
+          message?: string;
+          recipient?: NonNullable<SquadState["recipientPreview"]>;
+        };
+
+        toast.dismiss(loadingToast);
+
+        if (!response.ok || !payload.recipient) {
+          toast.error(payload.message ?? "That nearby code is unavailable.");
+          return;
+        }
+
+        dispatch({
+          recipientInput: payload.recipient.username,
+          recipientPreview: payload.recipient,
+          screen: "generate-intent",
+          scanManualInput: "",
+          nearbyOptions: [],
+        });
+
+        toast.success(`Nearby match found: @${payload.recipient.username}`);
+      } catch {
+        toast.dismiss(loadingToast);
+        toast.error("We couldn't resolve that nearby code right now.");
+      }
+    })();
+  }, []);
   const submitScannedToken = useCallback((raw: string) => {
-    const token = decodeQrToken(raw);
-    if (!token) {
-      toast.error("That code isn't a valid SQUAD payment token.");
+    if (!stateRef.current.wallets.length) {
+      toast.error("Link an account first so SQUAD can route the scanned payment.");
       return;
     }
-    if (isQrTokenExpired(token)) {
-      toast.error("This code expired. Ask the recipient to refresh their QR.");
-      return;
-    }
-    dispatch({ recipientInput: token.recipient, screen: "generate-intent" });
+
+    const loadingToast = toast.loading("Resolving the recipient...");
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/qr/resolve?token=${encodeURIComponent(raw)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const payload = (await response.json()) as {
+          message?: string;
+          recipient?: NonNullable<SquadState["recipientPreview"]>;
+        };
+
+        toast.dismiss(loadingToast);
+
+        if (!response.ok || !payload.recipient) {
+          toast.error(payload.message ?? "That code isn't a valid SQUAD payment token.");
+          return;
+        }
+
+        dispatch({
+          recipientInput: payload.recipient.username,
+          recipientPreview: payload.recipient,
+          screen: "generate-intent",
+          scanManualInput: "",
+        });
+
+        toast.success(`Recipient found: @${payload.recipient.username}`);
+      } catch {
+        toast.dismiss(loadingToast);
+        toast.error("We couldn't resolve that QR code right now.");
+      }
+    })();
   }, []);
   const submitManualScanCode = useCallback(() => {
     submitScannedToken(stateRef.current.scanManualInput.trim());
   }, [submitScannedToken]);
 
-  const logout = useCallback(() => dispatch(initialState()), []);
+  const readNotification = useCallback((notificationId: string) => {
+    const notification = stateRef.current.notifications.find((item) => item.id === notificationId);
+    if (!notification || !notification.unread) {
+      return;
+    }
 
-  const account = state.accounts[state.activeAccountId];
+    dispatch((s) => ({
+      notifications: s.notifications.map((item) => (item.id === notificationId ? { ...item, unread: false } : item)),
+    }));
+
+    void (async () => {
+      const result = await markNotificationRead({ notificationId });
+      if (!result.ok) {
+        dispatch((s) => ({
+          notifications: s.notifications.map((item) => (item.id === notificationId ? { ...item, unread: true } : item)),
+        }));
+        toast.error(result.message);
+      }
+    })();
+  }, []);
+
+  const readAllNotifications = useCallback(() => {
+    const previous = stateRef.current.notifications;
+    if (!previous.some((item) => item.unread)) {
+      return;
+    }
+
+    dispatch((s) => ({
+      notifications: s.notifications.map((item) => ({ ...item, unread: false })),
+    }));
+
+    void (async () => {
+      const result = await markAllNotificationsRead();
+      if (!result.ok) {
+        dispatch({ notifications: previous });
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Notifications updated.");
+    })();
+  }, []);
+
+  const account = {
+    profile: state.profile,
+    wallets: state.wallets,
+    sourceWalletId: state.sourceWalletId,
+    activityLog: state.activityLog,
+    notifications: state.notifications,
+    invoices: state.invoices,
+  };
 
   return {
     state,
     derived: {
       account,
-      otherAccount: state.accounts[otherAccountId(state.activeAccountId)],
-      sourceWallet: account.wallets.find((w) => w.id === account.sourceWalletId) ?? account.wallets[0],
-      availableProviders: PROVIDERS.filter((p) => !account.wallets.some((w) => w.providerId === p.id)),
-      linkProvider: PROVIDERS.find((p) => p.id === state.linkProviderId) ?? null,
+      sourceWallet: state.wallets.find((wallet) => wallet.id === state.sourceWalletId) ?? null,
+      hasAnyWallets: state.wallets.length > 0,
+      unreadNotifications: state.notifications.filter((item) => item.unread).length,
+      availableProviders: PROVIDERS.filter((provider) => !state.wallets.some((wallet) => wallet.providerId === provider.id)),
+      linkProvider: PROVIDERS.find((provider) => provider.id === state.linkProviderId) ?? null,
     },
     actions: {
-      setSignup,
-      setSignin,
-      onPhoneChange,
-      onOtpChange,
-      continueAuth,
-      verifyOtp,
-      onFullNameChange,
-      onMatriculeFiscalChange,
-      toggleProfessional,
-      submitProfile,
-      openAccountSwitcher,
-      closeAccountSwitcher,
-      switchAccount,
       goHome,
       goActivity,
       goProfile,
+      goNotifications,
       goInvoices,
       goGenerateIntent,
       goReceiveQr,
@@ -427,9 +547,12 @@ export function useSquadApp() {
       doneIntent,
       shareReceipt,
       onScanManualInputChange,
+      loadNearbyOptions,
+      submitNearbyOption,
       submitScannedToken,
       submitManualScanCode,
-      logout,
+      readNotification,
+      readAllNotifications,
     },
   };
 }

@@ -1,5 +1,5 @@
 import { squad } from "@/features/squad/constants";
-import type { LinkedWallet, Provider } from "@/features/wallets/types";
+import type { Provider } from "@/features/wallets/types";
 
 // Real Tunisian mobile-money / e-payment providers operating under the
 // TUNPAY interoperability label. Each only exposes the routing identifier
@@ -95,51 +95,5 @@ export const PROVIDERS: Provider[] = [
     network: "SMT · Interbank",
     subtitle: "Bank Card / RIB · ClicToPay",
     acceptedRoutingTypes: ["rib"],
-  },
-];
-
-export const ME_INITIAL_WALLETS: LinkedWallet[] = [
-  {
-    id: "flouci",
-    providerId: "flouci",
-    name: "Flouci",
-    network: "Flouci",
-    color: "#2FE6A3",
-    initials: "FL",
-    routingType: "wallet_tag",
-    routingValue: "@youssef.tn",
-  },
-  {
-    id: "walletii",
-    providerId: "walletii",
-    name: "walletii by Ooredoo",
-    network: "Ooredoo",
-    color: "#A78BFA",
-    initials: "WT",
-    routingType: "wallet_tag",
-    routingValue: "@youssef.wt",
-  },
-];
-
-// A pre-seeded, already-onboarded second persona so this prototype can
-// demo a real two-sided payment (switch accounts, send, switch back, see it
-// land) without a second device or a backend. See docs/06-conventions.md.
-export const AHMED_PROFILE = {
-  username: "ahmed_k",
-  fullName: "Ahmed Karray",
-  isProfessional: true,
-  matriculeFiscal: "1357902K/A/M/000",
-} as const;
-
-export const AHMED_INITIAL_WALLETS: LinkedWallet[] = [
-  {
-    id: "attijari-ahmed",
-    providerId: "attijari",
-    name: "Attijari Real Time",
-    network: "Attijari",
-    color: "#E0486B",
-    initials: "AT",
-    routingType: "rib",
-    routingValue: "10123456789012345678",
   },
 ];

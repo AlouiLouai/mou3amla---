@@ -1,47 +1,128 @@
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import type { QrToken } from "@/features/payments/types";
+const QR_TOKEN_VERSION = "sqd1";
 
-export const QR_TOKEN_TTL_MS = 60_000;
+type SignedQrTokenPayload = {
+  sub: string;
+  usr: string;
+  nonce: string;
+  iat: number;
+  exp: number;
+};
 
-/**
- * Opaque expiring proximity token encoded into the receive-screen QR code.
- *
- * This is intentionally NOT real cryptographic replay protection — it's a
- * base64 JSON blob with an expiry window, good enough for a client-only
- * prototype demo. A production version needs the token minted and signed
- * server-side (e.g. HMAC with a server-held key) so a scanner can verify it
- * hasn't been tampered with, not just that it hasn't expired.
- */
-export function createQrToken(recipient: string): QrToken {
-  const issuedAt = Date.now();
-  return {
-    recipient,
-    nonce: Math.random().toString(36).slice(2, 12),
-    issuedAt,
-    expiresAt: issuedAt + QR_TOKEN_TTL_MS,
-  };
+function encodeBase64Url(value: string | Buffer): string {
+  return Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
-export function encodeQrToken(token: QrToken): string {
-  return btoa(JSON.stringify(token));
+function decodeBase64Url(value: string): string {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  return Buffer.from(padded, "base64").toString("utf8");
 }
 
-export function decodeQrToken(raw: string): QrToken | null {
+function buildSignature(input: string, secret: string): string {
+  return encodeBase64Url(createHmac("sha256", secret).update(input).digest());
+}
+
+function safeEqual(expected: string, provided: string): boolean {
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+function parsePayload(value: string): SignedQrTokenPayload | null {
   try {
-    const parsed = JSON.parse(atob(raw));
+    const parsed = JSON.parse(decodeBase64Url(value)) as Partial<SignedQrTokenPayload>;
+
     if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      typeof parsed.recipient === "string" &&
-      typeof parsed.expiresAt === "number"
+      typeof parsed.sub !== "string" ||
+      typeof parsed.usr !== "string" ||
+      typeof parsed.nonce !== "string" ||
+      typeof parsed.iat !== "number" ||
+      typeof parsed.exp !== "number"
     ) {
-      return parsed as QrToken;
+      return null;
     }
-    return null;
+
+    return {
+      sub: parsed.sub,
+      usr: parsed.usr,
+      nonce: parsed.nonce,
+      iat: parsed.iat,
+      exp: parsed.exp,
+    };
   } catch {
     return null;
   }
 }
 
-export function isQrTokenExpired(token: QrToken): boolean {
+export function mintQrToken(input: {
+  recipientUserId: string;
+  recipientUsername: string;
+  secret: string;
+}): QrToken {
+  const issuedAt = Date.now();
+  const payload: SignedQrTokenPayload = {
+    sub: input.recipientUserId,
+    usr: input.recipientUsername,
+    nonce: randomUUID().replace(/-/g, "").slice(0, 16),
+    iat: issuedAt,
+    exp: issuedAt + QR_TOKEN_TTL_MS,
+  };
+
+  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+  const signingInput = `${QR_TOKEN_VERSION}.${encodedPayload}`;
+  const signature = buildSignature(signingInput, input.secret);
+  const token = `${signingInput}.${signature}`;
+
+  return {
+    token,
+    recipientUserId: payload.sub,
+    recipient: payload.usr,
+    nonce: payload.nonce,
+    issuedAt: payload.iat,
+    expiresAt: payload.exp,
+    signatureVersion: QR_TOKEN_VERSION,
+  };
+}
+
+export function verifyQrToken(raw: string, secret: string): QrToken | null {
+  const [version, encodedPayload, signature] = raw.split(".");
+  if (!version || !encodedPayload || !signature || version !== QR_TOKEN_VERSION) {
+    return null;
+  }
+
+  const signingInput = `${version}.${encodedPayload}`;
+  const expectedSignature = buildSignature(signingInput, secret);
+  if (!safeEqual(expectedSignature, signature)) {
+    return null;
+  }
+
+  const payload = parsePayload(encodedPayload);
+  if (!payload) {
+    return null;
+  }
+
+  return {
+    token: raw,
+    recipientUserId: payload.sub,
+    recipient: payload.usr,
+    nonce: payload.nonce,
+    issuedAt: payload.iat,
+    expiresAt: payload.exp,
+    signatureVersion: version,
+  };
+}
+
+export function isQrTokenExpired(token: Pick<QrToken, "expiresAt">): boolean {
   return Date.now() > token.expiresAt;
 }

@@ -1,7 +1,15 @@
-import { ChevronRight, FileText, LogOut, Repeat, ShieldAlert, Wallet as WalletIcon } from "lucide-react";
-import { alpha, squad } from "@/features/squad/constants";
-import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
+import type { ReactNode } from "react";
+import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut, ShieldAlert, Smartphone } from "lucide-react";
 import { BottomNav } from "@/features/squad/components/bottom-nav";
+import { alpha, cardShadow, squad } from "@/features/squad/constants";
+import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
+
+function verificationTone(status: string) {
+  if (status === "verified") return { bg: alpha("#15A46B", 0.12), color: "#12885A", label: "Verified profile" };
+  if (status === "pending") return { bg: alpha("#D28B11", 0.14), color: "#B6790E", label: "Verification in review" };
+  if (status === "rejected") return { bg: alpha(squad.destructive, 0.12), color: squad.destructive, label: "Action required" };
+  return { bg: alpha(squad.accent, 0.1), color: squad.accent, label: "Not verified" };
+}
 
 export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { derived, actions } = squadApp;
@@ -12,132 +20,172 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const verification = verificationTone(account.profile.verificationStatus);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
-        <div className="mb-4 text-xl font-extrabold tracking-tight">Profile</div>
+      <div className="flex-1 overflow-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
+        <div className="mb-4 text-[1.3rem] font-black tracking-tight">Profile</div>
 
-        <div className="mb-5 flex flex-col items-center text-center">
-          <div
-            className="mb-2.5 flex size-16 items-center justify-center rounded-full border text-lg font-bold"
-            style={{ background: squad.cardAlt, borderColor: squad.border, color: squad.accent }}
-          >
-            {initials || "SQ"}
+        <div className="mb-4 rounded-[28px] border px-5 py-5" style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}>
+          <div className="mb-4 flex items-center gap-4">
+            <div
+              className="flex size-16 items-center justify-center rounded-full border text-lg font-black"
+              style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.18), color: squad.accent }}
+            >
+              {initials || "SQ"}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[1.05rem] font-black">{account.profile.fullName || "SQUAD user"}</div>
+              <div className="mt-1 text-[12px] font-semibold" style={{ color: squad.textMuted }}>
+                @{account.profile.username}
+              </div>
+              {account.profile.phone ? (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: squad.textFaint }}>
+                  {account.profile.phone}
+                </div>
+              ) : null}
+            </div>
           </div>
-          <div className="text-[15px] font-bold">{account.profile.fullName || "SQUAD user"}</div>
-          <div className="mb-2 font-mono text-[12px]" style={{ color: squad.textMuted }}>
-            @{account.profile.username}
-          </div>
+
           <div
-            className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
-            style={{
-              background: alpha(account.profile.isProfessional ? squad.subtle : squad.accent, 0.16),
-              color: account.profile.isProfessional ? squad.subtle : squad.accent,
-            }}
+            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black"
+            style={{ background: verification.bg, color: verification.color }}
           >
-            {account.profile.isProfessional ? "Mode Professionnel" : "Personal account"}
+            <BadgeCheck className="size-4" />
+            <span>{verification.label}</span>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={actions.openAccountSwitcher}
-          className="mb-4 flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left"
-          style={{ background: alpha(squad.subtle, 0.08), borderColor: alpha(squad.subtle, 0.25) }}
-        >
-          <span className="flex items-center gap-2.5 text-[13px] font-semibold" style={{ color: squad.subtle }}>
-            <Repeat className="size-4" />
-            Preview as another account (demo)
-          </span>
-          <ChevronRight className="size-3.5" style={{ color: squad.subtle }} />
-        </button>
-
-        {account.profile.isProfessional && account.profile.matriculeFiscal && (
-          <div
-            className="mb-4 flex items-center justify-between rounded-2xl border px-4 py-3"
-            style={{ background: squad.card, borderColor: squad.border }}
-          >
-            <span className="text-[11.5px]" style={{ color: squad.textMuted }}>
-              Matricule Fiscal
-            </span>
-            <span className="font-mono text-[12px] font-semibold">{account.profile.matriculeFiscal}</span>
-          </div>
-        )}
-
-        <div className="mb-4 rounded-2xl border p-3 text-center" style={{ background: squad.card, borderColor: squad.border }}>
-          <div className="font-mono text-base font-bold">{account.wallets.length}</div>
-          <div className="mt-0.5 text-[10px]" style={{ color: squad.textMuted }}>
-            Linked accounts
-          </div>
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <InfoTile label="Destinations" value={String(account.wallets.length)} />
+          <InfoTile label="Unread alerts" value={String(derived.unreadNotifications)} />
         </div>
 
         <div className="mb-4 flex flex-col gap-2">
-          <div
-            className="flex items-center justify-between rounded-2xl border px-4 py-3"
-            style={{ background: squad.card, borderColor: squad.border }}
-          >
-            <span className="flex items-center gap-2.5 text-[13px] font-semibold">
-              <WalletIcon className="size-4" style={{ color: squad.textMuted }} />
-              Linked Accounts
-            </span>
-            <span className="text-xs" style={{ color: squad.textFaint }}>
-              {account.wallets.length} active
-            </span>
-          </div>
-          {account.profile.isProfessional && (
-            <button
-              type="button"
-              onClick={actions.goInvoices}
-              className="flex items-center justify-between rounded-2xl border px-4 py-3 text-left"
-              style={{ background: squad.card, borderColor: squad.border }}
-            >
-              <span className="flex items-center gap-2.5 text-[13px] font-semibold">
-                <FileText className="size-4" style={{ color: squad.textMuted }} />
-                Invoices (El Fatoora)
-              </span>
-              <span className="flex items-center gap-1 text-xs font-bold" style={{ color: squad.subtle }}>
-                {account.invoices.length} <ChevronRight className="size-3.5" />
-              </span>
-            </button>
-          )}
+          <LinkCard
+            href="/verify-identity"
+            icon={<Landmark className="size-4" style={{ color: squad.accent }} />}
+            label="Identity verification"
+            value={account.profile.verificationStatus}
+          />
+          <ActionCard
+            icon={<Bell className="size-4" style={{ color: squad.accent }} />}
+            label="Notification center"
+            value={`${derived.unreadNotifications} unread`}
+            onClick={actions.goNotifications}
+          />
+          <ActionCard
+            icon={<CreditCard className="size-4" style={{ color: squad.accent }} />}
+            label="Payment routes"
+            value={derived.sourceWallet?.name ?? "None"}
+            onClick={actions.goHome}
+          />
         </div>
 
-        <div
-          className="mb-4 rounded-2xl border p-3.5"
-          style={{ background: alpha(squad.subtle, 0.08), borderColor: alpha(squad.subtle, 0.25) }}
-        >
-          <div className="mb-1.5 flex items-center gap-2">
-            <ShieldAlert className="size-3.5" style={{ color: squad.subtle }} />
-            <span className="text-[12px] font-bold">Regulatory Sandbox Pilot</span>
+        <div className="mb-4 rounded-[24px] border p-4" style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.15) }}>
+          <div className="mb-2 flex items-center gap-2">
+            <Smartphone className="size-4" style={{ color: squad.accent }} />
+            <span className="text-[12px] font-black">Mobile-first identity</span>
           </div>
           <p className="text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
-            You&apos;re a volunteer participant in a Banque Centrale de
-            Tunisie regulatory sandbox test of SQUAD&apos;s routing service.
-            SQUAD never holds funds; all transfers execute in your own
-            banking app.
+            Your phone, handle, verification status, and public routing destinations stay synced with Supabase.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={actions.logout}
-          className="flex items-center justify-between rounded-2xl border px-4 py-3 text-left"
-          style={{ background: squad.card, borderColor: alpha(squad.destructive, 0.3) }}
-        >
-          <span className="flex items-center gap-2.5 text-[13px] font-semibold" style={{ color: squad.destructive }}>
-            <LogOut className="size-4" />
-            Log Out
-          </span>
-        </button>
+        <div className="mb-4 rounded-[24px] border p-4" style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.15) }}>
+          <div className="mb-2 flex items-center gap-2">
+            <ShieldAlert className="size-4" style={{ color: squad.accent }} />
+            <span className="text-[12px] font-black">Zero-liability routing</span>
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
+            SQUAD never holds your funds. Even after verification, the final transfer still executes in your bank or wallet app.
+          </p>
+        </div>
+
+        <form action="/auth/logout" method="post">
+          <button
+            type="submit"
+            className="flex w-full items-center justify-between rounded-[22px] border px-4 py-3 text-left"
+            style={{ background: squad.card, borderColor: alpha(squad.destructive, 0.22), boxShadow: cardShadow }}
+          >
+            <span className="flex items-center gap-2.5 text-[13px] font-semibold" style={{ color: squad.destructive }}>
+              <LogOut className="size-4" />
+              Log out
+            </span>
+          </button>
+        </form>
       </div>
-      <BottomNav
-        active="profile"
-        onHome={actions.goHome}
-        onSend={actions.goGenerateIntent}
-        onActivity={actions.goActivity}
-        onProfile={actions.goProfile}
-      />
+      <BottomNav active="profile" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
+    </div>
+  );
+}
+
+function LinkCard({
+  href,
+  icon,
+  label,
+  value,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="flex items-center justify-between rounded-[22px] border px-4 py-3 text-left"
+      style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
+    >
+      <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+        {icon}
+        {label}
+      </span>
+      <span className="flex items-center gap-1 text-xs font-bold capitalize" style={{ color: squad.textFaint }}>
+        {value} <ChevronRight className="size-3.5" />
+      </span>
+    </a>
+  );
+}
+
+function ActionCard({
+  icon,
+  label,
+  value,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-between rounded-[22px] border px-4 py-3 text-left"
+      style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
+    >
+      <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+        {icon}
+        {label}
+      </span>
+      <span className="flex items-center gap-1 text-xs font-bold capitalize" style={{ color: squad.textFaint }}>
+        {value} <ChevronRight className="size-3.5" />
+      </span>
+    </button>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border px-4 py-4" style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}>
+      <div className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
+        {label}
+      </div>
+      <div className="mt-1 text-[13px] font-black">{value}</div>
     </div>
   );
 }

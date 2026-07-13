@@ -1,51 +1,43 @@
 # Tech Stack
 
-This is a **Next.js 16 App Router** PWA. Next.js 16 is recent enough (released
-2025) that generic training knowledge about "Next.js" is frequently wrong for
-this repo — see the version notes below before assuming anything.
+This is a **Next.js 16 App Router** PWA. Next.js 16 is recent enough that
+generic training knowledge about "Next.js" is often wrong for this repo, so
+check the local docs under `node_modules/next/dist/docs/` before assuming an
+older pattern still applies.
 
 ## Core
 
 | Layer | Choice | Notes |
 | --- | --- | --- |
-| Framework | Next.js 16.2 (App Router) | **Turbopack is the default bundler** for both `next dev` and `next build` — there is no webpack fallback configured. Do not add `next.config.js` webpack customizations expecting them to run; they won't under Turbopack. |
-| Package manager | **pnpm** | Never use `npm install` / `yarn add` — it will create a second lockfile and desync `node_modules`. Always `pnpm add` / `pnpm add -D`. |
-| Language | TypeScript, strict mode | `tsconfig.json` includes `"webworker"` in `lib` alongside `"dom"` — this is required for `src/app/sw.ts` to type-check and is intentional, not a mistake to "clean up". |
-| UI library | React 19 | Server Components by default; add `"use client"` only where interactivity/hooks/browser APIs are needed. |
-| Styling | Tailwind CSS v4 | Config lives in CSS (`src/app/globals.css`) via `@theme inline`, not a `tailwind.config.ts` file. There is no JS Tailwind config to edit. |
-| Components | shadcn/ui (`radix` base, `nova` preset) | See [05-styling-ui.md](./05-styling-ui.md). |
-| Theming | `next-themes` | Class-based dark mode (`.dark` on `<html>`), not a custom context. |
-| Validation | `zod` (v4) | Used for env validation in `src/config/env.ts`. |
-| Toasts | `sonner` (via shadcn wrapper) | `src/components/ui/sonner.tsx` — themed automatically from `next-themes`. |
-| Offline / installability | `@serwist/turbopack` + `serwist` | **Not** `next-pwa`, **not** `@serwist/next` (webpack-based). See [03-pwa.md](./03-pwa.md) for why this distinction matters. |
-| Request interception | `proxy.ts` | **Not** `middleware.ts`. Next.js 16 renamed the file convention; the old name is deprecated. See [04-routing-and-proxy.md](./04-routing-and-proxy.md). |
+| Framework | Next.js 16.2 (App Router) | **Turbopack is the default bundler** for both `next dev` and `next build`. Do not add webpack-specific config expecting it to run. |
+| Package manager | **pnpm** | Never use `npm install` or `yarn add`. Keep one lockfile. |
+| Language | TypeScript, strict mode | `tsconfig.json` intentionally includes `"webworker"` alongside `"dom"` so `src/app/sw.ts` continues to type-check. |
+| UI library | React 19 | Server Components by default; add `"use client"` only where hooks/browser APIs are required. |
+| Styling | Tailwind CSS v4 | Theme config lives in `src/app/globals.css` via `@theme inline`, not in a JS Tailwind config file. |
+| Components | shadcn/ui (`radix` base, `nova` preset) | Use the CLI for new primitives; generated components rely on repo-specific CSS variables and tokens. |
+| Theming | `next-themes` | Theme stays forced light for the current white/pink/orange mobile fintech UI. |
+| Validation | `zod` v4 | Used for env validation and auth input parsing. |
+| Auth/session | Supabase Auth + `@supabase/ssr` | The MVP keeps a phone-first OTP UX, but the actual session is bridged through server-controlled Supabase auth helpers under `src/lib/supabase/**`; session refresh also happens in `src/proxy.ts`. |
+| Database | Supabase Postgres | User identity lives in `public.profiles`; linked destinations, payment transactions, and notifications live in Supabase too. Schema changes belong in `supabase/migrations/**`. |
+| QR routing | Server-minted signed tokens | Rotating receive QR codes are minted server-side and HMAC-signed before `/api/qr/resolve` exposes recipient routing data; the same signed payload also powers the 3-digit nearby handoff flow. |
+| Identity verification | Didit | KYC launch/session creation and webhook syncing live under `src/app/api/didit/**`; white-label styling is primarily configured in Didit's dashboard, while the workflow id can be supplied via `DIDIT_WORKFLOW_ID` and is not treated as a secret. |
+| Toasts | `sonner` | Wired through the shadcn wrapper in `src/components/ui/sonner.tsx`. |
+| Offline / installability | `@serwist/turbopack` + `serwist` | **Not** `next-pwa`, and **not** `@serwist/next` (webpack-based). |
+| Request interception | `proxy.ts` | **Not** `middleware.ts`. Next.js 16 renamed the file convention. |
 
 ## Version-sensitive facts an agent is likely to get wrong
 
-- **Turbopack is default**, not opt-in. `package.json` scripts explicitly pass
-  `--turbopack` to `dev`/`build` for clarity, but even without the flag it's
-  the default in this Next.js version.
-- **`middleware.ts` does not exist in this repo on purpose.** The file is
-  `src/proxy.ts`, exporting `function proxy(request)` instead of
-  `function middleware(request)`. Same runtime, same `config.matcher` API —
-  only the name changed. Do not "restore" a `middleware.ts`.
-- **shadcn's CLI is not the old `npx shadcn-ui@latest add button` flow.** This
-  repo uses `shadcn@latest` (package renamed) with a `components.json` that
-  has a `style: "radix-nova"` and a `preset` concept that didn't exist in
-  older shadcn docs/training data. Run `pnpm dlx shadcn@latest add <component>`
-  to add new primitives — don't hand-write shadcn components from memory, the
-  generated ones use project-specific CSS variables (`--card-spacing`, OKLCH
-  colors, etc.) that hand-written versions will miss.
-- **Serwist's classic `withSerwistInit` / `@serwist/next` (webpack plugin)
-  will not work here** — this project has no webpack build path. The
-  Turbopack-native integration is `@serwist/turbopack`, a distinct package
-  with a distinct API (`withSerwist`, `createSerwistRoute`,
-  `@serwist/turbopack/worker`, `@serwist/turbopack/react`). Don't mix the two.
+- **Turbopack is default**, not opt-in. The scripts pass `--turbopack`
+  explicitly, but the project is not maintaining a webpack fallback path.
+- **`middleware.ts` does not belong here.** The file is `src/proxy.ts`,
+  exporting `proxy(request)`.
+- **shadcn's CLI is the current `shadcn` package**, not the older
+  `shadcn-ui` package name. Use `pnpm dlx shadcn@latest add <component>`.
+- **Serwist must stay on the Turbopack-native integration.** Do not swap in
+  webpack-only PWA packages to "fix" build or service worker issues.
 - **`app/manifest.ts` is served at `/manifest.webmanifest`**, not
-  `/manifest.json`. The root layout's `metadata.manifest` must match.
-- Icons (`icon-192.png`, `icon-512.png`, `icon-512-maskable.png`) are
-  **generated at request/build time** via `next/og`'s `ImageResponse`, not
-  static files in `public/`. If you want to change how they look, edit the
-  route handlers under `src/app/icon-*.png/route.tsx` — don't drop PNGs into
-  `public/` and expect them to be picked up (the manifest points at the
-  routes).
+  `/manifest.json`.
+- **Manifest icons are generated route handlers**, not static PNG files under
+  `public/`.
+- **Supabase env access is centralized.** Import `env` from
+  `src/config/env.ts`; do not read `process.env` directly throughout the app.
