@@ -1,3 +1,6 @@
 import { env } from "@/config/env";
 
-export const DEMO_OTP_ASSIST_ENABLED = env.NODE_ENV !== "production";
+export const DUMMY_PHONE_OTP_ENABLED =
+  env.DUMMY_PHONE_OTP_ENABLED ? env.DUMMY_PHONE_OTP_ENABLED === "true" : env.NODE_ENV !== "production";
+
+export const DEMO_OTP_ASSIST_ENABLED = DUMMY_PHONE_OTP_ENABLED;

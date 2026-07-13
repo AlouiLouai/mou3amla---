@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { DEMO_OTP_ASSIST_ENABLED } from "@/config/auth";
+import { DEMO_OTP_ASSIST_ENABLED, DUMMY_PHONE_OTP_ENABLED } from "@/config/auth";
 import { env } from "@/config/env";
 import { buildDisplayName, landingInputSchema, normalizePhoneForAuth, otpInputSchema } from "@/features/auth/lib/identity";
 import { clearDemoOtpCookie, setDemoOtpCookie } from "@/features/auth/server/demo-otp";
@@ -127,9 +127,9 @@ export async function startPhoneAuth(
   }
 
   let profileId = phoneMatch?.id ?? usernameMatch?.id ?? null;
-  const demoOtp = DEMO_OTP_ASSIST_ENABLED ? buildDemoOtp(phone, username) : null;
-  const demoBridgePassword = DEMO_OTP_ASSIST_ENABLED ? buildDemoBridgePassword(phone, username) : null;
-  const demoBridgeEmail = DEMO_OTP_ASSIST_ENABLED ? buildDemoBridgeEmail(phone, username) : null;
+  const demoOtp = DUMMY_PHONE_OTP_ENABLED ? buildDemoOtp(phone, username) : null;
+  const demoBridgePassword = DUMMY_PHONE_OTP_ENABLED ? buildDemoBridgePassword(phone, username) : null;
+  const demoBridgeEmail = DUMMY_PHONE_OTP_ENABLED ? buildDemoBridgeEmail(phone, username) : null;
 
   if (demoOtp) {
     await setDemoOtpCookie({ phone, username, otp: demoOtp });
@@ -238,6 +238,11 @@ export async function verifyPhoneOtp(
   }
 
   const isDemoMatch = DEMO_OTP_ASSIST_ENABLED && expectedDemoOtp && parsed.data.otp === expectedDemoOtp;
+  if (!DUMMY_PHONE_OTP_ENABLED) {
+    return {
+      message: "Dummy OTP is disabled in this environment. Configure a real SMS OTP rail or re-enable the demo bridge.",
+    };
+  }
 
   if (!isDemoMatch) {
     return {

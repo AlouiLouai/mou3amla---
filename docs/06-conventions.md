@@ -50,6 +50,8 @@ Do not place `"use server"` functions inside client component files.
 - In the current MVP, the OTP is intentionally dummy/local: the user still
   experiences a phone-first OTP flow, but no real SMS provider or Supabase
   Phone setup is required.
+- Production-like tester deployments can keep that MVP auth rail enabled with
+  `DUMMY_PHONE_OTP_ENABLED=true` until a real SMS provider replaces it.
 - While the SMS provider is still provisional, the verify screen may surface a
   demo OTP-assist toast that pastes the current 6-digit code and submits it in
   one tap. Treat this as temporary MVP behavior, not production security.
@@ -104,6 +106,7 @@ Read this before "fixing" something that looks incomplete:
   `NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`,
+  `DUMMY_PHONE_OTP_ENABLED`,
   `QR_TOKEN_SECRET`,
   `DIDIT_API_KEY`,
   `DIDIT_WORKFLOW_ID`,
