@@ -36,6 +36,7 @@ src/
 
     onboarding/           # Post-login identity verification UX
       components/         # verification-flow-screen.tsx
+      server/             # Didit session status sync helpers
 
     wallets/              # Destination linking only; never balances
       components/
@@ -84,7 +85,8 @@ supabase/
   `src/features/auth/server/dal.ts`, not inside pages.
 - **Supabase client setup** belongs to `src/lib/supabase/**`.
 - **Didit identity verification** belongs to the `onboarding` feature for UI
-  and `src/app/api/didit/**` for server-side integration.
+  and `src/app/api/didit/**` for server-side integration, with shared sync
+  helpers under `src/features/onboarding/server/**`.
 - **Signed QR and nearby discovery** belong to the `payments` feature for UI
   and helpers, with thin route handlers under `src/app/api/qr/**` and
   `src/app/api/nearby/**`.

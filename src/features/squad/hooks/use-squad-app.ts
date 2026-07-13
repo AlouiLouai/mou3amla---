@@ -57,6 +57,7 @@ function initialState(initialUser?: InitialSquadUser): SquadState {
       isProfessional: false,
       verificationStatus: initialUser?.verificationStatus ?? "unverified",
       diditLatestStatus: initialUser?.diditLatestStatus ?? null,
+      diditSessionId: initialUser?.diditSessionId ?? null,
     },
     wallets: initialUser?.wallets ?? [],
     sourceWalletId: initialUser?.sourceWalletId ?? "",
@@ -91,6 +92,91 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (state.profile.verificationStatus !== "pending" || !state.profile.diditSessionId) {
+      return;
+    }
+
+    const activeTimers = timers.current;
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const schedulePoll = () => {
+      if (cancelled || attempts >= 10) {
+        return;
+      }
+
+      pollTimer = setTimeout(() => {
+        void pollStatus();
+      }, attempts === 0 ? 2500 : 12000);
+      activeTimers.add(pollTimer);
+    };
+
+    const pollStatus = async () => {
+      attempts += 1;
+
+      try {
+        const response = await fetch("/api/didit/status", {
+          method: "GET",
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as {
+          profile?: {
+            verificationStatus: SquadState["profile"]["verificationStatus"];
+            diditLatestStatus: string | null;
+            diditSessionId: string | null;
+          };
+        };
+
+        if (!response.ok || !payload.profile || cancelled) {
+          schedulePoll();
+          return;
+        }
+
+        const currentProfile = stateRef.current.profile;
+        const nextProfile = payload.profile;
+        const statusChanged = currentProfile.verificationStatus !== nextProfile.verificationStatus;
+        const latestChanged = currentProfile.diditLatestStatus !== nextProfile.diditLatestStatus;
+
+        if (statusChanged || latestChanged) {
+          dispatch((s) => ({
+            profile: {
+              ...s.profile,
+              verificationStatus: nextProfile.verificationStatus,
+              diditLatestStatus: nextProfile.diditLatestStatus,
+              diditSessionId: nextProfile.diditSessionId,
+            },
+          }));
+
+          if (currentProfile.verificationStatus !== "verified" && nextProfile.verificationStatus === "verified") {
+            toast.success("Identity verified. RIB linking is now unlocked.");
+          }
+
+          if (currentProfile.verificationStatus !== "rejected" && nextProfile.verificationStatus === "rejected") {
+            toast.error("Didit requested another verification attempt.");
+          }
+        }
+
+        if (nextProfile.verificationStatus === "pending") {
+          schedulePoll();
+        }
+      } catch {
+        schedulePoll();
+      }
+    };
+
+    schedulePoll();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        activeTimers.delete(pollTimer);
+      }
+    };
+  }, [state.profile.diditSessionId, state.profile.verificationStatus]);
 
   const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false }), []);
   const goActivity = useCallback(() => dispatch({ screen: "activity" }), []);

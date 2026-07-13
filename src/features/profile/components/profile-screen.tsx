@@ -21,6 +21,8 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
     .slice(0, 2)
     .toUpperCase();
   const verification = verificationTone(account.profile.verificationStatus);
+  const isVerificationSyncing =
+    account.profile.verificationStatus === "pending" && Boolean(account.profile.diditSessionId);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -56,6 +58,11 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
             <BadgeCheck className="size-4" />
             <span>{verification.label}</span>
           </div>
+          {isVerificationSyncing ? (
+            <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: squad.subtle }}>
+              Didit status refresh is running in the background.
+            </div>
+          ) : null}
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">

@@ -19,12 +19,12 @@ export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
 
   return (
     <div
-      className="h-[100dvh] w-full overflow-hidden font-sans antialiased"
+      className="min-h-[100dvh] w-full overflow-hidden font-sans antialiased"
       style={{ background: squad.bg, color: squad.text }}
     >
-      <div className="mx-auto h-[100dvh] w-full max-w-md overflow-hidden px-0 sm:py-3">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-md overflow-hidden px-0 sm:min-h-0 sm:py-3">
         <div
-          className="relative flex h-full flex-col overflow-hidden sm:rounded-[36px]"
+          className="relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
           style={{
             background: squad.surface,
             boxShadow: "0 24px 80px rgba(255,0,131,0.10), 0 10px 24px rgba(0,0,0,0.08)",

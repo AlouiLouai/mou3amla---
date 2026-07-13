@@ -58,6 +58,8 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const verification = verificationCopy(account.profile.verificationStatus);
   const VerificationIcon = verification.icon;
   const latestNotification = account.notifications[0] ?? null;
+  const isVerificationSyncing =
+    account.profile.verificationStatus === "pending" && Boolean(account.profile.diditSessionId);
   const initials = account.profile.fullName
     .split(" ")
     .map((part) => part[0])
@@ -147,6 +149,11 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
                     <p className="mt-1 text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
                       {verification.body}
                     </p>
+                    {isVerificationSyncing ? (
+                      <div className="mt-2 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: verification.tone }}>
+                        Auto-refreshing Didit status
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

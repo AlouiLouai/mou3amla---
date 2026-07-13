@@ -1,13 +1,22 @@
 import Link from "next/link";
+import { env } from "@/config/env";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
-import { requireCurrentAppUser } from "@/features/auth/server/dal";
+import { getCurrentAppUserFresh, requireCurrentAppUserFresh } from "@/features/auth/server/dal";
+import { syncDiditSessionStatus } from "@/features/onboarding/server/didit";
 
 type VerifyIdentityReturnPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export default async function VerifyIdentityReturnPage(props: VerifyIdentityReturnPageProps) {
-  const [user, searchParams] = await Promise.all([requireCurrentAppUser(), props.searchParams]);
+  let user = await requireCurrentAppUserFresh();
+  const searchParams = await props.searchParams;
+
+  if (env.DIDIT_API_KEY && user.diditSessionId && user.verificationStatus !== "verified") {
+    await syncDiditSessionStatus(user.diditSessionId, user.id);
+    user = (await getCurrentAppUserFresh()) ?? user;
+  }
+
   const hintedStatus = typeof searchParams.status === "string" ? searchParams.status : user.diditLatestStatus;
 
   return (
@@ -24,7 +33,7 @@ export default async function VerifyIdentityReturnPage(props: VerifyIdentityRetu
         </div>
         <h1 className="mb-2 text-[1.8rem] font-black leading-none">Back inside SQUAD.</h1>
         <p className="mb-4 text-[12px] leading-relaxed" style={{ color: squad.textMuted }}>
-          This page is only a return checkpoint. The final trusted verification state still comes from the Didit webhook.
+          This page re-checks your Didit session when you land back in SQUAD, then keeps the webhook as the background source of truth.
         </p>
 
         <div

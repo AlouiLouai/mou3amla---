@@ -12,6 +12,7 @@ export default async function HomePage() {
         displayName: user.displayName,
         verificationStatus: user.verificationStatus,
         diditLatestStatus: user.diditLatestStatus,
+        diditSessionId: user.diditSessionId,
         wallets: user.wallets,
         sourceWalletId: user.sourceWalletId,
         activityLog: user.activityLog,

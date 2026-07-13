@@ -1,8 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { env } from "@/config/env";
-import type { VerificationStatus } from "@/features/auth/types";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { applyDiditPayload } from "@/features/onboarding/server/didit";
 
 type DiditWebhookPayload = {
   event_id?: string;
@@ -65,25 +64,6 @@ function safeEqual(expected: string, provided: string | null): boolean {
   return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-function mapDiditStatus(status: string | null): VerificationStatus {
-  switch (status) {
-    case "Approved":
-      return "verified";
-    case "Declined":
-    case "Expired":
-    case "Abandoned":
-    case "Kyc Expired":
-      return "rejected";
-    case "Not Started":
-    case "In Progress":
-    case "Awaiting User":
-    case "Resubmitted":
-    case "In Review":
-    default:
-      return "pending";
-  }
-}
-
 function extractField(payload: DiditWebhookPayload, key: "session_id" | "status" | "vendor_data" | "webhook_type") {
   if (typeof payload[key] === "string") return payload[key] as string;
   if (payload.data && typeof payload.data[key] === "string") return payload.data[key] as string;
@@ -101,10 +81,16 @@ export async function POST(request: Request) {
   }
 
   const rawBody = await request.text();
-  const payload = JSON.parse(rawBody) as DiditWebhookPayload;
+  let payload: DiditWebhookPayload;
+
+  try {
+    payload = JSON.parse(rawBody) as DiditWebhookPayload;
+  } catch {
+    return NextResponse.json({ error: "Invalid Didit JSON payload" }, { status: 400 });
+  }
+
   const sessionId = extractField(payload, "session_id");
   const status = extractField(payload, "status");
-  const vendorData = extractField(payload, "vendor_data");
   const webhookType = extractField(payload, "webhook_type") ?? "status.updated";
 
   const v2Expected = createHmac("sha256", env.DIDIT_WEBHOOK_SECRET)
@@ -123,19 +109,19 @@ export async function POST(request: Request) {
     safeEqual(rawExpected, request.headers.get("x-signature")) ||
     (simpleExpected ? safeEqual(simpleExpected, request.headers.get("x-signature-simple")) : false);
 
-  if (!verified || !vendorData || !status) {
+  if (!verified || !status) {
     return NextResponse.json({ error: "Invalid webhook signature or payload" }, { status: 401 });
   }
 
-  const admin = createAdminClient();
-  await admin
-    .from("profiles")
-    .update({
-      verification_status: mapDiditStatus(status),
-      didit_latest_status: status,
-      didit_session_id: sessionId,
-    })
-    .eq("id", vendorData);
+  const result = await applyDiditPayload(payload);
 
-  return NextResponse.json({ ok: true });
+  if (!result.matched) {
+    console.warn("[didit:webhook] verified payload did not match any profile", {
+      sessionId,
+      status,
+      webhookType,
+    });
+  }
+
+  return NextResponse.json({ ok: true, matched: result.matched });
 }

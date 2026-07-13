@@ -124,13 +124,33 @@
 
   body {
     @apply bg-background text-foreground;
+    min-height: 100dvh;
     background-image:
       radial-gradient(circle at top right, rgba(255, 0, 131, 0.1), transparent 28%),
       radial-gradient(circle at bottom left, rgba(255, 141, 40, 0.12), transparent 26%);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: contain;
+    text-rendering: optimizeLegibility;
   }
 
   html {
     @apply font-sans;
+    background: var(--background);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  button,
+  [role="button"],
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1,
@@ -140,6 +160,17 @@
   h5,
   h6 {
     font-family: var(--font-syne);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

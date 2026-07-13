@@ -69,6 +69,10 @@ Do not place `"use server"` functions inside client component files.
   entry points.
 - Keep the local database state `unverified` or `pending` until Didit's
   callback/webhook confirms approval.
+- The Didit return page may do a server-side status re-check by
+  `didit_session_id`, and the authenticated shell may poll `/api/didit/status`
+  while a session is still pending. This improves resilience, but the signed
+  webhook remains the long-lived background sync rail.
 - 20-digit RIB binding stays locked unless `verificationStatus === "verified"`.
 - White-label/brand adjustments for Didit screens are mainly controlled in the
   Didit dashboard, while session launch/webhook handling stays in code.

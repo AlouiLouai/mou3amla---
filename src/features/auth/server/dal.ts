@@ -158,7 +158,7 @@ function buildActivityItem(
   };
 }
 
-export const getSessionIdentity = cache(async () => {
+async function loadSessionIdentity() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -170,10 +170,12 @@ export const getSessionIdentity = cache(async () => {
     userId: data.claims.sub,
     phone: typeof data.claims.phone === "string" ? data.claims.phone : null,
   };
-});
+}
 
-export const getCurrentAppUser = cache(async (): Promise<AuthenticatedAppUser | null> => {
-  const identity = await getSessionIdentity();
+export const getSessionIdentity = cache(loadSessionIdentity);
+
+async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
+  const identity = await loadSessionIdentity();
 
   if (!identity) {
     return null;
@@ -253,10 +255,26 @@ export const getCurrentAppUser = cache(async (): Promise<AuthenticatedAppUser | 
     notifications,
     invoices: [],
   };
-});
+}
+
+export const getCurrentAppUser = cache(loadCurrentAppUser);
+
+export async function getCurrentAppUserFresh() {
+  return loadCurrentAppUser();
+}
 
 export async function requireCurrentAppUser() {
   const user = await getCurrentAppUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  return user;
+}
+
+export async function requireCurrentAppUserFresh() {
+  const user = await getCurrentAppUserFresh();
 
   if (!user) {
     redirect("/");

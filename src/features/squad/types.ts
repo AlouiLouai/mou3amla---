@@ -26,6 +26,7 @@ export interface UserProfile {
   isProfessional: boolean;
   verificationStatus: VerificationStatus;
   diditLatestStatus?: string | null;
+  diditSessionId?: string | null;
   matriculeFiscal?: string;
 }
 
@@ -35,6 +36,7 @@ export interface InitialSquadUser {
   displayName: string;
   verificationStatus: VerificationStatus;
   diditLatestStatus: string | null;
+  diditSessionId: string | null;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];
