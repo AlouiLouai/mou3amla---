@@ -1,44 +1,47 @@
-export type Screen = "auth" | "otp" | "home" | "kyc" | "transfer" | "activity" | "profile";
+import type { LinkedWallet } from "@/features/wallets/types";
+import type { PaymentIntent, QrToken, ConfettiPiece } from "@/features/payments/types";
+import type { Invoice } from "@/features/invoices/types";
+import type { ActivityItem } from "@/features/activity/types";
+
+export type { ConfettiPiece };
+
+export type Screen =
+  | "auth"
+  | "otp"
+  | "profile-setup"
+  | "home"
+  | "wallet-registry"
+  | "generate-intent"
+  | "receive-qr"
+  | "scan-qr"
+  | "intent-result"
+  | "activity"
+  | "invoices"
+  | "profile";
+
 export type AuthMode = "signup" | "signin";
-export type KycStep = "intro" | "front" | "back" | "liveness" | "processing" | "success";
-export type TransferRole = "send" | "receive";
-export type TransferStep = "input" | "transmit" | "handshake" | "biometric" | "success";
 
-export interface Wallet {
-  id: string;
-  name: string;
-  tag: string;
-  balance: number;
-  network: string;
-  color: string;
-  initials: string;
+export interface UserProfile {
+  username: string;
+  fullName: string;
+  isProfessional: boolean;
+  matriculeFiscal?: string;
 }
 
-export interface Provider {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-  network: string;
-  subtitle: string;
-  /** Balance seeded when a coworker links this provider in the demo flow. */
-  mockBalance: number;
-}
+/**
+ * There is exactly one real identity per person in production. `AccountId`
+ * only exists so this prototype can be demoed as a real two-sided payment —
+ * "me" (created via onboarding) and "ahmed" (a pre-seeded counterpart) —
+ * without needing a second device or a backend. See docs/06-conventions.md.
+ */
+export type AccountId = "me" | "ahmed";
 
-export interface ActivityItem {
-  id: string;
-  type: TransferRole;
-  counterparty: string;
-  wallet: string;
-  amount: number;
-  date: string;
-}
-
-export interface ConfettiPiece {
-  left: string;
-  delay: string;
-  dur: string;
-  color: string;
+export interface AccountState {
+  profile: UserProfile;
+  wallets: LinkedWallet[];
+  sourceWalletId: string;
+  activityLog: ActivityItem[];
+  invoices: Invoice[];
 }
 
 export interface SquadState {
@@ -46,18 +49,21 @@ export interface SquadState {
   authMode: AuthMode;
   phoneInput: string;
   otpInput: string;
-  verified: boolean;
-  kycStep: KycStep;
-  kycSessionId: string;
+  onboarded: boolean;
+  fullNameInput: string;
+  matriculeFiscalInput: string;
   linkOpen: boolean;
+  linkStep: "provider" | "identifier";
+  linkProviderId: string | null;
+  linkIdentifierInput: string;
   linkConnectingId: string | null;
-  wallets: Wallet[];
-  transferRole: TransferRole;
-  transferStep: TransferStep;
-  sourceWalletId: string;
+  recipientInput: string;
   amount: string;
-  handshakeIndex: number;
-  txId: string;
-  activityLog: ActivityItem[];
+  currentIntent: PaymentIntent | null;
+  qrToken: QrToken | null;
+  scanManualInput: string;
   confetti: ConfettiPiece[];
+  accounts: Record<AccountId, AccountState>;
+  activeAccountId: AccountId;
+  accountSwitcherOpen: boolean;
 }

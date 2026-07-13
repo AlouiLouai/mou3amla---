@@ -1,6 +1,6 @@
 import React from "react";
 
-export function WalletIcon({ id, className, initials, color }: { id: string; className?: string; initials: string; color: string }) {
+export function WalletIcon({ id, className, initials }: { id: string; className?: string; initials: string }) {
     if (id === "flouci") {
         // Flouci: abstract infinity/f loop
         return (
@@ -11,8 +11,8 @@ export function WalletIcon({ id, className, initials, color }: { id: string; cla
             </svg>
         );
     }
-    if (id === "ooredoo") {
-        // Ooredoo: circles
+    if (id === "walletii") {
+        // walletii by Ooredoo: circles
         return (
             <svg viewBox="0 0 24 24" className={className} fill="currentColor">
                 <circle cx="9" cy="12" r="3.5" />
@@ -62,6 +62,25 @@ export function WalletIcon({ id, className, initials, color }: { id: string; cla
             <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="6" width="18" height="12" rx="2" fill="currentColor" fillOpacity="0.2" />
                 <circle cx="16" cy="12" r="2" />
+                <path d="M3 10h18" />
+            </svg>
+        );
+    }
+    if (id === "biat" || id === "amenpay") {
+        // Bank-backed RIB routes: a simple bank/column mark
+        return (
+            <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 10l9-6 9 6" />
+                <path d="M5 10v9M10 10v9M14 10v9M19 10v9" />
+                <path d="M3 19h18" />
+            </svg>
+        );
+    }
+    if (id === "clictopay") {
+        // ClicToPay / SMT: card mark
+        return (
+            <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="6" width="18" height="12" rx="2" />
                 <path d="M3 10h18" />
             </svg>
         );

@@ -44,6 +44,24 @@ structure from drifting.
     uses a `radix-nova` style that generates components with
     project-specific CSS variables — a hand-written "shadcn-style" component
     will look subtly different.
+11. **Never implement real BLE peripheral/advertiser code in this repo.**
+    Web Bluetooth (the only Bluetooth API available to a browser/PWA) can
+    only scan for and connect to devices ("central" role) — a web page
+    cannot make the device advertise itself for others to discover. That
+    requires native code. The BLE indicator in `receive-qr-screen.tsx` is,
+    and must stay, a visual simulation. See
+    [06-conventions.md](./06-conventions.md#mocked-vs-real-boundaries-in-the-squad-feature).
+12. **Never invent or "correct" Tunisian tax/regulatory figures** (Timbre
+    Fiscal stamp duty, Matricule Fiscal format, etc.). `lib/el-fatoora.ts`'s
+    rate is an explicit placeholder — treat it as something to confirm with
+    the user against a real Finance Law/BCT circular, not a fact to silently
+    replace with a different guessed number.
+13. **SQUAD is zero-liability by design — don't reintroduce balances.**
+    `LinkedWallet` stores a destination-only routing identifier
+    (`routingType`/`routingValue`), never a balance or credential. Don't add
+    a "balance" field back, don't call a wallet provider's balance API, and
+    don't ask a user for a PIN/password when linking an account — that's the
+    core regulatory constraint this app is built around.
 
 ## Before you finish a change
 

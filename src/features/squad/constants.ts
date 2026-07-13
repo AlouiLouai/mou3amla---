@@ -1,20 +1,31 @@
-import type { Provider, Wallet } from "@/features/squad/types";
-
-// SQUAD's palette is a fixed dark fintech theme, independent of the app's
-// light/dark shadcn theme — the design is intentionally always-dark.
+// SQUAD's palette: a fixed, deliberately monochrome dark theme — true black
+// background, white text, white primary UI — in the spirit of Instagram's
+// iOS dark mode. Independent of the app's light/dark shadcn theme, which
+// this feature doesn't use (see docs/05-styling-ui.md).
+//
+// This file is intentionally just design tokens — provider/wallet brand
+// colors live in src/features/wallets/constants.ts, not here. Those DO stay
+// colorful (each linked account keeps its own brand tint) the same way
+// Instagram's chrome is black/white but avatars/photos aren't.
 export const squad = {
-  bg: "#08090A",
-  surface: "#0A0B0D",
-  card: "#131417",
-  cardAlt: "#17181C",
-  text: "#F4F5F6",
-  green: "#00FFA0",
-  purple: "#B478FF",
-  red: "#FF6B6B",
-  amber: "#FFC24B",
+  bg: "#000000",
+  surface: "#000000",
+  card: "#1A1A1A",
+  cardAlt: "#262626",
+  border: "rgba(255,255,255,0.1)",
+  borderStrong: "rgba(255,255,255,0.2)",
+  text: "#FFFFFF",
+  textMuted: "rgba(255,255,255,0.55)",
+  textFaint: "rgba(255,255,255,0.35)",
+  /** Primary interactive color — buttons, links, active states. White, not a brand hue. */
+  accent: "#FFFFFF",
+  /** iOS system-gray — secondary badges/emphasis (Pro, sandbox notice, etc.). */
+  subtle: "#8E8E93",
+  /** Reserved for destructive actions only (Log Out, delete) — Instagram does the same in dark mode. */
+  destructive: "#ED4956",
 } as const;
 
-/** e.g. alpha(squad.green, 0.14) -> "rgba(0, 255, 160, 0.14)" */
+/** e.g. alpha(squad.accent, 0.14) -> "rgba(255, 255, 255, 0.14)" */
 export function alpha(hex: string, opacity: number): string {
   const value = parseInt(hex.slice(1), 16);
   const r = (value >> 16) & 255;
@@ -23,111 +34,6 @@ export function alpha(hex: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-export const PROVIDERS: Provider[] = [
-  {
-    id: "flouci",
-    name: "Flouci",
-    initials: "FL",
-    color: squad.green,
-    network: "Flouci · TUNPAY",
-    subtitle: "Mobile Wallet · TUNPAY",
-    mockBalance: 128.75,
-  },
-  {
-    id: "ooredoo",
-    name: "Ooredoo M-Tidjar",
-    initials: "OM",
-    color: squad.purple,
-    network: "Ooredoo · TUNPAY",
-    subtitle: "Mobile Wallet · TUNPAY",
-    mockBalance: 42.5,
-  },
-  {
-    id: "clictopay",
-    name: "e-Dinar · BIAT",
-    initials: "CP",
-    color: squad.text,
-    network: "ClicToPay",
-    subtitle: "Interbank Card · ClicToPay",
-    mockBalance: 615.2,
-  },
-  {
-    id: "walletii",
-    name: "Walletii",
-    initials: "WT",
-    color: squad.amber,
-    network: "Walletii · TUNPAY",
-    subtitle: "Mobile Wallet · TUNPAY",
-    mockBalance: 34.9,
-  },
-  {
-    id: "d17",
-    name: "D17 (La Poste)",
-    initials: "D17",
-    color: "#ECA310", // La Poste Yellow
-    network: "La Poste · TUNPAY",
-    subtitle: "Mobile Wallet · La Poste",
-    mockBalance: 145.2,
-  },
-  {
-    id: "zitounapay",
-    name: "Zitouna Pay",
-    initials: "ZP",
-    color: "#006747", // Zitouna green
-    network: "Banque Zitouna · TUNPAY",
-    subtitle: "Mobile Wallet · TUNPAY",
-    mockBalance: 320.0,
-  },
-  {
-    id: "orangemoney",
-    name: "Orange Money",
-    initials: "ORG",
-    color: "#FF7900", // Orange
-    network: "Orange · TUNPAY",
-    subtitle: "Mobile Wallet · TUNPAY",
-    mockBalance: 59.9,
-  },
-  {
-    id: "attijari",
-    name: "Attijari Real Time",
-    initials: "ART",
-    color: "#B41F3B",
-    network: "Attijari Bank · TUNPAY",
-    subtitle: "Mobile Wallet · TUNPAY",
-    mockBalance: 810.0,
-  },
-  {
-    id: "sobflous",
-    name: "SobFlous",
-    initials: "SF",
-    color: "#2C3E50",
-    network: "SobFlous · TUNPAY",
-    subtitle: "Payment Gateway",
-    mockBalance: 25.5,
-  }
-];
-
-export const INITIAL_WALLETS: Wallet[] = [
-  {
-    id: "flouci",
-    name: "Flouci",
-    tag: "@youssef.tn",
-    balance: 128.75,
-    network: "Flouci",
-    color: squad.green,
-    initials: "FL",
-  },
-  {
-    id: "ooredoo",
-    name: "Ooredoo M-Tidjar",
-    tag: "M-Tidjar •• 4821",
-    balance: 42.5,
-    network: "Ooredoo",
-    color: squad.purple,
-    initials: "OM",
-  },
-];
-
-export function formatDT(amount: number): string {
-  return amount.toFixed(3);
-}
+/** Shared elevation recipe — a tight contact shadow plus a soft ambient one. */
+export const cardShadow = "0 1px 2px rgba(0,0,0,0.5), 0 16px 32px -16px rgba(0,0,0,0.6)";
+export const raisedShadow = "0 2px 4px rgba(0,0,0,0.55), 0 24px 48px -20px rgba(0,0,0,0.65)";

@@ -32,10 +32,15 @@ Installed via the current (`shadcn@latest`) CLI, **not** the legacy
 
 ## Theming
 
-The product (SQUAD) is an intentionally **fixed-dark** experience — its
-screens use hardcoded hex colors from `src/features/squad/constants.ts`
-(`squad.bg`, `squad.green`, `squad.purple`, etc.), not the shadcn light/dark
-CSS variables. Accordingly:
+The product (SQUAD) is an intentionally **fixed-dark, monochrome**
+experience (Instagram-iOS dark-mode style) — its screens use hardcoded hex
+colors from `src/features/squad/constants.ts` (`squad.bg`/`squad.card` pure
+black/near-black, `squad.accent` white, `squad.subtle` iOS system gray,
+`squad.destructive` reserved only for destructive actions like Log Out),
+not the shadcn light/dark CSS variables. Wallet/provider brand colors
+(`PROVIDERS` in `src/features/wallets/constants.ts`) are the one deliberate
+exception — they stay colorful, like Instagram avatars, even though the app
+chrome around them is monochrome. Accordingly:
 
 - `src/components/layout/theme-provider.tsx` wraps `next-themes`'s
   `ThemeProvider` with **`forcedTheme="dark"`** — there is no user-facing
@@ -51,6 +56,17 @@ CSS variables. Accordingly:
   SQUAD's fixed palette (unlikely, but possible for an internal/admin view),
   use the existing `--background`/`--foreground`/etc. CSS variables rather
   than SQUAD's hardcoded hex values.
+
+## SQUAD's elevation/motion system
+
+Beyond raw colors, `src/features/squad/constants.ts` exports shared
+`cardShadow`/`raisedShadow` strings — use these instead of hand-rolling a new
+`box-shadow` per component, so elevation reads consistently across screens.
+Primary actions are flat `squad.accent` (white) fills, not gradients — there
+is no `gradients` export anymore; don't reintroduce one. Screen-level
+transitions come from a single `animate-[squad-screen-in_...]` wrapper in
+`squad-app.tsx` (keyed by `screen`) — don't add a per-screen transition, add
+it once there.
 
 ## Fonts
 

@@ -1,7 +1,7 @@
 import { squad } from "@/features/squad/constants";
 
 /**
- * The SQUAD brand mark (green rounded square + rotated outline square),
+ * The SQUAD brand mark (white rounded square + rotated outline square),
  * matching the logo drawn inline on the auth screen. Shared by the
  * next/og-generated icon routes under src/app/ so the app icon, apple-icon,
  * and manifest icons stay pixel-consistent with the in-app logo.
@@ -26,7 +26,7 @@ export function SquadMark({ size }: { size: number }) {
           width: size * 0.74,
           height: size * 0.74,
           borderRadius: size * 0.19,
-          background: squad.green,
+          background: squad.accent,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -38,7 +38,7 @@ export function SquadMark({ size }: { size: number }) {
             height: innerSize,
             transform: "rotate(45deg)",
             borderRadius: size * 0.03,
-            border: `${borderWidth}px solid #06110B`,
+            border: `${borderWidth}px solid ${squad.bg}`,
           }}
         />
       </div>

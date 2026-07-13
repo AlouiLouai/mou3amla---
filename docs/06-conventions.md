@@ -83,11 +83,76 @@ pending-state UX: form → `startTransition(async () => await action(...))`.
 Don't put `"use server"` functions directly inside a client component file —
 keep them in their own file under `server/`.
 
-The `squad` feature currently has no backend and needs none — its entire
-state machine (auth, KYC, transfers, wallets) is client-side mock state in
-`src/features/squad/hooks/use-squad-app.ts`, simulating async steps with
-`setTimeout`/`setInterval`. When a real backend is wired up, that's the file
-to convert to actually call Server Actions/an API instead of faking delays.
+The `squad` feature currently has no backend and needs none by design — it's
+a zero-liability router, not a custodial wallet. Its entire state machine
+(auth, onboarding, wallet registry, payment intents) is client-side mock
+state in `src/features/squad/hooks/use-squad-app.ts`, simulating async steps
+with `setTimeout`/`setInterval`. See the next section for exactly what's
+mocked vs. real.
+
+## Mocked vs. real boundaries in the `squad` feature
+
+Read this before "fixing" something that looks incomplete — several things
+are **intentionally** simulated for this prototype, not bugs:
+
+- **The account switcher** (`account-switcher-sheet.tsx`, `AccountId` in
+  `types.ts`, `SquadState.accounts`/`activeAccountId` in `use-squad-app.ts`)
+  is a demo-only affordance. In production there is exactly **one** SQUAD
+  identity per person — "switching accounts" is not a real feature to build
+  out further. It exists so this prototype can demo a genuine two-sided
+  payment (switch to the pre-seeded "ahmed" persona, send from "me", switch
+  back, watch it land) in one browser tab without a second device or a
+  backend. `generateIntent` checks whether the typed recipient matches the
+  *other* seeded account's username and, if so, writes a matching "receive"
+  entry (and invoice, if they're a pro account) directly into that other
+  account's slice — that cross-account write only happens because both
+  personas live in client state together for the demo; a real backend
+  wouldn't need this, the recipient's own server would create their side.
+- **OTP verification** (`otp-screen.tsx` / `verifyOtp` in `use-squad-app.ts`)
+  accepts any 4-digit code. There's a `// TODO(server-action)` marker where a
+  real Twilio Verify (or local SMS provider) call would go. Required env vars
+  once that's wired up: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+  `TWILIO_VERIFY_SERVICE_SID` (add to `src/config/env.ts` following the
+  existing zod pattern — don't read `process.env` directly).
+- **The `mou3amla://payment-success?ref=...` callback** (this app's own
+  hand-off-complete scheme) is simulated with a `setTimeout` in
+  `generateIntent` — in reality this fires from the user's own banking app
+  after *it* completes the transfer. SQUAD never confirms fund movement
+  itself; don't add code that treats the simulated timeout as if SQUAD
+  verified anything.
+- **QR tokens** (`lib/qr-token.ts`) are a base64 JSON blob with an expiry
+  window — good enough to demo the 60s-rotation UX, but **not** real
+  cryptographic replay protection. Real tamper-proofing needs the token
+  minted and signed server-side. Don't describe this as "cryptographic" in
+  UI copy or docs.
+- **BLE proximity** (`receive-qr-screen.tsx`'s pulse-ring indicator) is a
+  pure visual simulation. Actual BLE peripheral/advertiser mode is not
+  achievable from a browser or installed PWA (Web Bluetooth only supports
+  the "central"/scanning role) — it needs a native app. Don't attempt to
+  wire real `navigator.bluetooth` peripheral APIs into this repo; there
+  aren't any that would work. See [07-agent-guardrails.md](./07-agent-guardrails.md).
+- **`lib/el-fatoora.ts`'s stamp duty** (`PLACEHOLDER_STAMP_DUTY_TND`) is an
+  illustrative flat placeholder, not a verified current Tunisian tax figure.
+  Don't "correct" it to a different specific number without the user
+  confirming the current Finance Law/BCT circular rate first.
+- **`lib/deep-link.ts`'s `attemptNativeHandoff`** navigates a **hidden
+  iframe** (not the top-level page) to the custom-scheme URL and is
+  fire-and-forget — there's no standardized web API for "did a native app
+  intercept this." It deliberately does **not** auto-redirect the top-level
+  page to the web gateway on a timeout: setting `window.location.href`
+  directly to an unregistered scheme, or force-navigating away after a
+  guessed timeout, can strand the user on a browser error page (confirmed
+  while testing this in headless Chromium — the installed PWA's own tab went
+  blank, and `gateway.mou3amla.tn` isn't a real deployed service yet anyway).
+  Instead, `intent-result-screen.tsx` shows a visible "continue via gateway"
+  link (opens in a new tab) the user can tap if the native app didn't open.
+  Don't "simplify" this back to an automatic `location.href` redirect.
+- **The "Regulatory Sandbox Pilot" disclosure** (auth-screen badge + footer
+  copy, and the fuller card on `profile-screen.tsx`) is not filler copy —
+  it's grounded in §4.3 of BCT's actual *Guide d'accès à la Sandbox
+  Réglementaire* (Jan 2020), which requires clear written communication to
+  volunteer test clients about the test's purpose and risks. That PDF has no
+  UI/design guidance beyond this; don't attribute other design choices to it.
 
 ## Environment variables
 
