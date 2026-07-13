@@ -58,6 +58,15 @@ The shell transition lives in `src/features/squad/components/squad-app.tsx`.
 Do not add a different page-enter animation on every individual screen unless
 there is a strong product reason.
 
+The mobile shell also uses a shared frame primitive in
+`src/features/squad/components/screen-frame.tsx`. Keep headers and bottom nav
+outside the scrollable pane; only the body content should use the shell
+scroller.
+
+Recent performance tuning intentionally softened shell and card shadows in
+`src/features/squad/constants.ts`. If you want more depth, add it carefully;
+heavy blur and oversized shadow stacks make low-end mobile devices feel slow.
+
 ## Toasts
 
 App events use `sonner` through the shadcn wrapper in

@@ -10,21 +10,30 @@ interface BottomNavProps {
   onProfile: () => void;
 }
 
+const NAV_ITEMS = [
+  { key: "home" as const, label: "Home", icon: Home },
+  { key: "generate-intent" as const, label: "Send", icon: Send },
+  { key: "activity" as const, label: "Activity", icon: Activity },
+  { key: "profile" as const, label: "Profile", icon: CircleUserRound },
+] as const;
+
 export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: BottomNavProps) {
-  const items = [
-    { key: "home" as const, label: "Home", icon: Home, onClick: onHome },
-    { key: "generate-intent" as const, label: "Send", icon: Send, onClick: onSend },
-    { key: "activity" as const, label: "Activity", icon: Activity, onClick: onActivity },
-    { key: "profile" as const, label: "Profile", icon: CircleUserRound, onClick: onProfile },
-  ];
+  const handlers = {
+    home: onHome,
+    "generate-intent": onSend,
+    activity: onActivity,
+    profile: onProfile,
+  } as const;
 
   return (
     <div className="px-3 pt-2 pb-[max(0.95rem,env(safe-area-inset-bottom))]" style={{ background: squad.surface }}>
       <div
-        className="grid grid-cols-4 gap-1 rounded-[28px] border bg-white/96 p-2"
+        className="overflow-x-auto rounded-[28px] border bg-white/96 p-2"
         style={{ borderColor: squad.border, boxShadow: cardShadow }}
       >
-        {items.map(({ key, label, icon: Icon, onClick }) => {
+        <div className="flex min-w-max gap-1">
+          {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+            const onClick = handlers[key];
           const isActive = active === key;
 
           return (
@@ -32,7 +41,7 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: Bot
               key={key}
               type="button"
               onClick={onClick}
-              className="flex flex-col items-center gap-1 rounded-[20px] py-2 transition-transform active:scale-[0.97]"
+              className="flex min-w-[76px] flex-1 flex-col items-center gap-1 rounded-[20px] px-3 py-2 transition-transform active:scale-[0.97]"
               style={{
                 background: isActive ? alpha(squad.accent, 0.11) : "transparent",
                 color: isActive ? squad.accent : squad.textFaint,
@@ -42,7 +51,8 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: Bot
               <span className="text-[10px] font-black">{label}</span>
             </button>
           );
-        })}
+          })}
+        </div>
       </div>
     </div>
   );

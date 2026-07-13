@@ -6,6 +6,11 @@ Default to Server Components. Add `"use client"` only at the component that
 actually needs hooks, browser APIs, or local interactive state, and keep that
 boundary as low in the tree as practical.
 
+For the authenticated shell specifically, avoid eagerly importing every client
+screen into the first bundle. `src/features/squad/components/squad-app.tsx`
+now lazy-loads non-home screens with `next/dynamic`; keep that pattern when
+adding new screens unless there is a strong reason not to.
+
 ## Don't write to a ref during render
 
 The lint config flags `someRef.current = value` inside render. If you need a
@@ -100,6 +105,14 @@ Read this before "fixing" something that looks incomplete:
   server-backed 3-digit handoff code plus signed recipient payloads.
 - **`lib/el-fatoora.ts` stamp duty** remains a placeholder until the user
   confirms the current legal amount.
+
+## Shell layout conventions
+
+- In authenticated mobile screens, the header and bottom navigation are fixed
+  shell chrome.
+- Only the body content pane should scroll.
+- Prefer `src/features/squad/components/screen-frame.tsx` instead of manually
+  rebuilding sticky/scroll behavior per screen.
 
 ## Environment variables
 

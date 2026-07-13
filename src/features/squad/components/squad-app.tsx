@@ -1,17 +1,55 @@
 "use client";
 
-import { ActivityScreen } from "@/features/activity/components/activity-screen";
-import { InvoicesScreen } from "@/features/invoices/components/invoices-screen";
-import { NotificationsScreen } from "@/features/notifications/components/notifications-screen";
-import { GenerateIntentScreen } from "@/features/payments/components/generate-intent-screen";
-import { IntentResultScreen } from "@/features/payments/components/intent-result-screen";
-import { ReceiveQrScreen } from "@/features/payments/components/receive-qr-screen";
-import { ScanQrScreen } from "@/features/payments/components/scan-qr-screen";
-import { ProfileScreen } from "@/features/profile/components/profile-screen";
+import dynamic from "next/dynamic";
 import { HomeScreen } from "@/features/squad/components/home-screen";
 import { squad } from "@/features/squad/constants";
 import { useSquadApp } from "@/features/squad/hooks/use-squad-app";
 import type { InitialSquadUser } from "@/features/squad/types";
+
+function ScreenLoading() {
+  return (
+    <div className="flex flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
+      <div className="mb-4 h-10 w-32 rounded-full bg-black/5" />
+      <div className="mb-3 h-28 rounded-[28px] bg-black/5" />
+      <div className="mb-3 h-24 rounded-[24px] bg-black/5" />
+      <div className="h-24 rounded-[24px] bg-black/5" />
+    </div>
+  );
+}
+
+const ActivityScreen = dynamic(() => import("@/features/activity/components/activity-screen").then((mod) => mod.ActivityScreen), {
+  loading: () => <ScreenLoading />,
+});
+const InvoicesScreen = dynamic(() => import("@/features/invoices/components/invoices-screen").then((mod) => mod.InvoicesScreen), {
+  loading: () => <ScreenLoading />,
+});
+const NotificationsScreen = dynamic(
+  () => import("@/features/notifications/components/notifications-screen").then((mod) => mod.NotificationsScreen),
+  {
+    loading: () => <ScreenLoading />,
+  },
+);
+const GenerateIntentScreen = dynamic(
+  () => import("@/features/payments/components/generate-intent-screen").then((mod) => mod.GenerateIntentScreen),
+  {
+    loading: () => <ScreenLoading />,
+  },
+);
+const IntentResultScreen = dynamic(
+  () => import("@/features/payments/components/intent-result-screen").then((mod) => mod.IntentResultScreen),
+  {
+    loading: () => <ScreenLoading />,
+  },
+);
+const ProfileScreen = dynamic(() => import("@/features/profile/components/profile-screen").then((mod) => mod.ProfileScreen), {
+  loading: () => <ScreenLoading />,
+});
+const ReceiveQrScreen = dynamic(() => import("@/features/payments/components/receive-qr-screen").then((mod) => mod.ReceiveQrScreen), {
+  loading: () => <ScreenLoading />,
+});
+const ScanQrScreen = dynamic(() => import("@/features/payments/components/scan-qr-screen").then((mod) => mod.ScanQrScreen), {
+  loading: () => <ScreenLoading />,
+});
 
 export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
   const squadApp = useSquadApp(initialUser);
@@ -27,7 +65,7 @@ export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
           className="relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
           style={{
             background: squad.surface,
-            boxShadow: "0 24px 80px rgba(255,0,131,0.10), 0 10px 24px rgba(0,0,0,0.08)",
+            boxShadow: "0 16px 42px rgba(255,0,131,0.08), 0 8px 18px rgba(0,0,0,0.06)",
           }}
         >
           <div
@@ -39,7 +77,11 @@ export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
             style={{ background: "radial-gradient(circle, rgba(255,141,40,0.14), transparent 68%)" }}
           />
 
-          <div key={screen} className="relative z-10 flex flex-1 flex-col overflow-hidden animate-[squad-screen-in_0.28s_ease_both]">
+          <div
+            key={screen}
+            className="relative z-10 flex flex-1 flex-col overflow-hidden animate-[squad-screen-in_0.28s_ease_both]"
+            style={{ contain: "layout paint style" }}
+          >
             {screen === "home" && <HomeScreen squadApp={squadApp} />}
             {screen === "generate-intent" && <GenerateIntentScreen squadApp={squadApp} />}
             {screen === "receive-qr" && <ReceiveQrScreen squadApp={squadApp} />}

@@ -1,4 +1,5 @@
 import { ChevronLeft, Delete, ShieldCheck } from "lucide-react";
+import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
@@ -14,10 +15,9 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
     Number.parseFloat(state.amount) > 0 &&
     state.recipientInput.trim().length > 0 &&
     !state.isSendingPayment;
-
-  return (
-    <div className="flex flex-1 flex-col overflow-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
-      <div className="mb-4 flex items-center gap-3">
+  const header = (
+    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={actions.goHome}
@@ -34,7 +34,11 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
           </div>
         </div>
       </div>
+    </div>
+  );
 
+  return (
+    <ScreenFrame header={header} contentClassName="px-4 pb-6">
       <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: squad.textMuted }}>
         FROM
       </div>
@@ -162,6 +166,6 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
       >
         {state.isSendingPayment ? "Saving..." : "Send via TUNPAY"}
       </button>
-    </div>
+    </ScreenFrame>
   );
 }

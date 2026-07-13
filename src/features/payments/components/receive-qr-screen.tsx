@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, Waves } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
+import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
 
@@ -22,15 +23,8 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { startQrRotation, goHome } = actions;
   const qrToken = state.qrToken;
   const nearbyHandoff = state.nearbyHandoff;
-
-  useEffect(() => startQrRotation(), [startQrRotation]);
-
-  const secondsLeft = qrToken ? Math.max(0, Math.ceil((qrToken.expiresAt - now) / 1000)) : 0;
-  const nearbySecondsLeft = nearbyHandoff ? Math.max(0, Math.ceil((nearbyHandoff.expiresAt - now) / 1000)) : 0;
-  const progress = qrToken ? secondsLeft / (QR_TOKEN_TTL_MS / 1000) : 0;
-
-  return (
-    <div className="flex flex-1 flex-col overflow-auto px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-8">
+  const header = (
+    <div className="px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-3">
       <button
         type="button"
         onClick={goHome}
@@ -40,12 +34,22 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
         <ChevronLeft className="size-4" />
       </button>
 
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="mb-1 text-[17px] font-extrabold tracking-tight">Request a payment</div>
-        <div className="mb-5 max-w-[280px] text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
-          Nearby users can match your 3-digit code, or they can still scan the signed SQUAD QR.
-        </div>
+      <div className="mb-1 text-[17px] font-extrabold tracking-tight">Request a payment</div>
+      <div className="max-w-[280px] text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
+        Nearby users can match your 3-digit code, or they can still scan the signed SQUAD QR.
+      </div>
+    </div>
+  );
 
+  useEffect(() => startQrRotation(), [startQrRotation]);
+
+  const secondsLeft = qrToken ? Math.max(0, Math.ceil((qrToken.expiresAt - now) / 1000)) : 0;
+  const nearbySecondsLeft = nearbyHandoff ? Math.max(0, Math.ceil((nearbyHandoff.expiresAt - now) / 1000)) : 0;
+  const progress = qrToken ? secondsLeft / (QR_TOKEN_TTL_MS / 1000) : 0;
+
+  return (
+    <ScreenFrame header={header} contentClassName="px-6 pb-8">
+      <div className="flex flex-col items-center justify-center text-center">
         <div
           className="mb-4 w-full rounded-[28px] border p-4 text-left"
           style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.22), boxShadow: cardShadow }}
@@ -133,6 +137,6 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
           uses the same TUNPAY intent handoff.
         </div>
       </div>
-    </div>
+    </ScreenFrame>
   );
 }

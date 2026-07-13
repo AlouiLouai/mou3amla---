@@ -22,7 +22,7 @@ src/
   features/
     squad/                # Authenticated shell: screen router, shared reducer,
                            # dashboard, bottom nav, shell-level theme tokens
-      components/
+      components/         # includes shell primitives like screen-frame.tsx
       hooks/
       constants.ts
       types.ts
@@ -99,9 +99,17 @@ interaction state, and shared shell chrome such as the bottom nav. Auth,
 wallets, notifications, profile, invoices, and payments still keep their own
 domain code in their feature folders.
 
+The shell now uses a reusable frame pattern: header and footer/tab chrome stay
+fixed, while each screen's central content pane is the only scrollable region.
+That shared behavior belongs in `src/features/squad/components/screen-frame.tsx`
+instead of being reimplemented ad hoc per screen.
+
 The shell now bootstraps its real user state from Supabase-backed server data:
 profile, linked destinations, activity history, and notifications are passed
 through `initialUser`. Only transient UI state stays in the reducer.
+
+To keep the first mobile load lighter, non-home shell screens are lazy-loaded
+from `src/features/squad/components/squad-app.tsx` with `next/dynamic`.
 
 ## Rule of thumb: where does new code go?
 

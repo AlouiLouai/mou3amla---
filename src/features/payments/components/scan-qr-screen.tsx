@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, RefreshCw, Waves } from "lucide-react";
+import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
 
@@ -21,6 +22,23 @@ export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const supportsBarcodeDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
+  const header = (
+    <div className="px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-3">
+      <button
+        type="button"
+        onClick={goHome}
+        className="mb-4.5 flex size-9 items-center justify-center rounded-full border"
+        style={{ background: squad.card, borderColor: squad.border }}
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+
+      <div className="mb-1 text-[17px] font-extrabold tracking-tight">Find the recipient</div>
+      <div className="text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
+        Use the nearby 3-digit code first, then fall back to camera scan or pasted SQUAD token.
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     loadNearbyOptions();
@@ -72,21 +90,7 @@ export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   }, [supportsBarcodeDetector]);
 
   return (
-    <div className="flex flex-1 flex-col overflow-auto px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-8">
-      <button
-        type="button"
-        onClick={goHome}
-        className="mb-4.5 flex size-9 items-center justify-center rounded-full border"
-        style={{ background: squad.card, borderColor: squad.border }}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-
-      <div className="mb-1 text-[17px] font-extrabold tracking-tight">Find the recipient</div>
-      <div className="mb-5 text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
-        Use the nearby 3-digit code first, then fall back to camera scan or pasted SQUAD token.
-      </div>
-
+    <ScreenFrame header={header} contentClassName="px-6 pb-8">
       <div
         className="mb-5 rounded-[26px] border p-4"
         style={{ background: squad.cardAlt, borderColor: squad.borderStrong }}
@@ -190,6 +194,6 @@ export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
       >
         Continue
       </button>
-    </div>
+    </ScreenFrame>
   );
 }

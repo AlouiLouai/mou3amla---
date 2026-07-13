@@ -1,7 +1,8 @@
 import { ChevronLeft, Download } from "lucide-react";
+import { invoicesToCsv } from "@/features/invoices/lib/el-fatoora";
+import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
-import { invoicesToCsv } from "@/features/invoices/lib/el-fatoora";
 
 function downloadCsv(csv: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -16,9 +17,8 @@ function downloadCsv(csv: string) {
 export function InvoicesScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { derived, actions } = squadApp;
   const account = derived.account;
-
-  return (
-    <div className="flex flex-1 flex-col overflow-auto p-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-8">
+  const header = (
+    <div className="px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3">
       <button
         type="button"
         onClick={actions.goProfile}
@@ -28,7 +28,7 @@ export function InvoicesScreen({ squadApp }: { squadApp: UseSquadApp }) {
         <ChevronLeft className="size-4" />
       </button>
 
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between gap-3">
         <div className="text-xl font-extrabold tracking-tight">Invoices (El Fatoora)</div>
         <button
           type="button"
@@ -41,11 +41,14 @@ export function InvoicesScreen({ squadApp }: { squadApp: UseSquadApp }) {
           Export
         </button>
       </div>
-      <p className="mb-5 text-[11.5px] leading-relaxed" style={{ color: squad.textFaint }}>
-        Stamp duty shown is an illustrative placeholder — confirm the current
-        Timbre Fiscal rate with your accountant before filing.
+      <p className="text-[11.5px] leading-relaxed" style={{ color: squad.textFaint }}>
+        Stamp duty shown is an illustrative placeholder - confirm the current Timbre Fiscal rate with your accountant before filing.
       </p>
+    </div>
+  );
 
+  return (
+    <ScreenFrame header={header} contentClassName="px-5 pb-8">
       {account.invoices.length === 0 ? (
         <div
           className="rounded-2xl border p-5 text-center text-[12.5px]"
@@ -84,6 +87,6 @@ export function InvoicesScreen({ squadApp }: { squadApp: UseSquadApp }) {
           ))}
         </div>
       )}
-    </div>
+    </ScreenFrame>
   );
 }

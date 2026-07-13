@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut, ShieldAlert, Smartphone } from "lucide-react";
 import { BottomNav } from "@/features/squad/components/bottom-nav";
+import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
 
@@ -23,12 +24,17 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const verification = verificationTone(account.profile.verificationStatus);
   const isVerificationSyncing =
     account.profile.verificationStatus === "pending" && Boolean(account.profile.diditSessionId);
+  const header = (
+    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
+      <div className="text-[1.3rem] font-black tracking-tight">Profile</div>
+    </div>
+  );
+  const footer = (
+    <BottomNav active="profile" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
+  );
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
-        <div className="mb-4 text-[1.3rem] font-black tracking-tight">Profile</div>
-
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
         <div className="mb-4 rounded-[28px] border px-5 py-5" style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}>
           <div className="mb-4 flex items-center gap-4">
             <div
@@ -123,9 +129,7 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
             </span>
           </button>
         </form>
-      </div>
-      <BottomNav active="profile" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
-    </div>
+    </ScreenFrame>
   );
 }
 

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, Bell, CreditCard, Landmark, QrCode, ScanLine, Send, ShieldCheck, Sparkles } from "lucide-react";
+import { BottomNav } from "@/features/squad/components/bottom-nav";
+import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
-import { BottomNav } from "@/features/squad/components/bottom-nav";
 import { WalletRegistrySheet } from "@/features/wallets/components/wallet-registry-sheet";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
@@ -66,107 +67,113 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-
-  return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto px-4 pt-[max(0.85rem,env(safe-area-inset-top))] pb-3">
+  const footer = (
+    <BottomNav active="home" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
+  );
+  const header = (
+    <div className="px-4 pt-[max(0.85rem,env(safe-area-inset-top))] pb-3">
+      <div
+        className="relative overflow-hidden rounded-[32px] px-4 pt-4 pb-5 text-white"
+        style={{ background: squad.hero, boxShadow: "0 18px 42px rgba(0,0,0,0.16)" }}
+      >
         <div
-          className="relative mb-4 overflow-hidden rounded-[32px] px-4 pt-4 pb-5 text-white"
-          style={{ background: squad.hero, boxShadow: "0 28px 70px rgba(0,0,0,0.22)" }}
-        >
-          <div
-            className="pointer-events-none absolute -top-12 right-[-34px] h-36 w-36 rounded-full"
-            style={{ background: "linear-gradient(135deg, rgba(255,0,131,0.95), rgba(255,141,40,0.86))", filter: "blur(8px)" }}
-          />
-          <div
-            className="pointer-events-none absolute -bottom-12 left-[-36px] h-32 w-32 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(255,141,40,0.34), transparent 68%)" }}
-          />
+          className="pointer-events-none absolute -top-12 right-[-34px] h-36 w-36 rounded-full"
+          style={{ background: "linear-gradient(135deg, rgba(255,0,131,0.95), rgba(255,141,40,0.86))", filter: "blur(8px)" }}
+        />
+        <div
+          className="pointer-events-none absolute -bottom-12 left-[-36px] h-32 w-32 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(255,141,40,0.34), transparent 68%)" }}
+        />
 
-          <div className="relative flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.26em] text-white/62">Welcome</div>
-              <div className="mt-2 text-[1.55rem] font-black leading-none">{firstName}!</div>
-              <div className="mt-1 text-[12px] font-medium text-white/66">{timeGreeting()}</div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={actions.openLink}
-                className="rounded-full bg-white/12 px-3 py-2 text-[11px] font-black text-white backdrop-blur"
-              >
-                + Link
-              </button>
-              <button
-                type="button"
-                onClick={actions.goNotifications}
-                className="relative flex size-10 items-center justify-center rounded-full border border-white/14 bg-white/8 text-white backdrop-blur"
-              >
-                <Bell className="size-4.5" />
-                {derived.unreadNotifications > 0 ? (
-                  <span
-                    className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full px-1 text-center text-[9px] font-black"
-                    style={{ background: squad.accent, color: "#FFFFFF" }}
-                  >
-                    {Math.min(derived.unreadNotifications, 9)}
-                  </span>
-                ) : null}
-              </button>
-            </div>
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.26em] text-white/62">Welcome</div>
+            <div className="mt-2 text-[1.55rem] font-black leading-none">{firstName}!</div>
+            <div className="mt-1 text-[12px] font-medium text-white/66">{timeGreeting()}</div>
           </div>
 
-          <div className="relative mt-4 rounded-[26px] bg-white p-3 text-black">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex size-11 items-center justify-center rounded-[18px] text-[12px] font-black"
-                style={{ background: alpha(squad.accent, 0.1), color: squad.accent }}
-              >
-                {initials || "SQ"}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-black">@{account.profile.username}</div>
-                <div className="text-[11px] font-medium" style={{ color: squad.textMuted }}>
-                  {account.wallets.length} route{account.wallets.length === 1 ? "" : "s"} linked
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="mt-3 rounded-[22px] px-3 py-3"
-              style={{ background: verification.tone === squad.accent ? "#FFF3F9" : alpha(verification.tone, 0.09) }}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={actions.openLink}
+              className="rounded-full bg-white/12 px-3 py-2 text-[11px] font-black text-white"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div
-                    className="mt-0.5 flex size-9 items-center justify-center rounded-2xl"
-                    style={{ background: alpha(verification.tone, 0.12), color: verification.tone }}
-                  >
-                    <VerificationIcon className="size-4.5" />
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-black">{verification.title}</div>
-                    <p className="mt-1 text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
-                      {verification.body}
-                    </p>
-                    {isVerificationSyncing ? (
-                      <div className="mt-2 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: verification.tone }}>
-                        Auto-refreshing Didit status
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {account.profile.verificationStatus !== "verified" ? (
-                  <Link href="/verify-identity" className="shrink-0" style={{ color: squad.accent }}>
-                    <ArrowRight className="size-4.5" />
-                  </Link>
-                ) : null}
-              </div>
-            </div>
+              + Link
+            </button>
+            <button
+              type="button"
+              onClick={actions.goNotifications}
+              className="relative flex size-10 items-center justify-center rounded-full border border-white/14 bg-white/8 text-white"
+            >
+              <Bell className="size-4.5" />
+              {derived.unreadNotifications > 0 ? (
+                <span
+                  className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full px-1 text-center text-[9px] font-black"
+                  style={{ background: squad.accent, color: "#FFFFFF" }}
+                >
+                  {Math.min(derived.unreadNotifications, 9)}
+                </span>
+              ) : null}
+            </button>
           </div>
         </div>
 
+        <div className="relative mt-4 rounded-[26px] bg-white p-3 text-black">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex size-11 items-center justify-center rounded-[18px] text-[12px] font-black"
+              style={{ background: alpha(squad.accent, 0.1), color: squad.accent }}
+            >
+              {initials || "SQ"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-black">@{account.profile.username}</div>
+              <div className="text-[11px] font-medium" style={{ color: squad.textMuted }}>
+                {account.wallets.length} route{account.wallets.length === 1 ? "" : "s"} linked
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="mt-3 rounded-[22px] px-3 py-3"
+            style={{ background: verification.tone === squad.accent ? "#FFF3F9" : alpha(verification.tone, 0.09) }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div
+                  className="mt-0.5 flex size-9 items-center justify-center rounded-2xl"
+                  style={{ background: alpha(verification.tone, 0.12), color: verification.tone }}
+                >
+                  <VerificationIcon className="size-4.5" />
+                </div>
+                <div>
+                  <div className="text-[13px] font-black">{verification.title}</div>
+                  <p className="mt-1 text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
+                    {verification.body}
+                  </p>
+                  {isVerificationSyncing ? (
+                    <div className="mt-2 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: verification.tone }}>
+                      Auto-refreshing Didit status
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {account.profile.verificationStatus !== "verified" ? (
+                <Link href="/verify-identity" className="shrink-0" style={{ color: squad.accent }}>
+                  <ArrowRight className="size-4.5" />
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-3">
         <div className="mb-4 grid grid-cols-2 gap-2.5">
           <ActionCard
             label="Send money"
@@ -286,11 +293,9 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
             );
           })}
         </div>
-      </div>
-
-      <BottomNav active="home" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
+      </ScreenFrame>
       <WalletRegistrySheet squadApp={squadApp} />
-    </div>
+    </>
   );
 }
 

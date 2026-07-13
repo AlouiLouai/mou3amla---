@@ -22,5 +22,5 @@ export function alpha(hex: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-export const cardShadow = "0 16px 40px rgba(255,0,131,0.10), 0 6px 18px rgba(0,0,0,0.07)";
-export const raisedShadow = "0 26px 60px rgba(255,0,131,0.14), 0 10px 24px rgba(0,0,0,0.10)";
+export const cardShadow = "0 10px 24px rgba(255,0,131,0.08), 0 4px 12px rgba(0,0,0,0.05)";
+export const raisedShadow = "0 18px 36px rgba(255,0,131,0.10), 0 8px 18px rgba(0,0,0,0.08)";
