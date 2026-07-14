@@ -5,10 +5,17 @@ import { squad } from "@/features/squad/constants";
  * matching the logo drawn inline on the auth screen. Shared by the
  * next/og-generated icon routes under src/app/ so the app icon, apple-icon,
  * and manifest icons stay pixel-consistent with the in-app logo.
+ *
+ * `maskable` shrinks the badge so its corners stay inside the ~40%-radius
+ * safe-zone circle Android's adaptive-icon spec masks content to (some
+ * launchers - including plain circular masks - crop anything outside it;
+ * the default 0.74 badge's corners sit outside that circle).
  */
-export function SquadMark({ size }: { size: number }) {
-  const innerSize = size * 0.41;
-  const borderWidth = Math.max(1, size * 0.073);
+export function SquadMark({ size, maskable = false }: { size: number; maskable?: boolean }) {
+  const badgeScale = maskable ? 0.52 : 0.74;
+  const badgeSize = size * badgeScale;
+  const innerSize = badgeSize * 0.55;
+  const borderWidth = Math.max(1, badgeSize * 0.1);
 
   return (
     <div
@@ -23,9 +30,9 @@ export function SquadMark({ size }: { size: number }) {
     >
       <div
         style={{
-          width: size * 0.74,
-          height: size * 0.74,
-          borderRadius: size * 0.19,
+          width: badgeSize,
+          height: badgeSize,
+          borderRadius: badgeSize * 0.26,
           background: squad.accent,
           display: "flex",
           alignItems: "center",

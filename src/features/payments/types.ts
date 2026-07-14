@@ -23,9 +23,21 @@ export interface QrToken {
   signatureVersion: string;
 }
 
+export type NearbyMatchStatus = "published" | "matched" | "confirmed";
+
 export interface NearbyHandoff {
   code: string;
   expiresAt: number;
+  status: NearbyMatchStatus;
+  ownerAccepted: boolean;
+  payerAccepted: boolean;
+}
+
+export interface NearbyMatchState {
+  code: string;
+  status: NearbyMatchStatus;
+  ownerAccepted: boolean;
+  payerAccepted: boolean;
 }
 
 export interface ConfettiPiece {

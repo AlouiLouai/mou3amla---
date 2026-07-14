@@ -65,7 +65,7 @@ export function InstallPrompt() {
   }
 
   return (
-    <Card className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm shadow-lg sm:right-4 sm:left-auto">
+    <Card className="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto max-w-sm shadow-lg sm:right-[max(1rem,env(safe-area-inset-right))] sm:left-auto">
       <CardHeader>
         <CardTitle className="text-base">Install this app</CardTitle>
         <CardDescription>

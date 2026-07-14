@@ -30,6 +30,26 @@ All icons are generated, not static assets, using `next/og`'s
 To change the icon look, edit these route files directly. Do not add PNG files
 to `public/` for this purpose because nothing references them.
 
+All four rely on the shared `SquadMark` (`src/features/squad/mark.tsx`), which
+takes a `maskable` prop. Pass it **only** from the `-maskable` route: it
+shrinks the badge so its corners stay inside Android's ~40%-radius
+adaptive-icon safe zone. Some Android launchers (and plain circular masks)
+crop anything outside that circle, so don't reuse the non-maskable (`0.74`
+scale) badge for `purpose: "maskable"` icons.
+
+## Cross-device viewport height
+
+Six top-level screen shells (`squad-app.tsx`, `auth-screen.tsx`,
+`otp-screen.tsx`, `verification-flow-screen.tsx`) size themselves with the
+`.squad-viewport-h` CSS class (`src/app/globals.css`) instead of Tailwind's
+`min-h-[100dvh]` arbitrary value. That class declares `min-height: 100vh`
+*then* `min-height: 100dvh` as two separate rules: browsers that don't
+recognize the `dvh` unit (older Android WebViews, older Samsung Internet)
+silently drop only the second, unrecognized declaration and keep the `100vh`
+fallback, instead of dropping the whole rule and collapsing the shell to
+`auto` height. Use `squad-viewport-h` for any new full-height screen shell
+instead of reaching for `min-h-[100dvh]` directly.
+
 ## Service worker (Serwist, Turbopack-native)
 
 This is the part most likely to be implemented wrong by older training data,
@@ -75,7 +95,11 @@ curl -I http://localhost:3000/serwist/sw.js   # should be 200
 `src/components/pwa/install-prompt.tsx` handles the `beforeinstallprompt`
 event on Chromium/Android and shows manual "Add to Home Screen" instructions
 on iOS. Dismissal is remembered in `localStorage` under
-`pwa-install-dismissed`.
+`pwa-install-dismissed`. Its fixed positioning uses
+`bottom-[max(1rem,env(safe-area-inset-bottom))]` (and the equivalent on the
+right, in the `sm:` desktop-preview layout) so it doesn't sit under an
+Android gesture-nav bar or a notch in landscape. Keep that pattern for any
+other `fixed`-positioned chrome.
 
 The implementation deliberately avoids `useEffect(() => setState(...))` for
 one-time client reads. See

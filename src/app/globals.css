@@ -124,6 +124,7 @@
 
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh; /* fallback for browsers without dvh support (older Android WebViews / Samsung Internet) */
     min-height: 100dvh;
     background-image:
       radial-gradient(circle at top right, rgba(255, 0, 131, 0.1), transparent 28%),
@@ -172,6 +173,15 @@
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* min-height: 100dvh with a 100vh fallback for browsers that don't parse the
+   dvh unit (older Android WebViews, older Samsung Internet) - those browsers
+   drop an unrecognized-unit declaration entirely, so without the fallback the
+   shell would collapse to auto height instead of filling the viewport. */
+.squad-viewport-h {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .squad-scroll {

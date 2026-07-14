@@ -87,7 +87,17 @@ supabase/
   and `src/features/onboarding/server/**` for Supabase status updates.
 - **Signed QR and nearby discovery** belong to the `payments` feature for UI
   and helpers, with thin route handlers under `src/app/api/qr/**` and
-  `src/app/api/nearby/**`.
+  `src/app/api/nearby/**`. The nearby flow is a mutual-accept, AirDrop-style
+  alternative to QR (not real BLE - see
+  [07-agent-guardrails.md](./07-agent-guardrails.md)): both the payer and the
+  recipient must independently accept a shared 3-digit code before the
+  recipient is revealed. Shared lookup/response-shaping logic for that
+  handshake lives in `src/features/payments/server/nearby-match.ts`, polled
+  from the client via `/api/nearby/status`.
+- **Recipient username search-as-you-type** on the send screen calls
+  `/api/users/search` (an admin-client query, since RLS only lets a user read
+  their own `profiles` row) and is debounced client-side in
+  `generate-intent-screen.tsx`.
 
 ## The `squad` shell vs. domain features
 

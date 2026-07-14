@@ -13,7 +13,7 @@ export function AuthScreen() {
 
   return (
     <div
-      className="flex min-h-[100dvh] flex-1 flex-col justify-center px-5 py-[max(1.2rem,env(safe-area-inset-top))]"
+      className="squad-viewport-h flex flex-1 flex-col justify-center px-5 py-[max(1.2rem,env(safe-area-inset-top))]"
       style={{ background: `linear-gradient(180deg, ${squad.surface} 0%, ${squad.bg} 100%)`, color: squad.text }}
     >
       <div className="mx-auto flex w-full max-w-md flex-col">

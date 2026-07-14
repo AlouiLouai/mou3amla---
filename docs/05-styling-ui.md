@@ -72,6 +72,13 @@ heavy blur and oversized shadow stacks make low-end mobile devices feel slow.
 App events use `sonner` through the shadcn wrapper in
 `src/components/ui/sonner.tsx`.
 
+- Toasts render `top-center` with a safe-area-aware offset
+  (`max(1rem, env(safe-area-inset-top))`) rather than sonner's default
+  `bottom-right`. This is deliberate: the bottom nav in the authenticated
+  shell floats over content and slides in/out on scroll (see
+  [03-pwa.md](./03-pwa.md#mobile-shell-behavior)), so a bottom-anchored toast
+  would visually collide with it. Don't move toasts back to the bottom
+  without also accounting for that.
 - Keep toast visuals aligned with the SQUAD palette.
 - Prefer concise operational copy: linked, routed, verified, failed.
 - Use success/error/loading states for payment, link, OTP, and notification

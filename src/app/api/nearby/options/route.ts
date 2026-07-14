@@ -45,6 +45,7 @@ export async function GET() {
     .from("nearby_handoffs")
     .select("challenge_code")
     .neq("owner_user_id", userId)
+    .eq("status", "published")
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
     .limit(4);

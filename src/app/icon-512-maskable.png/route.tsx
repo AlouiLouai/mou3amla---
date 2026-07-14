@@ -4,9 +4,9 @@ import { SquadMark } from "@/features/squad/mark";
 export const size = { width: 512, height: 512 };
 export const contentType = "image/png";
 
-// SquadMark already keeps its content within a ~74% centered safe zone over
-// a full-bleed background, which is what maskable icons need — OS launchers
-// crop/mask the outer edges, so nothing important can live out there.
+// `maskable` shrinks the badge so its corners stay inside Android's ~40%
+// safe-zone radius — OS launchers (including plain circular masks) crop
+// anything outside it, so nothing important can live out there.
 export function GET() {
-  return new ImageResponse(<SquadMark size={size.width} />, { ...size });
+  return new ImageResponse(<SquadMark size={size.width} maskable />, { ...size });
 }

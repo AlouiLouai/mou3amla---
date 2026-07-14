@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { env } from "@/config/env";
-import { verifyQrToken, isQrTokenExpired } from "@/features/payments/lib/qr-token";
-import { resolveRecipientPreview } from "@/features/payments/server/recipient-preview";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,11 +8,13 @@ const claimSchema = z.object({
 });
 
 type NearbyRow = {
-  owner_user_id: string;
-  signed_token: string;
+  id: string;
   expires_at: string;
 };
 
+// Proposes a match on a published nearby code. This does not reveal the
+// recipient yet - both the payer and the owner must separately call
+// /api/nearby/accept before /api/nearby/status returns recipient details.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
@@ -36,8 +35,9 @@ export async function POST(request: Request) {
 
   const { data: row, error } = await admin
     .from("nearby_handoffs")
-    .select("owner_user_id, signed_token, expires_at")
+    .select("id, expires_at")
     .eq("challenge_code", parsed.data.code)
+    .eq("status", "published")
     .neq("owner_user_id", userId)
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
@@ -48,19 +48,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "That nearby code is no longer available." }, { status: 404 });
   }
 
-  const token = verifyQrToken(row.signed_token, env.QR_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY);
-  if (!token || isQrTokenExpired(token)) {
-    return NextResponse.json({ message: "That nearby code expired. Ask the recipient to refresh it." }, { status: 410 });
+  const { data: updated, error: updateError } = await admin
+    .from("nearby_handoffs")
+    .update({ status: "matched", payer_user_id: userId })
+    .eq("id", row.id)
+    .eq("status", "published")
+    .select("expires_at")
+    .maybeSingle<{ expires_at: string }>();
+
+  if (updateError || !updated) {
+    return NextResponse.json({ message: "Someone else just grabbed that code. Try another one." }, { status: 409 });
   }
 
-  const recipient = await resolveRecipientPreview({
-    recipientUserId: token.recipientUserId,
-    username: token.recipient,
+  return NextResponse.json({
+    handoff: {
+      code: parsed.data.code,
+      expiresAt: new Date(updated.expires_at).getTime(),
+      status: "matched",
+      ownerAccepted: false,
+      payerAccepted: false,
+    },
   });
-
-  if (!recipient) {
-    return NextResponse.json({ message: "Recipient not found." }, { status: 404 });
-  }
-
-  return NextResponse.json({ recipient });
 }

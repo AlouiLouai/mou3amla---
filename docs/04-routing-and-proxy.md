@@ -14,9 +14,12 @@ Important app routes in this project:
 - `/verify-identity` -> local mock identity verification flow
 - `/api/qr/mint` -> mints a signed rotating QR payload for the authenticated recipient
 - `/api/qr/resolve` -> verifies a signed QR payload and resolves recipient routing preview
-- `/api/nearby/publish` -> publishes the current recipient's short nearby code
-- `/api/nearby/options` -> loads four nearby code choices for the payer
-- `/api/nearby/claim` -> resolves the chosen nearby code into the same signed recipient payload
+- `/api/nearby/publish` -> publishes/refreshes the current recipient's short nearby code
+- `/api/nearby/options` -> loads four nearby code choices (only genuinely `published` ones) for the payer
+- `/api/nearby/claim` -> proposes a match on a chosen nearby code (does **not** reveal the recipient yet)
+- `/api/nearby/status` -> polled by both sides of a nearby match to read/react to status changes
+- `/api/nearby/accept` -> either side accepts the match; recipient is only revealed once both have
+- `/api/users/search` -> recipient username typeahead for the send screen (own admin-client query, since RLS only allows reading your own profile row)
 - `/auth/logout` -> destroys the Supabase session
 - `/~offline` -> offline fallback
 - `/serwist/[path]` -> service worker build/serve route

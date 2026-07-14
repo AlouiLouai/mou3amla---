@@ -1,13 +1,57 @@
-import { ChevronLeft, Delete, ShieldCheck } from "lucide-react";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, Delete, Loader2, ShieldCheck } from "lucide-react";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
+import type { RecipientPreview } from "@/features/payments/types";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "backspace"];
+const SEARCH_DEBOUNCE_MS = 250;
+
+function useRecipientSearch(query: string, enabled: boolean) {
+  const [results, setResults] = useState<RecipientPreview[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!enabled || query.trim().length < 2) {
+      // Nothing to search; the caller only renders results while `enabled` is
+      // true, so leaving stale state here is harmless and avoids a
+      // synchronous setState-in-effect on every keystroke.
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+
+    const timer = setTimeout(() => {
+      setIsSearching(true);
+      void (async () => {
+        try {
+          const response = await fetch(`/api/users/search?q=${encodeURIComponent(query.trim())}`, { cache: "no-store" });
+          const payload = (await response.json()) as { users?: RecipientPreview[] };
+          if (requestIdRef.current !== requestId) return;
+          setResults(response.ok ? (payload.users ?? []) : []);
+        } catch {
+          if (requestIdRef.current === requestId) setResults([]);
+        } finally {
+          if (requestIdRef.current === requestId) setIsSearching(false);
+        }
+      })();
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [query, enabled]);
+
+  return { results, isSearching };
+}
 
 export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { state, derived, actions } = squadApp;
+  const searchEnabled = !state.recipientPreview && state.recipientInput.trim().length >= 2;
+  const { results: recipientResults, isSearching } = useRecipientSearch(state.recipientInput, searchEnabled);
   const account = derived.account;
   const amountDisplay = state.amount || "0";
   const canGenerate =
@@ -99,6 +143,40 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
           Scan
         </button>
       </div>
+
+      {searchEnabled && (isSearching || recipientResults.length > 0) ? (
+        <div
+          className="mb-4 overflow-hidden rounded-[20px] border"
+          style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
+        >
+          {isSearching && recipientResults.length === 0 ? (
+            <div className="flex items-center gap-2 px-4 py-3.5 text-[12px]" style={{ color: squad.textMuted }}>
+              <Loader2 className="size-3.5 animate-spin" />
+              Searching SQUAD users...
+            </div>
+          ) : (
+            recipientResults.map((result) => (
+              <button
+                key={result.userId}
+                type="button"
+                onClick={() => actions.selectRecipient(result)}
+                className="flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left last:border-b-0"
+                style={{ borderColor: squad.border }}
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-black">{result.displayName}</div>
+                  <div className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
+                    @{result.username}
+                  </div>
+                </div>
+                {result.verificationStatus === "verified" ? (
+                  <ShieldCheck className="size-4 shrink-0" style={{ color: squad.accent }} />
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
 
       {state.recipientPreview ? (
         <div

@@ -1,7 +1,10 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { ChevronLeft, Waves } from "lucide-react";
+import { CheckCircle2, ChevronLeft, HandCoins, Waves } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
+import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -47,7 +50,8 @@ function NearbyCountdown({ expiresAt }: { expiresAt: number }) {
 
 export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { state, derived, actions } = squadApp;
-  const { startQrRotation, goHome } = actions;
+  const { startQrRotation, startNearbyMatchPolling, acceptOwnerMatch, goHome } = actions;
+  const [mode, setMode] = useState<HandoffMode>("qr");
   const qrToken = state.qrToken;
   const nearbyHandoff = state.nearbyHandoff;
   const header = (
@@ -63,109 +67,156 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
 
       <div className="mb-1 text-[17px] font-extrabold tracking-tight">Request a payment</div>
       <div className="max-w-[280px] text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
-        Nearby users can match your 3-digit code, or they can still scan the signed SQUAD QR.
+        Share your signed QR, or let a nearby payer match your code, AirDrop-style.
       </div>
     </div>
   );
 
   useEffect(() => startQrRotation(), [startQrRotation]);
+  useEffect(() => startNearbyMatchPolling("owner"), [startNearbyMatchPolling]);
 
   return (
     <ScreenFrame header={header} contentClassName="px-6 pb-8">
-      <div className="flex flex-col items-center justify-center text-center">
-        <div
-          className="mb-4 w-full rounded-[28px] border p-4 text-left"
-          style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.22), boxShadow: cardShadow }}
-        >
-          <div className="mb-2 flex items-center gap-2">
-            <div
-              className="flex size-9 items-center justify-center rounded-2xl"
-              style={{ background: alpha(squad.accent, 0.12), color: squad.accent }}
-            >
-              <Waves className="size-4.5" />
-            </div>
-            <div>
-              <div className="text-[12px] font-black">Nearby handoff code</div>
-              <div className="text-[10.5px] font-medium" style={{ color: squad.textMuted }}>
-                Ask the payer to choose this code from 4 nearby options.
-              </div>
-            </div>
-          </div>
+      <HandoffModeToggle mode={mode} onChange={setMode} />
 
-          <div className="mt-3 flex items-end justify-between gap-3">
-            <div className="font-mono text-[2.3rem] font-black tracking-[0.26em]" style={{ color: squad.hero }}>
-              {nearbyHandoff?.code ?? "---"}
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: squad.textFaint }}>
-                Expires
-              </div>
-              {nearbyHandoff ? (
-                <NearbyCountdown expiresAt={nearbyHandoff.expiresAt} />
-              ) : (
-                <div className="font-mono text-[13px] font-bold" style={{ color: squad.accent }}>
-                  --
+      {mode === "qr" ? (
+        <div className="flex flex-col items-center justify-center text-center">
+          <div
+            className="rounded-[28px] border p-4"
+            style={{ background: squad.card, borderColor: alpha(squad.accent, 0.4), boxShadow: cardShadow }}
+          >
+            {qrToken ? (
+              <QRCodeSVG value={qrToken.token} size={200} level="M" />
+            ) : (
+              <div className="flex size-[200px] items-center justify-center rounded-[18px]" style={{ background: squad.cardAlt }}>
+                <div className="text-center">
+                  <div
+                    className="mx-auto mb-3 size-8 animate-spin rounded-full border-[3px]"
+                    style={{ borderColor: alpha(squad.accent, 0.16), borderTopColor: squad.accent }}
+                  />
+                  <div className="text-[12px] font-semibold" style={{ color: squad.textMuted }}>
+                    Minting secure QR
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        <div
-          className="rounded-[28px] border p-4"
-          style={{ background: squad.card, borderColor: alpha(squad.accent, 0.4), boxShadow: cardShadow }}
-        >
           {qrToken ? (
-            <QRCodeSVG value={qrToken.token} size={200} level="M" />
+            <CountdownBadge expiresAt={qrToken.expiresAt} totalMs={QR_TOKEN_TTL_MS} />
           ) : (
-            <div className="flex size-[200px] items-center justify-center rounded-[18px]" style={{ background: squad.cardAlt }}>
-              <div className="text-center">
-                <div
-                  className="mx-auto mb-3 size-8 animate-spin rounded-full border-[3px]"
-                  style={{ borderColor: alpha(squad.accent, 0.16), borderTopColor: squad.accent }}
-                />
-                <div className="text-[12px] font-semibold" style={{ color: squad.textMuted }}>
-                  Minting secure QR
-                </div>
-              </div>
+            <div className="mt-4 flex items-center gap-2">
+              <div className="h-1 w-24 overflow-hidden rounded-full" style={{ background: alpha(squad.accent, 0.12) }} />
+              <span className="font-mono text-xs" style={{ color: squad.textMuted }}>
+                --
+              </span>
             </div>
           )}
-        </div>
-
-        {qrToken ? (
-          <CountdownBadge expiresAt={qrToken.expiresAt} totalMs={QR_TOKEN_TTL_MS} />
-        ) : (
-          <div className="mt-4 flex items-center gap-2">
-            <div className="h-1 w-24 overflow-hidden rounded-full" style={{ background: alpha(squad.accent, 0.12) }} />
-            <span className="font-mono text-xs" style={{ color: squad.textMuted }}>
-              --
-            </span>
+          <div className="mt-1 font-mono text-[11px]" style={{ color: squad.textFaint }}>
+            @{derived.account.profile.username}
           </div>
-        )}
-        <div className="mt-1 font-mono text-[11px]" style={{ color: squad.textFaint }}>
-          @{derived.account.profile.username}
         </div>
-
-        <div className="relative mt-10 flex size-[100px] items-center justify-center">
-          {[0, 0.6, 1.2].map((delay) => (
-            <div
-              key={delay}
-              className="absolute size-full animate-[squad-pulse-ring_1.8s_ease-out_infinite] rounded-full border-2"
-              style={{ borderColor: squad.subtle, animationDelay: `${delay}s` }}
-            />
-          ))}
+      ) : (
+        <div className="flex flex-col items-center justify-center text-center">
           <div
-            className="z-10 flex size-11 items-center justify-center rounded-full border"
-            style={{ background: squad.card, borderColor: squad.border }}
+            className="mb-4 w-full rounded-[28px] border p-4 text-left"
+            style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.22), boxShadow: cardShadow }}
           >
-            <div className="size-3.5 rounded-full border-[2.2px]" style={{ borderColor: squad.subtle }} />
+            <div className="mb-2 flex items-center gap-2">
+              <div
+                className="flex size-9 items-center justify-center rounded-2xl"
+                style={{ background: alpha(squad.accent, 0.12), color: squad.accent }}
+              >
+                <Waves className="size-4.5" />
+              </div>
+              <div>
+                <div className="text-[12px] font-black">Nearby handoff code</div>
+                <div className="text-[10.5px] font-medium" style={{ color: squad.textMuted }}>
+                  Ask the payer to choose this code from 4 nearby options.
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <div className="font-mono text-[2.3rem] font-black tracking-[0.26em]" style={{ color: squad.hero }}>
+                {nearbyHandoff?.code ?? "---"}
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: squad.textFaint }}>
+                  Expires
+                </div>
+                {nearbyHandoff ? (
+                  <NearbyCountdown expiresAt={nearbyHandoff.expiresAt} />
+                ) : (
+                  <div className="font-mono text-[13px] font-bold" style={{ color: squad.accent }}>
+                    --
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+
+          {nearbyHandoff && nearbyHandoff.status === "confirmed" ? (
+            <div
+              className="w-full rounded-[24px] border p-4 text-left"
+              style={{ background: "rgba(19,154,99,0.08)", borderColor: "rgba(19,154,99,0.24)" }}
+            >
+              <div className="flex items-center gap-2" style={{ color: "#139A63" }}>
+                <CheckCircle2 className="size-5" />
+                <span className="text-[13px] font-black">Matched!</span>
+              </div>
+              <p className="mt-1.5 text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
+                The payer is now finishing the payment on their phone. You&apos;ll get a notification once it&apos;s
+                routed.
+              </p>
+            </div>
+          ) : nearbyHandoff && nearbyHandoff.status === "matched" ? (
+            <div
+              className="w-full rounded-[24px] border p-4 text-left"
+              style={{ background: alpha(squad.accent, 0.06), borderColor: alpha(squad.accent, 0.2) }}
+            >
+              <div className="flex items-center gap-2">
+                <HandCoins className="size-4.5" style={{ color: squad.accent }} />
+                <span className="text-[13px] font-black">A nearby phone wants to pay you</span>
+              </div>
+              <p className="mt-1.5 mb-3 text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
+                Confirm on your side too - both phones need to accept before the code unlocks.
+              </p>
+              <button
+                type="button"
+                onClick={acceptOwnerMatch}
+                disabled={nearbyHandoff.ownerAccepted}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-[13.5px] font-black disabled:opacity-60"
+                style={{ background: squad.accent, color: "#FFFFFF" }}
+              >
+                {nearbyHandoff.ownerAccepted ? "Waiting for the other phone..." : "Accept this match"}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="relative mt-6 flex size-[100px] items-center justify-center">
+                {[0, 0.6, 1.2].map((delay) => (
+                  <div
+                    key={delay}
+                    className="absolute size-full animate-[squad-pulse-ring_1.8s_ease-out_infinite] rounded-full border-2"
+                    style={{ borderColor: squad.subtle, animationDelay: `${delay}s` }}
+                  />
+                ))}
+                <div
+                  className="z-10 flex size-11 items-center justify-center rounded-full border"
+                  style={{ background: squad.card, borderColor: squad.border }}
+                >
+                  <div className="size-3.5 rounded-full border-[2.2px]" style={{ borderColor: squad.subtle }} />
+                </div>
+              </div>
+              <div className="mt-3 max-w-[290px] text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
+                This is still a web-safe nearby simulation, not real BLE broadcasting. Both phones vibrate and must
+                accept once a payer picks your code.
+              </div>
+            </>
+          )}
         </div>
-        <div className="mt-3 max-w-[290px] text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
-          This is still a web-safe nearby simulation, not real BLE broadcasting. Once matched, the final payment still
-          uses the same TUNPAY intent handoff.
-        </div>
-      </div>
+      )}
     </ScreenFrame>
   );
 }

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
+  Lock,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
@@ -112,6 +113,7 @@ export function VerificationFlowScreen({
 }) {
   const router = useRouter();
   const [stepId, setStepId] = useState<StepId>(() => initialStep(user, resultStatus));
+  const [hasConsented, setHasConsented] = useState(false);
   const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
   const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
@@ -185,7 +187,7 @@ export function VerificationFlowScreen({
   }
 
   const canContinue =
-    stepId === "intro" ||
+    (stepId === "intro" && hasConsented) ||
     (stepId === "cin-front" && !!frontPreviewUrl) ||
     (stepId === "cin-back" && !!backPreviewUrl) ||
     (stepId === "selfie" && !!selfieDataUrl);
@@ -204,7 +206,7 @@ export function VerificationFlowScreen({
 
   return (
     <div
-      className="flex min-h-[100dvh] flex-1 flex-col px-5 py-[max(1.2rem,env(safe-area-inset-top))]"
+      className="squad-viewport-h flex flex-1 flex-col px-5 py-[max(1.2rem,env(safe-area-inset-top))]"
       style={{ background: `linear-gradient(180deg, ${squad.surface} 0%, ${squad.bg} 100%)` }}
     >
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
@@ -236,6 +238,23 @@ export function VerificationFlowScreen({
               Current status: <span style={{ color: status.tone }}>{status.label}</span>
             </div>
           </div>
+        </div>
+
+        <div
+          className="mb-4 flex items-start gap-3 rounded-[22px] border px-4 py-3"
+          style={{ background: alpha("#139A63", 0.07), borderColor: alpha("#139A63", 0.2) }}
+        >
+          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl" style={{ background: alpha("#139A63", 0.14), color: "#139A63" }}>
+            <Lock className="size-4" />
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
+            <span className="font-black" style={{ color: "#139A63" }}>
+              Tunisian data sovereignty.
+            </span>{" "}
+            Your CIN and selfie photos are processed on this device only and are never uploaded or stored on any
+            server. This demo is built to respect the data protection principles overseen by INPDP and is presented
+            to BCT in that spirit.
+          </p>
         </div>
 
         <div className="flex flex-1 flex-col rounded-[30px] border bg-white px-5 pt-5 pb-5" style={{ borderColor: squad.border, boxShadow: cardShadow }}>
@@ -292,6 +311,24 @@ export function VerificationFlowScreen({
             {stepId === "selfie" ? (
               <SelfieCaptureStep previewUrl={selfieDataUrl} onCapture={setSelfieDataUrl} onRetake={() => setSelfieDataUrl(null)} />
             ) : null}
+            {stepId === "intro" ? (
+              <label
+                className="flex cursor-pointer items-start gap-3 rounded-[20px] border px-4 py-3.5"
+                style={{ background: squad.cardAlt, borderColor: squad.border }}
+              >
+                <input
+                  type="checkbox"
+                  checked={hasConsented}
+                  onChange={(event) => setHasConsented(event.target.checked)}
+                  className="mt-0.5 size-4 shrink-0 accent-current"
+                  style={{ color: squad.accent }}
+                />
+                <span className="text-[12px] leading-relaxed" style={{ color: squad.text }}>
+                  I agree to let SQUAD capture a photo of the front and back of my CIN and a live selfie, and to run
+                  this on-device face check to verify my identity.
+                </span>
+              </label>
+            ) : null}
             {stepId === "review" ? (
               derivedStatus === "verified" ? (
                 <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
@@ -332,7 +369,8 @@ export function VerificationFlowScreen({
             <button
               type="button"
               onClick={goNext}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[14px] font-black"
+              disabled={!canContinue}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[14px] font-black disabled:opacity-50"
               style={{ background: squad.accent, color: "#FFFFFF", boxShadow: cardShadow }}
             >
               Start

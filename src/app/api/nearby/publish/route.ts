@@ -10,6 +10,14 @@ type ProfileRow = {
   username: string;
 };
 
+type ExistingHandoffRow = {
+  id: string;
+  status: "published" | "matched" | "confirmed";
+  challenge_code: string;
+  owner_accepted_at: string | null;
+  payer_accepted_at: string | null;
+};
+
 function generateChallengeCode(): string {
   return Math.floor(Math.random() * 1000)
     .toString()
@@ -39,6 +47,30 @@ export async function POST() {
 
   if (destinationError || !destination) {
     return NextResponse.json({ message: "Link a destination before publishing a nearby code." }, { status: 403 });
+  }
+
+  // A payer may already be mid-handshake on this owner's current code: never clobber
+  // that with a fresh rotation, just slide the expiry so the handshake has room to finish.
+  const { data: existing } = await admin
+    .from("nearby_handoffs")
+    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at")
+    .eq("owner_user_id", userId)
+    .gt("expires_at", nowIso)
+    .maybeSingle<ExistingHandoffRow>();
+
+  if (existing && existing.status !== "published") {
+    const expiresAt = new Date(Date.now() + QR_TOKEN_TTL_MS).toISOString();
+    await admin.from("nearby_handoffs").update({ expires_at: expiresAt }).eq("id", existing.id);
+
+    return NextResponse.json({
+      handoff: {
+        code: existing.challenge_code,
+        expiresAt: Date.now() + QR_TOKEN_TTL_MS,
+        status: existing.status,
+        ownerAccepted: !!existing.owner_accepted_at,
+        payerAccepted: !!existing.payer_accepted_at,
+      },
+    });
   }
 
   await admin.from("nearby_handoffs").delete().eq("owner_user_id", userId);
@@ -71,6 +103,7 @@ export async function POST() {
     owner_user_id: profile.id,
     signed_token: qrToken.token,
     challenge_code: challengeCode,
+    status: "published",
     expires_at: new Date(Date.now() + QR_TOKEN_TTL_MS).toISOString(),
   });
 
@@ -82,6 +115,9 @@ export async function POST() {
     handoff: {
       code: challengeCode,
       expiresAt: Date.now() + QR_TOKEN_TTL_MS,
+      status: "published",
+      ownerAccepted: false,
+      payerAccepted: false,
     },
   });
 }

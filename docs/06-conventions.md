@@ -95,6 +95,35 @@ Do not place `"use server"` functions inside client component files.
 - 20-digit RIB binding stays locked unless `verificationStatus === "verified"`.
 - Keep the verification flow SQUAD-branded and local until the user asks for a
   real KYC provider integration.
+- The intro step requires an explicit consent checkbox ("I agree to let SQUAD
+  capture a photo of the front and back of my CIN and a live selfie...")
+  before `Start` is enabled, and the whole flow shows a persistent Tunisian
+  data-sovereignty statement referencing INPDP and BCT. Don't remove either
+  without the user asking - they're there for regulatory-review demo
+  purposes, not decoration.
+
+## Nearby AirDrop-style handoff (mutual accept)
+
+- This is a **choice presented alongside QR code**, not a replacement for it:
+  `HandoffModeToggle` (`src/features/payments/components/handoff-mode-toggle.tsx`)
+  switches both `receive-qr-screen.tsx` and `scan-qr-screen.tsx` between a
+  `"qr"` and a `"nearby"` mode.
+- The nearby flow requires **both sides to explicitly accept** a shared
+  3-digit code before the recipient's identity is revealed to the payer:
+  `claim` proposes a match (`published` -> `matched`), then each side calls
+  `/api/nearby/accept` independently; only once both are accepted does status
+  become `confirmed` and `/api/nearby/status` starts returning the recipient.
+  Do not shortcut this back to a one-sided reveal.
+- Both sides poll `/api/nearby/status` (via `startNearbyMatchPolling` in
+  `use-squad-app.ts`) rather than using a push channel - this repo has no
+  websocket/realtime infra, and polling matches the existing QR-rotation
+  convention. If you need lower latency, reduce `NEARBY_POLL_INTERVAL_MS`
+  before reaching for new infra.
+- Proximity itself is still simulated via the shared code, not real
+  Bluetooth (guardrail #11). The one added sensory cue is
+  `navigator.vibrate(...)` on state transitions (matched, then confirmed),
+  feature-detected since iOS Safari has no Vibration API - never assume it's
+  available.
 
 ## Mocked vs. real boundaries in the `squad` shell
 

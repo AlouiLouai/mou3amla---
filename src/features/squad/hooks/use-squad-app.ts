@@ -31,6 +31,14 @@ function applyDefaultWallet(wallets: LinkedWallet[], selectedId: string) {
   }));
 }
 
+const NEARBY_POLL_INTERVAL_MS = 1500;
+
+function vibrate(pattern: number | number[]) {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+}
+
 function initialState(initialUser?: InitialSquadUser): SquadState {
   return {
     screen: "home",
@@ -45,6 +53,7 @@ function initialState(initialUser?: InitialSquadUser): SquadState {
     currentIntent: null,
     qrToken: null,
     nearbyHandoff: null,
+    payerMatch: null,
     nearbyOptions: [],
     isLoadingNearbyOptions: false,
     scanManualInput: "",
@@ -273,6 +282,11 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       }),
     [],
   );
+  const selectRecipient = useCallback(
+    (preview: NonNullable<SquadState["recipientPreview"]>) =>
+      dispatch({ recipientInput: preview.username, recipientPreview: preview }),
+    [],
+  );
   const keypadPress = useCallback((digit: string) => {
     dispatch((s) => {
       if (digit === "." && s.amount.includes(".")) return null;
@@ -375,7 +389,7 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       return;
     }
 
-    const loadingToast = toast.loading("Matching the nearby payer...");
+    const loadingToast = toast.loading("Requesting that nearby code...");
 
     void (async () => {
       try {
@@ -389,30 +403,174 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
 
         const payload = (await response.json()) as {
           message?: string;
-          recipient?: NonNullable<SquadState["recipientPreview"]>;
+          handoff?: { code: string };
         };
 
         toast.dismiss(loadingToast);
 
-        if (!response.ok || !payload.recipient) {
+        if (!response.ok || !payload.handoff) {
           toast.error(payload.message ?? "That nearby code is unavailable.");
           return;
         }
 
+        vibrate([80, 60, 80]);
         dispatch({
-          recipientInput: payload.recipient.username,
-          recipientPreview: payload.recipient,
-          screen: "generate-intent",
-          scanManualInput: "",
+          payerMatch: {
+            code: payload.handoff.code,
+            status: "matched",
+            ownerAccepted: false,
+            payerAccepted: false,
+          },
           nearbyOptions: [],
         });
-
-        toast.success(`Nearby match found: @${payload.recipient.username}`);
       } catch {
         toast.dismiss(loadingToast);
         toast.error("We couldn't resolve that nearby code right now.");
       }
     })();
+  }, []);
+
+  const acceptPayerMatch = useCallback(() => {
+    const code = stateRef.current.payerMatch?.code;
+    if (!code) return;
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/nearby/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+
+        const payload = (await response.json()) as {
+          message?: string;
+          match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean; recipient?: NonNullable<SquadState["recipientPreview"]> };
+        };
+
+        if (!response.ok || !payload.match) {
+          toast.error(payload.message ?? "We couldn't confirm that match.");
+          return;
+        }
+
+        if (payload.match.status === "confirmed" && payload.match.recipient) {
+          vibrate(200);
+          dispatch({
+            recipientInput: payload.match.recipient.username,
+            recipientPreview: payload.match.recipient,
+            screen: "generate-intent",
+            scanManualInput: "",
+            payerMatch: null,
+          });
+          toast.success(`Nearby match confirmed: @${payload.match.recipient.username}`);
+          return;
+        }
+
+        dispatch((s) =>
+          s.payerMatch ? { payerMatch: { ...s.payerMatch, ownerAccepted: payload.match!.ownerAccepted, payerAccepted: payload.match!.payerAccepted } } : null,
+        );
+      } catch {
+        toast.error("We couldn't confirm that match right now.");
+      }
+    })();
+  }, []);
+
+  const acceptOwnerMatch = useCallback(() => {
+    const code = stateRef.current.nearbyHandoff?.code;
+    if (!code) return;
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/nearby/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+
+        const payload = (await response.json()) as {
+          message?: string;
+          match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean };
+        };
+
+        if (!response.ok || !payload.match) {
+          toast.error(payload.message ?? "We couldn't confirm that match.");
+          return;
+        }
+
+        if (payload.match.status === "confirmed") vibrate(200);
+
+        dispatch((s) =>
+          s.nearbyHandoff
+            ? { nearbyHandoff: { ...s.nearbyHandoff, status: payload.match!.status, ownerAccepted: payload.match!.ownerAccepted, payerAccepted: payload.match!.payerAccepted } }
+            : null,
+        );
+      } catch {
+        toast.error("We couldn't confirm that match right now.");
+      }
+    })();
+  }, []);
+
+  const startNearbyMatchPolling = useCallback((role: "owner" | "payer") => {
+    let cancelled = false;
+
+    const tick = async () => {
+      const code = role === "owner" ? stateRef.current.nearbyHandoff?.code : stateRef.current.payerMatch?.code;
+      if (!code) return;
+
+      try {
+        const response = await fetch(`/api/nearby/status?code=${encodeURIComponent(code)}`, { cache: "no-store" });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as {
+          match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean; recipient?: NonNullable<SquadState["recipientPreview"]> };
+        };
+        if (cancelled || !payload.match) return;
+
+        if (role === "owner") {
+          const previousStatus = stateRef.current.nearbyHandoff?.status;
+          if (previousStatus === "published" && payload.match.status !== "published") {
+            vibrate([80, 60, 80]);
+          }
+          dispatch((s) =>
+            s.nearbyHandoff
+              ? { nearbyHandoff: { ...s.nearbyHandoff, status: payload.match!.status, ownerAccepted: payload.match!.ownerAccepted, payerAccepted: payload.match!.payerAccepted } }
+              : null,
+          );
+          return;
+        }
+
+        if (payload.match.status === "confirmed" && payload.match.recipient) {
+          vibrate(200);
+          dispatch((s) =>
+            s.payerMatch
+              ? {
+                  recipientInput: payload.match!.recipient!.username,
+                  recipientPreview: payload.match!.recipient!,
+                  screen: "generate-intent",
+                  scanManualInput: "",
+                  payerMatch: null,
+                }
+              : null,
+          );
+          return;
+        }
+
+        dispatch((s) =>
+          s.payerMatch ? { payerMatch: { ...s.payerMatch, ownerAccepted: payload.match!.ownerAccepted, payerAccepted: payload.match!.payerAccepted } } : null,
+        );
+      } catch {
+        // Transient poll failure - the next tick will retry.
+      }
+    };
+
+    void tick();
+    const interval = setInterval(() => void tick(), NEARBY_POLL_INTERVAL_MS);
+    timers.current.add(interval);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      timers.current.delete(interval);
+    };
   }, []);
   const submitScannedToken = useCallback((raw: string) => {
     if (!stateRef.current.wallets.length) {
@@ -539,6 +697,7 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       confirmLinkWallet,
       selectSource,
       onRecipientChange,
+      selectRecipient,
       keypadPress,
       keypadBackspace,
       quickAmount5,
@@ -548,6 +707,9 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       onScanManualInputChange,
       loadNearbyOptions,
       submitNearbyOption,
+      acceptPayerMatch,
+      acceptOwnerMatch,
+      startNearbyMatchPolling,
       submitScannedToken,
       submitManualScanCode,
       readNotification,

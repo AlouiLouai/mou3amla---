@@ -1,5 +1,5 @@
 import type { LinkedWallet } from "@/features/wallets/types";
-import type { PaymentIntent, QrToken, NearbyHandoff, ConfettiPiece, RecipientPreview } from "@/features/payments/types";
+import type { PaymentIntent, QrToken, NearbyHandoff, NearbyMatchState, ConfettiPiece, RecipientPreview } from "@/features/payments/types";
 import type { Invoice } from "@/features/invoices/types";
 import type { ActivityItem } from "@/features/activity/types";
 import type { VerificationStatus } from "@/features/auth/types";
@@ -53,6 +53,7 @@ export interface SquadState {
   currentIntent: PaymentIntent | null;
   qrToken: QrToken | null;
   nearbyHandoff: NearbyHandoff | null;
+  payerMatch: NearbyMatchState | null;
   nearbyOptions: string[];
   isLoadingNearbyOptions: boolean;
   scanManualInput: string;
