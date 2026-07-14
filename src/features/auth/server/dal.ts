@@ -15,8 +15,6 @@ type ProfileRow = {
   username: string;
   display_name: string;
   verification_status: VerificationStatus;
-  didit_latest_status: string | null;
-  didit_session_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -76,8 +74,6 @@ function toAppProfile(profile: ProfileRow): AppProfileRecord {
     username: profile.username,
     displayName: profile.display_name,
     verificationStatus: profile.verification_status,
-    diditLatestStatus: profile.didit_latest_status,
-    diditSessionId: profile.didit_session_id,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
   };
@@ -184,7 +180,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("id, phone, username, display_name, verification_status, didit_latest_status, didit_session_id, created_at, updated_at")
+    .select("id, phone, username, display_name, verification_status, created_at, updated_at")
     .eq("id", identity.userId)
     .maybeSingle<ProfileRow>();
 
@@ -247,8 +243,6 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
     username: profile.username,
     displayName: profile.displayName,
     verificationStatus: profile.verificationStatus,
-    diditLatestStatus: profile.diditLatestStatus,
-    diditSessionId: profile.diditSessionId,
     wallets,
     sourceWalletId,
     activityLog,

@@ -34,8 +34,8 @@ rules most likely to be broken by stale training data or over-eager refactors.
     there before use.
 16. **Supabase schema changes must land in migrations.** Do not leave durable
     database changes implied only in app code.
-17. **Didit verification is post-auth.** Do not gate the initial OTP login on
-    CIN/selfie completion; KYC unlocks higher-trust features afterward.
+17. **Identity verification is post-auth.** Do not gate the initial OTP login
+    on CIN/selfie completion; KYC unlocks higher-trust features afterward.
 
 ## Before you finish a change
 

@@ -17,9 +17,36 @@ function useNow(intervalMs: number): number {
   return now;
 }
 
+function CountdownBadge({ expiresAt, totalMs }: { expiresAt: number; totalMs: number }) {
+  const now = useNow(1000);
+  const secondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  const progress = secondsLeft / (totalMs / 1000);
+
+  return (
+    <div className="mt-4 flex items-center gap-2">
+      <div className="h-1 w-24 overflow-hidden rounded-full" style={{ background: alpha(squad.accent, 0.12) }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${progress * 100}%`, background: squad.accent }} />
+      </div>
+      <span className="font-mono text-xs" style={{ color: squad.textMuted }}>
+        {secondsLeft}s
+      </span>
+    </div>
+  );
+}
+
+function NearbyCountdown({ expiresAt }: { expiresAt: number }) {
+  const now = useNow(1000);
+  const secondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+
+  return (
+    <div className="font-mono text-[13px] font-bold" style={{ color: squad.accent }}>
+      {secondsLeft}s
+    </div>
+  );
+}
+
 export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { state, derived, actions } = squadApp;
-  const now = useNow(1000);
   const { startQrRotation, goHome } = actions;
   const qrToken = state.qrToken;
   const nearbyHandoff = state.nearbyHandoff;
@@ -42,10 +69,6 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   );
 
   useEffect(() => startQrRotation(), [startQrRotation]);
-
-  const secondsLeft = qrToken ? Math.max(0, Math.ceil((qrToken.expiresAt - now) / 1000)) : 0;
-  const nearbySecondsLeft = nearbyHandoff ? Math.max(0, Math.ceil((nearbyHandoff.expiresAt - now) / 1000)) : 0;
-  const progress = qrToken ? secondsLeft / (QR_TOKEN_TTL_MS / 1000) : 0;
 
   return (
     <ScreenFrame header={header} contentClassName="px-6 pb-8">
@@ -77,9 +100,13 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: squad.textFaint }}>
                 Expires
               </div>
-              <div className="font-mono text-[13px] font-bold" style={{ color: squad.accent }}>
-                {nearbyHandoff ? `${nearbySecondsLeft}s` : "--"}
-              </div>
+              {nearbyHandoff ? (
+                <NearbyCountdown expiresAt={nearbyHandoff.expiresAt} />
+              ) : (
+                <div className="font-mono text-[13px] font-bold" style={{ color: squad.accent }}>
+                  --
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -105,14 +132,16 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
           )}
         </div>
 
-        <div className="mt-4 flex items-center gap-2">
-          <div className="h-1 w-24 overflow-hidden rounded-full" style={{ background: alpha(squad.accent, 0.12) }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress * 100}%`, background: squad.accent }} />
+        {qrToken ? (
+          <CountdownBadge expiresAt={qrToken.expiresAt} totalMs={QR_TOKEN_TTL_MS} />
+        ) : (
+          <div className="mt-4 flex items-center gap-2">
+            <div className="h-1 w-24 overflow-hidden rounded-full" style={{ background: alpha(squad.accent, 0.12) }} />
+            <span className="font-mono text-xs" style={{ color: squad.textMuted }}>
+              --
+            </span>
           </div>
-          <span className="font-mono text-xs" style={{ color: squad.textMuted }}>
-            {qrToken ? `${secondsLeft}s` : "--"}
-          </span>
-        </div>
+        )}
         <div className="mt-1 font-mono text-[11px]" style={{ color: squad.textFaint }}>
           @{derived.account.profile.username}
         </div>

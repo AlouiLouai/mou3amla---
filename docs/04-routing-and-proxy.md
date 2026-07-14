@@ -11,11 +11,7 @@ Important app routes in this project:
 - `/` -> Stage 1 landing screen for `+216` phone + `@username`
 - `/verify` -> Stage 2 6-digit OTP gate
 - `/home` -> authenticated dashboard shell
-- `/verify-identity` -> Didit launch screen
-- `/verify-identity/return` -> post-Didit return/status page
-- `/api/didit/session` -> creates a Didit verification session
-- `/api/didit/webhook` -> receives Didit webhook status updates
-- `/api/didit/status` -> re-syncs the authenticated user's Didit session status on demand
+- `/verify-identity` -> local mock identity verification flow
 - `/api/qr/mint` -> mints a signed rotating QR payload for the authenticated recipient
 - `/api/qr/resolve` -> verifies a signed QR payload and resolves recipient routing preview
 - `/api/nearby/publish` -> publishes the current recipient's short nearby code

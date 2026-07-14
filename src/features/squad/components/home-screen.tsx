@@ -29,7 +29,7 @@ function verificationCopy(status: string) {
   if (status === "pending") {
     return {
       title: "Verification in review",
-      body: "Didit is reviewing your file. High-trust features unlock right after approval.",
+      body: "Your mock review is parked for approval. High-trust features unlock as soon as you mark it verified.",
       icon: Sparkles,
       tone: squad.subtle,
     };
@@ -38,7 +38,7 @@ function verificationCopy(status: string) {
   if (status === "rejected") {
     return {
       title: "Verification needs retry",
-      body: "Restart the Didit flow to unlock bank account linking and higher-trust routes.",
+      body: "Replay the mock verification screens to unlock bank account linking and higher-trust routes.",
       icon: ShieldCheck,
       tone: squad.destructive,
     };
@@ -59,8 +59,6 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const verification = verificationCopy(account.profile.verificationStatus);
   const VerificationIcon = verification.icon;
   const latestNotification = account.notifications[0] ?? null;
-  const isVerificationSyncing =
-    account.profile.verificationStatus === "pending" && Boolean(account.profile.diditSessionId);
   const initials = account.profile.fullName
     .split(" ")
     .map((part) => part[0])
@@ -151,11 +149,6 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
                   <p className="mt-1 text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
                     {verification.body}
                   </p>
-                  {isVerificationSyncing ? (
-                    <div className="mt-2 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: verification.tone }}>
-                      Auto-refreshing Didit status
-                    </div>
-                  ) : null}
                 </div>
               </div>
 
@@ -215,7 +208,7 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
             body={
               account.profile.verificationStatus === "verified"
                 ? "Bank account linking is now available."
-                : "Didit approval is required before adding a RIB."
+                : "Verification approval is required before adding a RIB."
             }
             icon={<Landmark className="size-4.5" style={{ color: squad.subtle }} />}
           />
@@ -243,7 +236,7 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
           >
             <div className="text-[14px] font-black">No linked destination yet.</div>
             <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
-              Start with a wallet tag or merchant id. After Didit approval, you can also attach a 20-digit RIB.
+              Start with a wallet tag or merchant id. After verification approval, you can also attach a 20-digit RIB.
             </p>
           </div>
         ) : null}

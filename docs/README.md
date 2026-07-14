@@ -15,11 +15,13 @@ Authentication now uses a single Supabase-backed entry flow: one landing
 screen collects a Tunisian `+216` phone number plus a unique `@username`,
 then routes every user through the same 6-digit OTP gate before sending them
 to the home dashboard. Digital identity verification is a separate
-Didit-powered KYC flow launched from the dashboard banner or profile.
-Didit keeps only its API key and webhook secret in env; the chosen workflow id
-is app config, not a secret. The current MVP keeps the phone-first OTP UX but
-uses a local dummy OTP plus a hidden Supabase bridge identity, so no SMS
-provider is required during prototyping.
+SQUAD-branded mock KYC flow launched from the dashboard banner or profile.
+The current MVP keeps the phone-first OTP UX and a local mock verification
+rail so the team can demo trusted-route states without an external identity
+provider. The same Supabase `verification_status` still controls which
+high-trust features unlock. The current MVP also uses a local dummy OTP plus a
+hidden Supabase bridge identity, so no SMS provider is required during
+prototyping.
 Linked destinations, routed payment records, and in-app notifications now
 persist in Supabase instead of living only in the client shell.
 Mode Professionnel accounts get a lightweight El Fatoora micro-invoicing

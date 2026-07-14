@@ -13,8 +13,7 @@ src/
     page.tsx              # Stage 1 auth landing: phone + username
     verify/page.tsx       # Stage 2 OTP gate
     home/page.tsx         # Stage 3 authenticated dashboard
-    verify-identity/      # Didit launch + return screens
-    api/didit/            # Didit session creation + webhook sync
+    verify-identity/      # Local mock identity verification screens
     api/qr/               # Signed QR mint + recipient resolve
     api/nearby/           # Nearby 3-digit handoff publish/options/claim
     auth/logout/route.ts  # Session teardown
@@ -36,7 +35,7 @@ src/
 
     onboarding/           # Post-login identity verification UX
       components/         # verification-flow-screen.tsx
-      server/             # Didit session status sync helpers
+      server/             # mock verification status actions
 
     wallets/              # Destination linking only; never balances
       components/
@@ -84,9 +83,8 @@ supabase/
 - **Authenticated user lookup** belongs to
   `src/features/auth/server/dal.ts`, not inside pages.
 - **Supabase client setup** belongs to `src/lib/supabase/**`.
-- **Didit identity verification** belongs to the `onboarding` feature for UI
-  and `src/app/api/didit/**` for server-side integration, with shared sync
-  helpers under `src/features/onboarding/server/**`.
+- **Mock identity verification** belongs to the `onboarding` feature for UI
+  and `src/features/onboarding/server/**` for Supabase status updates.
 - **Signed QR and nearby discovery** belong to the `payments` feature for UI
   and helpers, with thin route handlers under `src/app/api/qr/**` and
   `src/app/api/nearby/**`.

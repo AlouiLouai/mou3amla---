@@ -42,6 +42,12 @@ The actual setup:
   `@serwist/turbopack`
 - `src/app/sw.ts` is the service worker source: precaches build assets, enables
   navigation preload, and falls back to `/~offline` for document requests
+- `src/app/sw.ts` also forces `NetworkOnly` for `/api/qr/*` and `/api/nearby/*`
+  ahead of Serwist's `defaultCache`, so a flaky connection can never make the
+  worker serve a stale cached QR/nearby-handoff response for a payment. Every
+  other same-origin API route still falls under `defaultCache`'s default
+  `NetworkFirst` behavior. Keep any new payment-sensitive `GET` route in that
+  `NetworkOnly` list.
 - `src/app/serwist/[path]/route.ts` bundles and serves the worker at
   `/serwist/sw.js`
 - `src/app/layout.tsx` wraps the app in
@@ -89,9 +95,18 @@ something useful instead of a browser error.
 The in-app shell intentionally behaves like a compact native container:
 
 - the header zone is fixed per screen
-- the bottom navigation rail is fixed per screen
+- the bottom navigation rail floats over the content pane and auto-hides,
+  Instagram-style: it slides out of view (`translateY`, no layout reflow) on
+  scroll-down past a small threshold, and slides back in on scroll-up or once
+  the pane is back near the top
 - only the central content pane scrolls
 
-Supporting CSS lives in `src/app/globals.css` and the shared shell frame lives
-in `src/features/squad/components/screen-frame.tsx`. If a screen starts
-scrolling edge-to-edge again, treat that as a regression.
+That show/hide behavior is owned entirely by
+`src/features/squad/components/screen-frame.tsx`, not by individual screens:
+it tracks scroll direction on its own scroll container (rAF-throttled, passive
+listener) and measures the footer's real height via `ResizeObserver` into a
+`--squad-bottomnav-h` CSS variable so the scrollable content always reserves
+enough bottom space. Do not reimplement scroll/sticky handling per screen —
+extend `screen-frame.tsx` instead. Supporting CSS lives in
+`src/app/globals.css`. If a screen starts scrolling edge-to-edge again, or the
+nav stops floating over content, treat that as a regression.

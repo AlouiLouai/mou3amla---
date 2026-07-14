@@ -5,9 +5,6 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   DUMMY_PHONE_OTP_ENABLED: z.enum(["true", "false"]).optional(),
   QR_TOKEN_SECRET: z.string().min(32).optional(),
-  DIDIT_API_KEY: z.string().min(1).optional(),
-  DIDIT_WORKFLOW_ID: z.string().uuid().optional(),
-  DIDIT_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
 const clientSchema = z.object({
@@ -22,9 +19,6 @@ const parsedServer = serverSchema.safeParse({
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   DUMMY_PHONE_OTP_ENABLED: process.env.DUMMY_PHONE_OTP_ENABLED,
   QR_TOKEN_SECRET: process.env.QR_TOKEN_SECRET,
-  DIDIT_API_KEY: process.env.DIDIT_API_KEY,
-  DIDIT_WORKFLOW_ID: process.env.DIDIT_WORKFLOW_ID,
-  DIDIT_WEBHOOK_SECRET: process.env.DIDIT_WEBHOOK_SECRET,
 });
 
 const parsedClient = clientSchema.safeParse({

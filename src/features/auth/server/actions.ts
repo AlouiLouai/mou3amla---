@@ -182,8 +182,6 @@ export async function startPhoneAuth(
       username,
       display_name: buildDisplayName(username),
       verification_status: "unverified",
-      didit_latest_status: null,
-      didit_session_id: null,
     });
 
     if (insertProfileError) {

@@ -120,7 +120,7 @@ export function WalletRegistrySheet({ squadApp }: { squadApp: UseSquadApp }) {
                         color: squad.textMuted,
                       }}
                     >
-                      Complete the Didit verification flow before entering a 20-digit bank RIB.
+                      Complete identity verification before entering a 20-digit bank RIB.
                     </div>
                   ) : null}
                   <div className="mb-2 text-xs font-semibold tracking-wide" style={{ color: squad.textMuted }}>

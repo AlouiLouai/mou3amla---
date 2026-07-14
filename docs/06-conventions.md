@@ -70,20 +70,31 @@ Do not place `"use server"` functions inside client component files.
 
 ## KYC conventions
 
-- Didit is launched only after authentication, from the dashboard/profile
-  entry points.
-- Keep the local database state `unverified` or `pending` until Didit's
-  callback/webhook confirms approval.
-- The Didit return page may do a server-side status re-check by
-  `didit_session_id`, and the authenticated shell may poll `/api/didit/status`
-  while a session is still pending. This improves resilience, but the signed
-  webhook remains the long-lived background sync rail.
+- Identity verification is launched only after authentication, from the
+  dashboard/profile entry points.
+- Capture is real, the decision is mocked: `src/features/onboarding/components/cin-capture-step.tsx`
+  captures the CIN front/back via a plain `<input type="file" accept="image/*">`
+  (no `capture` attribute, so mobile browsers offer both the camera and the
+  photo library) and `selfie-capture-step.tsx` drives a live `getUserMedia`
+  selfie with an oval guide that auto-snapshots once a face is aligned
+  (`FaceDetector` API where supported, a timed fallback otherwise). No image
+  quality/OCR validation happens — any captured photo is accepted.
+- The face-match "comparison" between the CIN photo and the selfie is
+  simulated client-side (a short delay, then success) — there is no real
+  biometric matching. Do not add one without the user asking for a real KYC
+  provider.
+- Captured photos are never uploaded or persisted: they live only in browser
+  memory (`URL.createObjectURL` / canvas `dataURL`) for the duration of the
+  flow and are revoked/discarded on retake or unmount. Do not add a Supabase
+  Storage bucket for these without the user explicitly asking for photo
+  retention.
+- Keep the local database state `unverified`, `pending`, `verified`, or
+  `rejected` in `profiles.verification_status`; the mock flow writes that value
+  directly via `setMockVerificationStatus` in
+  `src/features/onboarding/server/actions.ts`.
 - 20-digit RIB binding stays locked unless `verificationStatus === "verified"`.
-- White-label/brand adjustments for Didit screens are mainly controlled in the
-  Didit dashboard, while session launch/webhook handling stays in code.
-- Keep `DIDIT_API_KEY` and `DIDIT_WEBHOOK_SECRET` in env. `DIDIT_WORKFLOW_ID`
-  is configuration rather than a secret, and the app can read it from env with
-  a safe fallback in `src/config/kyc.ts`.
+- Keep the verification flow SQUAD-branded and local until the user asks for a
+  real KYC provider integration.
 
 ## Mocked vs. real boundaries in the `squad` shell
 
@@ -92,7 +103,7 @@ Read this before "fixing" something that looks incomplete:
 - **Authentication is real now.** Landing, OTP, session cookies, and profile
   lookup are backed by Supabase.
 - **KYC status is real app state.** Verification status comes from the
-  `profiles` table and Didit webhook sync.
+  `profiles` table even though the current UI is a local mock flow.
 - **Linked destinations, payment history, and notifications are real now.**
   The home shell hydrates them from Supabase, and payment creation writes back
   to the database before the TUNPAY handoff.
@@ -108,8 +119,9 @@ Read this before "fixing" something that looks incomplete:
 
 ## Shell layout conventions
 
-- In authenticated mobile screens, the header and bottom navigation are fixed
-  shell chrome.
+- In authenticated mobile screens, the header is fixed shell chrome and the
+  bottom navigation floats over the content pane, auto-hiding on scroll-down
+  and reappearing on scroll-up (see [03-pwa.md](./03-pwa.md#mobile-shell-behavior)).
 - Only the body content pane should scroll.
 - Prefer `src/features/squad/components/screen-frame.tsx` instead of manually
   rebuilding sticky/scroll behavior per screen.
@@ -124,10 +136,7 @@ Read this before "fixing" something that looks incomplete:
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`,
   `DUMMY_PHONE_OTP_ENABLED`,
-  `QR_TOKEN_SECRET`,
-  `DIDIT_API_KEY`,
-  `DIDIT_WORKFLOW_ID`,
-  `DIDIT_WEBHOOK_SECRET`.
+  `QR_TOKEN_SECRET`.
 
 ## Package manager
 
