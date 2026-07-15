@@ -5,6 +5,7 @@ import { HomeScreen } from "@/features/squad/components/home-screen";
 import { squad } from "@/features/squad/constants";
 import { useSquadApp } from "@/features/squad/hooks/use-squad-app";
 import type { InitialSquadUser } from "@/features/squad/types";
+import { WalletRegistrySheet } from "@/features/wallets/components/wallet-registry-sheet";
 
 function ScreenLoading() {
   return (
@@ -50,6 +51,9 @@ const ReceiveQrScreen = dynamic(() => import("@/features/payments/components/rec
 const ScanQrScreen = dynamic(() => import("@/features/payments/components/scan-qr-screen").then((mod) => mod.ScanQrScreen), {
   loading: () => <ScreenLoading />,
 });
+const AccountsScreen = dynamic(() => import("@/features/wallets/components/accounts-screen").then((mod) => mod.AccountsScreen), {
+  loading: () => <ScreenLoading />,
+});
 
 export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
   const squadApp = useSquadApp(initialUser);
@@ -91,9 +95,11 @@ export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
             {screen === "invoices" && <InvoicesScreen squadApp={squadApp} />}
             {screen === "profile" && <ProfileScreen squadApp={squadApp} />}
             {screen === "notifications" && <NotificationsScreen squadApp={squadApp} />}
+            {screen === "accounts" && <AccountsScreen squadApp={squadApp} />}
           </div>
         </div>
       </div>
+      <WalletRegistrySheet squadApp={squadApp} />
     </div>
   );
 }

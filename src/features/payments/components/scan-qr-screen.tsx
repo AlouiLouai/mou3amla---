@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, HandCoins, RefreshCw, Waves } from "lucide-react";
+import { HandCoins, RefreshCw, Waves } from "lucide-react";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -18,36 +20,26 @@ declare global {
 }
 
 export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
-  const { state, actions } = squadApp;
-  const { goHome, loadNearbyOptions, submitNearbyOption, acceptPayerMatch, startNearbyMatchPolling } = actions;
-  const [mode, setMode] = useState<HandoffMode>("qr");
+  const { state, derived, actions } = squadApp;
+  const { loadNearbyOptions, submitNearbyOption, acceptPayerMatch, cancelPayerMatch, startNearbyMatchPolling } = actions;
+  const [mode, setMode] = useState<HandoffMode>(state.initialHandoffMode);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const supportsBarcodeDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
   const payerMatch = state.payerMatch;
   const header = (
-    <div className="px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-3">
-      <button
-        type="button"
-        onClick={goHome}
-        className="mb-4.5 flex size-9 items-center justify-center rounded-full border"
-        style={{ background: squad.card, borderColor: squad.border }}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-
-      <div className="mb-1 text-[17px] font-extrabold tracking-tight">Find the recipient</div>
-      <div className="text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
-        Scan their signed QR, or use the nearby 3-digit code instead, AirDrop-style.
-      </div>
-    </div>
+    <AppHeader profile={derived.account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
   );
+  const footer = renderAppFooter("scan-qr", actions);
 
   useEffect(() => {
     if (mode === "nearby") loadNearbyOptions();
   }, [mode, loadNearbyOptions]);
 
-  useEffect(() => startNearbyMatchPolling("payer"), [startNearbyMatchPolling]);
+  useEffect(() => {
+    if (mode !== "nearby") return;
+    return startNearbyMatchPolling("payer");
+  }, [mode, startNearbyMatchPolling]);
 
   useEffect(() => {
     if (mode !== "qr" || !supportsBarcodeDetector || !videoRef.current) return;
@@ -95,7 +87,13 @@ export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   }, [mode, supportsBarcodeDetector]);
 
   return (
-    <ScreenFrame header={header} contentClassName="px-6 pb-8">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-6 pb-8">
+      <div className="mb-3">
+        <div className="text-[15px] font-black tracking-tight">Find the recipient</div>
+        <div className="text-[12px] leading-relaxed" style={{ color: squad.textMuted }}>
+          Scan their signed QR, or use the nearby 3-digit code instead, AirDrop-style.
+        </div>
+      </div>
       <HandoffModeToggle mode={mode} onChange={setMode} />
 
       {mode === "qr" ? (
@@ -167,7 +165,8 @@ export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
               <div>
                 <div className="text-[12px] font-black">Nearby match</div>
                 <div className="text-[10.5px] font-medium" style={{ color: squad.textMuted }}>
-                  Ask the recipient which 3 digits they see, then pick it here.
+                  Ask the recipient which 3 digits they see, then pick it here. Uses your
+                  approximate location, if allowed, to only show codes nearby.
                 </div>
               </div>
             </div>
@@ -202,6 +201,14 @@ export function ScanQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
                 style={{ background: squad.accent, color: "#FFFFFF" }}
               >
                 {payerMatch.payerAccepted ? "Waiting for the other phone..." : "Accept this match"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelPayerMatch}
+                className="mt-2 w-full text-center text-[11.5px] font-bold"
+                style={{ color: squad.textMuted }}
+              >
+                Not this one? Cancel and pick another code
               </button>
             </div>
           ) : (

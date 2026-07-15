@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { env } from "@/config/env";
-import { mintQrToken } from "@/features/payments/lib/qr-token";
+import { getQrTokenSecret, mintQrToken } from "@/features/payments/lib/qr-token";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,11 +13,7 @@ type DestinationRow = {
   id: string;
 };
 
-function getQrTokenSecret(): string {
-  return env.QR_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY;
-}
-
-export async function POST() {
+export const POST = withRouteErrorHandling(async () => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
 
@@ -55,4 +51,4 @@ export async function POST() {
       },
     },
   );
-}
+});

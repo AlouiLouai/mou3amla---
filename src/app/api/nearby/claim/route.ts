@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { NEARBY_GEO_MATCH_RADIUS_DEG, NEARBY_HANDSHAKE_TTL_MS } from "@/features/payments/constants";
+import { roundCoord } from "@/features/payments/lib/geolocation";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const claimSchema = z.object({
   code: z.string().regex(/^\d{3}$/),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
 });
 
 type NearbyRow = {
@@ -15,7 +20,7 @@ type NearbyRow = {
 // Proposes a match on a published nearby code. This does not reveal the
 // recipient yet - both the payer and the owner must separately call
 // /api/nearby/accept before /api/nearby/status returns recipient details.
-export async function POST(request: Request) {
+export const POST = withRouteErrorHandling(async (request: Request) => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
 
@@ -32,25 +37,41 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const userId = authData.claims.sub;
   const nowIso = new Date().toISOString();
+  const hasLocation = parsed.data.lat !== undefined && parsed.data.lng !== undefined;
+  const lat = hasLocation ? roundCoord(parsed.data.lat!) : null;
+  const lng = hasLocation ? roundCoord(parsed.data.lng!) : null;
 
-  const { data: row, error } = await admin
+  let lookup = admin
     .from("nearby_handoffs")
     .select("id, expires_at")
     .eq("challenge_code", parsed.data.code)
     .eq("status", "published")
     .neq("owner_user_id", userId)
-    .gt("expires_at", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<NearbyRow>();
+    .gt("expires_at", nowIso);
+
+  // If the payer shared a coarse location, don't let a claim through for a
+  // code whose owner is (or claims to be) somewhere else entirely - a code
+  // published without a location can't be verified either way, so it's
+  // excluded here rather than trusted blindly.
+  if (hasLocation) {
+    lookup = lookup
+      .gte("geo_lat", lat! - NEARBY_GEO_MATCH_RADIUS_DEG)
+      .lte("geo_lat", lat! + NEARBY_GEO_MATCH_RADIUS_DEG)
+      .gte("geo_lng", lng! - NEARBY_GEO_MATCH_RADIUS_DEG)
+      .lte("geo_lng", lng! + NEARBY_GEO_MATCH_RADIUS_DEG);
+  }
+
+  const { data: row, error } = await lookup.order("created_at", { ascending: false }).limit(1).maybeSingle<NearbyRow>();
 
   if (error || !row) {
     return NextResponse.json({ message: "That nearby code is no longer available." }, { status: 404 });
   }
 
+  const handshakeExpiresAt = new Date(Date.now() + NEARBY_HANDSHAKE_TTL_MS).toISOString();
+
   const { data: updated, error: updateError } = await admin
     .from("nearby_handoffs")
-    .update({ status: "matched", payer_user_id: userId })
+    .update({ status: "matched", payer_user_id: userId, expires_at: handshakeExpiresAt })
     .eq("id", row.id)
     .eq("status", "published")
     .select("expires_at")
@@ -69,4 +90,4 @@ export async function POST(request: Request) {
       payerAccepted: false,
     },
   });
-}
+});

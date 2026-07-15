@@ -1,4 +1,6 @@
-import { Bell, CheckCheck, ChevronLeft, CreditCard, ShieldCheck, Sparkles } from "lucide-react";
+import { Bell, CheckCheck, CreditCard, ShieldCheck, Sparkles } from "lucide-react";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -24,51 +26,29 @@ export function NotificationsScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { derived, actions } = squadApp;
   const notifications = derived.account.notifications;
   const header = (
-    <div className="px-4 pt-[max(0.9rem,env(safe-area-inset-top))] pb-3">
-      <div
-        className="relative overflow-hidden rounded-[30px] px-4 pt-4 pb-5 text-white"
-        style={{ background: squad.hero, boxShadow: "0 16px 40px rgba(0,0,0,0.14)" }}
-      >
-        <div
-          className="pointer-events-none absolute -top-12 right-[-26px] h-32 w-32 rounded-full"
-          style={{ background: "linear-gradient(135deg, rgba(255,0,131,0.95), rgba(255,141,40,0.88))" }}
-        />
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={actions.goHome}
-              className="flex size-10 items-center justify-center rounded-full border border-white/14 bg-white/10 text-white"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.26em] text-white/60">Notification center</div>
-              <div className="mt-2 text-[1.45rem] font-black leading-none">Stay in sync.</div>
+    <AppHeader profile={derived.account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+  );
+  const footer = renderAppFooter("notifications", actions);
+
+  return (
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[15px] font-black tracking-tight">Notifications</div>
+            <div className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
+              {derived.unreadNotifications} unread alert(s)
             </div>
           </div>
-
           <button
             type="button"
             onClick={actions.readAllNotifications}
-            className="rounded-full bg-white/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white"
+            className="rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em]"
+            style={{ background: alpha(squad.accent, 0.1), color: squad.accent }}
           >
             Mark read
           </button>
         </div>
 
-        <div className="relative mt-4 rounded-[22px] bg-white px-4 py-3 text-black">
-          <div className="text-[13px] font-black">{derived.unreadNotifications} unread alert(s)</div>
-          <div className="mt-1 text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
-            Payment routing events, verification updates, and system notices appear here.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <ScreenFrame header={header} contentClassName="px-4 pb-4">
         {notifications.length === 0 ? (
           <div className="rounded-[24px] border p-5 text-center" style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}>
             <div

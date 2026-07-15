@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronLeft, HandCoins, Waves } from "lucide-react";
+import { CheckCircle2, HandCoins, Waves } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -50,33 +52,29 @@ function NearbyCountdown({ expiresAt }: { expiresAt: number }) {
 
 export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { state, derived, actions } = squadApp;
-  const { startQrRotation, startNearbyMatchPolling, acceptOwnerMatch, goHome } = actions;
-  const [mode, setMode] = useState<HandoffMode>("qr");
+  const { startQrRotation, startNearbyMatchPolling, acceptOwnerMatch, cancelOwnerMatch } = actions;
+  const [mode, setMode] = useState<HandoffMode>(state.initialHandoffMode);
   const qrToken = state.qrToken;
   const nearbyHandoff = state.nearbyHandoff;
   const header = (
-    <div className="px-6 pt-[max(1.125rem,env(safe-area-inset-top))] pb-3">
-      <button
-        type="button"
-        onClick={goHome}
-        className="mb-4.5 flex size-9 items-center justify-center rounded-full border"
-        style={{ background: squad.card, borderColor: squad.border }}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-
-      <div className="mb-1 text-[17px] font-extrabold tracking-tight">Request a payment</div>
-      <div className="max-w-[280px] text-[13px] leading-relaxed" style={{ color: squad.textMuted }}>
-        Share your signed QR, or let a nearby payer match your code, AirDrop-style.
-      </div>
-    </div>
+    <AppHeader profile={derived.account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
   );
+  const footer = renderAppFooter("receive-qr", actions);
 
   useEffect(() => startQrRotation(), [startQrRotation]);
-  useEffect(() => startNearbyMatchPolling("owner"), [startNearbyMatchPolling]);
+  useEffect(() => {
+    if (mode !== "nearby") return;
+    return startNearbyMatchPolling("owner");
+  }, [mode, startNearbyMatchPolling]);
 
   return (
-    <ScreenFrame header={header} contentClassName="px-6 pb-8">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-6 pb-8">
+      <div className="mb-3 text-center">
+        <div className="text-[15px] font-black tracking-tight">Request a payment</div>
+        <div className="mx-auto max-w-[280px] text-[12px] leading-relaxed" style={{ color: squad.textMuted }}>
+          Share your signed QR, or let a nearby payer match your code, AirDrop-style.
+        </div>
+      </div>
       <HandoffModeToggle mode={mode} onChange={setMode} />
 
       {mode === "qr" ? (
@@ -132,7 +130,8 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
               <div>
                 <div className="text-[12px] font-black">Nearby handoff code</div>
                 <div className="text-[10.5px] font-medium" style={{ color: squad.textMuted }}>
-                  Ask the payer to choose this code from 4 nearby options.
+                  Ask the payer to choose this code from 4 nearby options. Uses your approximate
+                  location, if allowed, to only match with codes actually nearby.
                 </div>
               </div>
             </div>
@@ -190,6 +189,14 @@ export function ReceiveQrScreen({ squadApp }: { squadApp: UseSquadApp }) {
                 style={{ background: squad.accent, color: "#FFFFFF" }}
               >
                 {nearbyHandoff.ownerAccepted ? "Waiting for the other phone..." : "Accept this match"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelOwnerMatch}
+                className="mt-2 w-full text-center text-[11.5px] font-bold"
+                style={{ color: squad.textMuted }}
+              >
+                Cancel and generate a new code
               </button>
             </div>
           ) : (

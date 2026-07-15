@@ -93,7 +93,21 @@ supabase/
   recipient must independently accept a shared 3-digit code before the
   recipient is revealed. Shared lookup/response-shaping logic for that
   handshake lives in `src/features/payments/server/nearby-match.ts`, polled
-  from the client via `/api/nearby/status`.
+  from the client via `/api/nearby/status`. A claimed-but-unconfirmed handoff
+  gets a bounded acceptance window (`NEARBY_HANDSHAKE_TTL_MS` in
+  `src/features/payments/constants.ts`) set once at claim time - the owner's
+  background QR/code republish must never slide that expiry forward, or an
+  abandoned handshake would block that owner's code slot indefinitely.
+  `/api/nearby/cancel` lets either side bail out before that window elapses:
+  as owner it deletes the handoff outright, as payer it releases the claim
+  back to `published` without touching the owner's row. "Nearby" is bounded by
+  a coarse, rounded geolocation (`src/features/payments/lib/geolocation.ts`,
+  ~100m precision, never the raw device coordinates) rather than real
+  proximity detection - `/api/nearby/options` and `/api/nearby/claim` bound
+  results to a small bounding box around the requester's coordinates when
+  shared, and fall back to the unfiltered recent-published pool if location
+  permission was declined (demo-friendly, but no longer a physical-proximity
+  guarantee for that user).
 - **Recipient username search-as-you-type** on the send screen calls
   `/api/users/search` (an admin-client query, since RLS only lets a user read
   their own `profiles` row) and is debounced client-side in
@@ -111,6 +125,22 @@ The shell now uses a reusable frame pattern: header and footer/tab chrome stay
 fixed, while each screen's central content pane is the only scrollable region.
 That shared behavior belongs in `src/features/squad/components/screen-frame.tsx`
 instead of being reimplemented ad hoc per screen.
+
+Every full-page screen in the authenticated shell (home, send, receive, scan,
+intent result, activity, invoices, profile, notifications) shares the exact
+same header and bottom nav - not just the four screens the bottom nav can
+navigate directly to. This is a deliberate tab-app IA: there is no per-screen
+back-chevron header, and "back" is just tapping Home. Screens must not build
+their own header; use `src/features/squad/components/app-header.tsx`
+(`AppHeader`) and `renderAppFooter` from
+`src/features/squad/components/bottom-nav.tsx` instead. Screen-specific
+context (a title, a subtitle) belongs as the first thing in the *scrollable
+body*, not in the fixed header. `ScreenFrame`'s footer prop accepts a
+`(compact: boolean) => ReactNode` render function specifically so the bottom
+nav can compact to an icon-only pill while scrolling and expand back at rest
+(mirrors Instagram's tab bar) - it must never fully disappear.
+Sheets/overlays like `WalletRegistrySheet` are not full-page screens and stay
+exempt from this pattern.
 
 The shell now bootstraps its real user state from Supabase-backed server data:
 profile, linked destinations, activity history, and notifications are passed

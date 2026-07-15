@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { RecipientPreview } from "@/features/payments/types";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,7 @@ type DestinationRow = {
   is_default: boolean;
 };
 
-export async function GET(request: Request) {
+export const GET = withRouteErrorHandling(async (request: Request) => {
   const url = new URL(request.url);
   const rawQuery = url.searchParams.get("q") ?? "";
   const query = rawQuery.replace(/^@+/, "").trim().toLowerCase();
@@ -81,4 +82,4 @@ export async function GET(request: Request) {
   });
 
   return NextResponse.json({ users });
-}
+});

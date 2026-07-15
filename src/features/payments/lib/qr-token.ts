@@ -1,7 +1,13 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { env } from "@/config/env";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import type { QrToken } from "@/features/payments/types";
 const QR_TOKEN_VERSION = "sqd1";
+
+/** Falls back to the service-role key only because no dedicated secret was configured for this MVP - set QR_TOKEN_SECRET in production so QR-token signing isn't coupled to the DB admin credential. */
+export function getQrTokenSecret(): string {
+  return env.QR_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY;
+}
 
 type SignedQrTokenPayload = {
   sub: string;

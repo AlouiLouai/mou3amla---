@@ -1,5 +1,6 @@
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft } from "lucide-react";
-import { BottomNav } from "@/features/squad/components/bottom-nav";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -14,32 +15,19 @@ export function ActivityScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { derived, actions } = squadApp;
   const account = derived.account;
   const header = (
-    <div className="px-4 pt-[max(0.9rem,env(safe-area-inset-top))] pb-3">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={actions.goHome}
-          className="flex size-10 items-center justify-center rounded-full border"
-          style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
-        >
-          <ChevronLeft className="size-4" />
-        </button>
+    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+  );
+  const footer = renderAppFooter("activity", actions);
 
-        <div>
-          <div className="text-[1.2rem] font-black tracking-tight">Activity</div>
+  return (
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
+        <div className="mb-3">
+          <div className="text-[15px] font-black tracking-tight">Activity</div>
           <p className="text-[11px] font-semibold" style={{ color: squad.textFaint }}>
             Payment routing history across sent and received intents.
           </p>
         </div>
-      </div>
-    </div>
-  );
-  const footer = (
-    <BottomNav active="activity" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
-  );
 
-  return (
-    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
         {account.activityLog.length === 0 ? (
           <div
             className="rounded-[24px] border p-5 text-center text-[12.5px]"

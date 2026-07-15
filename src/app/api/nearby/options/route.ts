@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { NEARBY_GEO_MATCH_RADIUS_DEG } from "@/features/payments/constants";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,7 +31,12 @@ function shuffle<T>(items: T[]): T[] {
   return result;
 }
 
-export async function GET() {
+export const GET = withRouteErrorHandling(async (request: Request) => {
+  const url = new URL(request.url);
+  const lat = Number(url.searchParams.get("lat"));
+  const lng = Number(url.searchParams.get("lng"));
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng) && url.searchParams.has("lat") && url.searchParams.has("lng");
+
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
 
@@ -41,14 +48,26 @@ export async function GET() {
   const userId = authData.claims.sub;
   const nowIso = new Date().toISOString();
 
-  const { data: rows, error } = await admin
+  let query = admin
     .from("nearby_handoffs")
     .select("challenge_code")
     .neq("owner_user_id", userId)
     .eq("status", "published")
-    .gt("expires_at", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(4);
+    .gt("expires_at", nowIso);
+
+  // Bound "nearby" to plausible physical proximity when the payer shared a
+  // coarse location - rows without a location (owner declined permission)
+  // are correctly excluded by the range filter's NULL semantics. Without a
+  // location from the payer, fall back to the unfiltered recent pool.
+  if (hasLocation) {
+    query = query
+      .gte("geo_lat", lat - NEARBY_GEO_MATCH_RADIUS_DEG)
+      .lte("geo_lat", lat + NEARBY_GEO_MATCH_RADIUS_DEG)
+      .gte("geo_lng", lng - NEARBY_GEO_MATCH_RADIUS_DEG)
+      .lte("geo_lng", lng + NEARBY_GEO_MATCH_RADIUS_DEG);
+  }
+
+  const { data: rows, error } = await query.order("created_at", { ascending: false }).limit(4);
 
   if (error) {
     return NextResponse.json({ message: "We couldn't load nearby codes right now." }, { status: 500 });
@@ -68,4 +87,4 @@ export async function GET() {
     options: shuffle(options),
     hasLiveMatch: realCodes.length > 0,
   });
-}
+});

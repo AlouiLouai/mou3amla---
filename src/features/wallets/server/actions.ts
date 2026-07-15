@@ -6,6 +6,7 @@ import { getSessionIdentity } from "@/features/auth/server/dal";
 import { PROVIDERS } from "@/features/wallets/constants";
 import type { LinkedWallet, RoutingType } from "@/features/wallets/types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 
 type ProfileVerificationRow = {
   verification_status: "unverified" | "pending" | "verified" | "rejected";
@@ -73,10 +74,9 @@ function toWallet(row: LinkedDestinationRow): LinkedWallet {
   };
 }
 
-export async function linkDestination(input: {
-  providerId: string;
-  routingValue: string;
-}): Promise<{ ok: true; wallet: LinkedWallet; sourceWalletId: string } | { ok: false; message: string }> {
+type LinkDestinationResult = { ok: true; wallet: LinkedWallet; sourceWalletId: string } | { ok: false; message: string };
+
+async function linkDestinationUnsafe(input: { providerId: string; routingValue: string }): Promise<LinkDestinationResult> {
   const parsed = linkDestinationSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: "Complete the provider and routing fields first." };
@@ -155,9 +155,18 @@ export async function linkDestination(input: {
   };
 }
 
-export async function setPrimaryDestination(input: {
-  destinationId: string;
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function linkDestination(input: { providerId: string; routingValue: string }): Promise<LinkDestinationResult> {
+  try {
+    return await linkDestinationUnsafe(input);
+  } catch (error) {
+    logger.error("Unhandled error linking destination", error, { providerId: input.providerId });
+    return { ok: false, message: "We couldn't link that destination right now. Please try again." };
+  }
+}
+
+type SetPrimaryDestinationResult = { ok: true } | { ok: false; message: string };
+
+async function setPrimaryDestinationUnsafe(input: { destinationId: string }): Promise<SetPrimaryDestinationResult> {
   const parsed = selectPrimarySchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: "Choose a valid destination first." };
@@ -202,4 +211,13 @@ export async function setPrimaryDestination(input: {
 
   revalidatePath("/home");
   return { ok: true };
+}
+
+export async function setPrimaryDestination(input: { destinationId: string }): Promise<SetPrimaryDestinationResult> {
+  try {
+    return await setPrimaryDestinationUnsafe(input);
+  } catch (error) {
+    logger.error("Unhandled error setting primary destination", error, { destinationId: input.destinationId });
+    return { ok: false, message: "We couldn't update your primary route right now." };
+  }
 }

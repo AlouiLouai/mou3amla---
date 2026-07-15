@@ -1,5 +1,7 @@
-import { ChevronLeft, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import { invoicesToCsv } from "@/features/invoices/lib/el-fatoora";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -18,18 +20,14 @@ export function InvoicesScreen({ squadApp }: { squadApp: UseSquadApp }) {
   const { derived, actions } = squadApp;
   const account = derived.account;
   const header = (
-    <div className="px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3">
-      <button
-        type="button"
-        onClick={actions.goProfile}
-        className="mb-4.5 flex size-9 items-center justify-center rounded-full border"
-        style={{ background: squad.card, borderColor: squad.border }}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
+    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+  );
+  const footer = renderAppFooter("invoices", actions);
 
+  return (
+    <ScreenFrame header={header} footer={footer} contentClassName="px-5 pb-8">
       <div className="mb-1 flex items-center justify-between gap-3">
-        <div className="text-xl font-extrabold tracking-tight">Invoices (El Fatoora)</div>
+        <div className="text-[15px] font-black tracking-tight">Invoices (El Fatoora)</div>
         <button
           type="button"
           onClick={() => downloadCsv(invoicesToCsv(account.invoices))}
@@ -41,14 +39,10 @@ export function InvoicesScreen({ squadApp }: { squadApp: UseSquadApp }) {
           Export
         </button>
       </div>
-      <p className="text-[11.5px] leading-relaxed" style={{ color: squad.textFaint }}>
+      <p className="mb-3 text-[11.5px] leading-relaxed" style={{ color: squad.textFaint }}>
         Stamp duty shown is an illustrative placeholder - confirm the current Timbre Fiscal rate with your accountant before filing.
       </p>
-    </div>
-  );
 
-  return (
-    <ScreenFrame header={header} contentClassName="px-5 pb-8">
       {account.invoices.length === 0 ? (
         <div
           className="rounded-2xl border p-5 text-center text-[12.5px]"

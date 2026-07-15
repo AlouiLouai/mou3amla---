@@ -27,11 +27,14 @@ Installed via the current (`shadcn@latest`) CLI, **not** the legacy
 ## Theming
 
 The product (SQUAD) now uses an intentionally **fixed-light fintech** visual
-system built around a compact mobile layout:
+system built around a compact mobile layout. Pink/orange are reserved for
+CTAs, highlights, and active states - surfaces stay neutral (white/soft grey/
+dark grey), not pink-tinted or pure black:
 
 - `squad.surface` / `squad.card`: white surfaces
-- `squad.bg`: soft pink-tinted page wash
-- `squad.hero`: near-black hero sections
+- `squad.bg`: neutral off-white page wash
+- `squad.cardAlt`: neutral light-grey alt surface
+- `squad.hero`: dark neutral surface (wallet pocket, dark action cards) - not pure black
 - `squad.accent`: hot pink `#FF0083` for primary actions
 - `squad.subtle`: orange `#FF8D28` for secondary emphasis
 - `squad.destructive`: reserved for destructive and error states

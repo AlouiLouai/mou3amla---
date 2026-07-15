@@ -1,6 +1,7 @@
 import { squad } from "@/features/squad/constants";
+import type { HandoffMode } from "@/features/squad/types";
 
-export type HandoffMode = "qr" | "nearby";
+export type { HandoffMode };
 
 const OPTIONS: Array<{ value: HandoffMode; label: string }> = [
   { value: "qr", label: "QR code" },

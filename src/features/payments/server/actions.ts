@@ -8,6 +8,7 @@ import type { NotificationItem } from "@/features/notifications/types";
 import type { PaymentIntent } from "@/features/payments/types";
 import { generateRefId } from "@/features/payments/lib/tunpay";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 
 type SenderProfileRow = {
   id: string;
@@ -66,19 +67,22 @@ function formatActivityDate(value: string): string {
   }).format(date);
 }
 
-export async function createPaymentIntent(input: {
+type CreatePaymentIntentInput = {
   sourceWalletId: string;
   recipientUsername: string;
   amount: number;
-}): Promise<
+};
+
+type CreatePaymentIntentResult =
   | {
       ok: true;
       intent: PaymentIntent;
       activity: ActivityItem;
       senderNotification: NotificationItem;
     }
-  | { ok: false; message: string }
-> {
+  | { ok: false; message: string };
+
+async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promise<CreatePaymentIntentResult> {
   const parsed = sendPaymentSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -190,8 +194,13 @@ export async function createPaymentIntent(input: {
     .insert([senderNotificationDraft, recipientNotificationDraft])
     .select("id, user_id, type, title, body, unread, created_at");
 
+  // The payment route itself already committed above - a notification-insert
+  // failure must not report the whole intent as failed (the client would show
+  // an error and the transaction row would silently exist anyway, inviting a
+  // duplicate retry). Log it and fall back to locally-built notification data
+  // below; the in-app notification is a nice-to-have, not the source of truth.
   if (notificationError) {
-    return { ok: false, message: "The payment saved, but notifications could not be created safely." };
+    logger.error("Failed to insert payment notifications", notificationError, { transactionId: transaction.id });
   }
 
   const senderNotificationRow = ((notificationRows ?? []) as NotificationInsertRow[]).find((row) => row.user_id === senderProfile.id);
@@ -231,4 +240,18 @@ export async function createPaymentIntent(input: {
     },
     senderNotification,
   };
+}
+
+// Every *expected* failure above already returns a typed { ok: false } result.
+// This just catches anything unexpected (a thrown error from the Supabase
+// client, a bug) so a single bad request can never crash the server action -
+// the client gets a normal error toast and the failure is still logged with
+// enough context to diagnose.
+export async function createPaymentIntent(input: CreatePaymentIntentInput): Promise<CreatePaymentIntentResult> {
+  try {
+    return await createPaymentIntentUnsafe(input);
+  } catch (error) {
+    logger.error("Unhandled error creating payment intent", error, { sourceWalletId: input.sourceWalletId });
+    return { ok: false, message: "We couldn't process this payment right now. Please try again." };
+  }
 }

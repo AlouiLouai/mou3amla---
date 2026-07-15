@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-import { env } from "@/config/env";
+import { z } from "zod";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
-import { mintQrToken } from "@/features/payments/lib/qr-token";
+import { roundCoord } from "@/features/payments/lib/geolocation";
+import { getQrTokenSecret, mintQrToken } from "@/features/payments/lib/qr-token";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+const publishSchema = z.object({
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+});
 
 type ProfileRow = {
   id: string;
@@ -16,6 +23,7 @@ type ExistingHandoffRow = {
   challenge_code: string;
   owner_accepted_at: string | null;
   payer_accepted_at: string | null;
+  expires_at: string;
 };
 
 function generateChallengeCode(): string {
@@ -24,13 +32,20 @@ function generateChallengeCode(): string {
     .padStart(3, "0");
 }
 
-export async function POST() {
+export const POST = withRouteErrorHandling(async (request: Request) => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
 
   if (authError || !authData?.claims?.sub) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
+
+  const body = await request.json().catch(() => null);
+  const parsed = publishSchema.safeParse(body ?? {});
+  const geo =
+    parsed.success && parsed.data.lat !== undefined && parsed.data.lng !== undefined
+      ? { geo_lat: roundCoord(parsed.data.lat), geo_lng: roundCoord(parsed.data.lng) }
+      : { geo_lat: null, geo_lng: null };
 
   const admin = createAdminClient();
   const userId = authData.claims.sub;
@@ -50,22 +65,21 @@ export async function POST() {
   }
 
   // A payer may already be mid-handshake on this owner's current code: never clobber
-  // that with a fresh rotation, just slide the expiry so the handshake has room to finish.
+  // that with a fresh rotation. Report it as-is and let its own bounded handshake
+  // TTL (set at claim time) decide when it expires - don't slide it forward here,
+  // or an abandoned handshake would never free up its code while this screen stays open.
   const { data: existing } = await admin
     .from("nearby_handoffs")
-    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at")
+    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at, expires_at")
     .eq("owner_user_id", userId)
     .gt("expires_at", nowIso)
     .maybeSingle<ExistingHandoffRow>();
 
   if (existing && existing.status !== "published") {
-    const expiresAt = new Date(Date.now() + QR_TOKEN_TTL_MS).toISOString();
-    await admin.from("nearby_handoffs").update({ expires_at: expiresAt }).eq("id", existing.id);
-
     return NextResponse.json({
       handoff: {
         code: existing.challenge_code,
-        expiresAt: Date.now() + QR_TOKEN_TTL_MS,
+        expiresAt: new Date(existing.expires_at).getTime(),
         status: existing.status,
         ownerAccepted: !!existing.owner_accepted_at,
         payerAccepted: !!existing.payer_accepted_at,
@@ -96,7 +110,7 @@ export async function POST() {
   const qrToken = mintQrToken({
     recipientUserId: profile.id,
     recipientUsername: profile.username,
-    secret: env.QR_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY,
+    secret: getQrTokenSecret(),
   });
 
   const { error: insertError } = await admin.from("nearby_handoffs").insert({
@@ -105,6 +119,7 @@ export async function POST() {
     challenge_code: challengeCode,
     status: "published",
     expires_at: new Date(Date.now() + QR_TOKEN_TTL_MS).toISOString(),
+    ...geo,
   });
 
   if (insertError) {
@@ -120,4 +135,4 @@ export async function POST() {
       payerAccepted: false,
     },
   });
-}
+});

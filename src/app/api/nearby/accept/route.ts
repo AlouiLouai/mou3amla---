@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildNearbyMatchPayload, loadNearbyMatchByCode, type NearbyHandoffRow } from "@/features/payments/server/nearby-match";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 const acceptSchema = z.object({
   code: z.string().regex(/^\d{3}$/),
@@ -34,23 +35,18 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const nowIso = new Date().toISOString();
-  const column = lookup.role === "owner" ? "owner_accepted_at" : "payer_accepted_at";
 
-  const willBothBeAccepted =
-    lookup.role === "owner" ? !!lookup.row.payer_accepted_at : !!lookup.row.owner_accepted_at;
-
+  // Read-decide-write here would race: two people tapping "Accept" at nearly
+  // the same instant could both read before either write landed and neither
+  // would ever flip status to "confirmed". `accept_nearby_handoff` does the
+  // read-and-decide inside a single UPDATE so Postgres's row locking
+  // serializes concurrent accepts correctly - see its migration for detail.
   const { data: updated, error: updateError } = await admin
-    .from("nearby_handoffs")
-    .update({
-      [column]: nowIso,
-      status: willBothBeAccepted ? "confirmed" : lookup.row.status,
-    })
-    .eq("id", lookup.row.id)
-    .select("id, owner_user_id, payer_user_id, challenge_code, status, owner_accepted_at, payer_accepted_at, expires_at")
+    .rpc("accept_nearby_handoff", { p_id: lookup.row.id, p_role: lookup.role })
     .single<NearbyHandoffRow>();
 
   if (updateError || !updated) {
+    logger.error("nearby accept RPC failed", updateError, { handoffId: lookup.row.id, role: lookup.role });
     return NextResponse.json({ message: "We couldn't confirm the match right now." }, { status: 500 });
   }
 

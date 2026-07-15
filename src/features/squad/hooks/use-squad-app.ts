@@ -6,10 +6,11 @@ import { buildInvoice } from "@/features/invoices/lib/el-fatoora";
 import { markAllNotificationsRead, markNotificationRead } from "@/features/notifications/server/actions";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import { attemptNativeHandoff } from "@/features/payments/lib/deep-link";
+import { type CoarseLocation, getCoarseLocation } from "@/features/payments/lib/geolocation";
 import { buildTunpayUri } from "@/features/payments/lib/tunpay";
 import { createPaymentIntent } from "@/features/payments/server/actions";
 import type { NearbyHandoff, QrToken } from "@/features/payments/types";
-import type { InitialSquadUser, SquadState } from "@/features/squad/types";
+import type { HandoffMode, InitialSquadUser, SquadState } from "@/features/squad/types";
 import { PROVIDERS } from "@/features/wallets/constants";
 import { linkDestination, setPrimaryDestination } from "@/features/wallets/server/actions";
 import type { LinkedWallet } from "@/features/wallets/types";
@@ -42,6 +43,7 @@ function vibrate(pattern: number | number[]) {
 function initialState(initialUser?: InitialSquadUser): SquadState {
   return {
     screen: "home",
+    initialHandoffMode: "qr",
     linkOpen: false,
     linkStep: "provider",
     linkProviderId: null,
@@ -85,6 +87,16 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
   const [state, dispatch] = useReducer(reducer, initialState(initialUser));
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const stateRef = useRef(state);
+  const nearbyGeoRef = useRef<CoarseLocation | null | undefined>(undefined);
+
+  // Resolves once per app session (cached in a ref) so re-entering the nearby
+  // flow doesn't re-prompt for location permission on every publish/poll tick.
+  const resolveNearbyGeo = useCallback(async (): Promise<CoarseLocation | null> => {
+    if (nearbyGeoRef.current === undefined) {
+      nearbyGeoRef.current = await getCoarseLocation();
+    }
+    return nearbyGeoRef.current;
+  }, []);
 
   useEffect(() => {
     stateRef.current = state;
@@ -100,7 +112,8 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
     };
   }, []);
 
-  const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false }), []);
+  const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false, payerMatch: null }), []);
+  const goAccounts = useCallback(() => dispatch({ screen: "accounts" }), []);
   const goActivity = useCallback(() => dispatch({ screen: "activity" }), []);
   const goProfile = useCallback(() => dispatch({ screen: "profile" }), []);
   const goNotifications = useCallback(() => dispatch({ screen: "notifications" }), []);
@@ -113,21 +126,28 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
 
     dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null });
   }, []);
-  const goReceiveQr = useCallback(() => {
+  const goReceiveQr = useCallback((mode: HandoffMode = "qr") => {
     if (!stateRef.current.wallets.length) {
       toast.error("Link an account first so SQUAD knows where to route incoming payments.");
       return;
     }
 
-    dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null });
+    dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null, initialHandoffMode: mode });
   }, []);
-  const goScanQr = useCallback(() => {
+  const goScanQr = useCallback((mode: HandoffMode = "qr") => {
     if (!stateRef.current.wallets.length) {
       toast.error("Link an account first so SQUAD can route your outgoing payment.");
       return;
     }
 
-    dispatch({ screen: "scan-qr", scanManualInput: "", nearbyOptions: [], isLoadingNearbyOptions: false });
+    dispatch({
+      screen: "scan-qr",
+      scanManualInput: "",
+      nearbyOptions: [],
+      isLoadingNearbyOptions: false,
+      payerMatch: null,
+      initialHandoffMode: mode,
+    });
   }, []);
 
   const startQrRotation = useCallback(() => {
@@ -136,16 +156,20 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
     let didShowNearbyError = false;
 
     const refresh = async () => {
-      const [qrResult, nearbyResult] = await Promise.allSettled([
-        fetch("/api/qr/mint", {
-          method: "POST",
-          cache: "no-store",
-        }),
+      // The QR mint must never wait on the (possibly 5s-timeout) geolocation
+      // prompt - only the nearby publish call needs coarse location, so it
+      // resolves that independently while QR minting fires immediately.
+      const qrPromise = fetch("/api/qr/mint", { method: "POST", cache: "no-store" });
+      const nearbyPromise = resolveNearbyGeo().then((geo) =>
         fetch("/api/nearby/publish", {
           method: "POST",
           cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(geo ?? {}),
         }),
-      ]);
+      );
+
+      const [qrResult, nearbyResult] = await Promise.allSettled([qrPromise, nearbyPromise]);
 
       let qrToken: QrToken | null = null;
       let nearbyHandoff: NearbyHandoff | null = null;
@@ -193,7 +217,7 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       clearInterval(interval);
       timers.current.delete(interval);
     };
-  }, []);
+  }, [resolveNearbyGeo]);
 
   const openLink = useCallback(
     () => dispatch({ linkOpen: true, linkStep: "provider", linkProviderId: null, linkIdentifierInput: "" }),
@@ -269,8 +293,6 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
         toast.error(result.message);
         return;
       }
-
-      toast.success("Primary payment route updated.");
     })();
   }, []);
 
@@ -361,7 +383,9 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
 
     void (async () => {
       try {
-        const response = await fetch("/api/nearby/options", {
+        const geo = await resolveNearbyGeo();
+        const query = geo ? `?lat=${geo.lat}&lng=${geo.lng}` : "";
+        const response = await fetch(`/api/nearby/options${query}`, {
           method: "GET",
           cache: "no-store",
         });
@@ -382,7 +406,7 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
         toast.error("We couldn't load nearby codes right now.");
       }
     })();
-  }, []);
+  }, [resolveNearbyGeo]);
   const submitNearbyOption = useCallback((code: string) => {
     if (!/^\d{3}$/.test(code)) {
       toast.error("Choose a valid 3-digit nearby code.");
@@ -393,12 +417,13 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
 
     void (async () => {
       try {
+        const geo = await resolveNearbyGeo();
         const response = await fetch("/api/nearby/claim", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, ...(geo ?? {}) }),
         });
 
         const payload = (await response.json()) as {
@@ -428,7 +453,7 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
         toast.error("We couldn't resolve that nearby code right now.");
       }
     })();
-  }, []);
+  }, [resolveNearbyGeo]);
 
   const acceptPayerMatch = useCallback(() => {
     const code = stateRef.current.payerMatch?.code;
@@ -509,6 +534,32 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
     })();
   }, []);
 
+  const cancelPayerMatch = useCallback(() => {
+    dispatch({ payerMatch: null });
+
+    void (async () => {
+      try {
+        await fetch("/api/nearby/cancel", { method: "POST" });
+      } catch {
+        // The stale match TTL will still catch this within NEARBY_HANDSHAKE_TTL_MS.
+      }
+    })();
+
+    loadNearbyOptions();
+  }, [loadNearbyOptions]);
+
+  const cancelOwnerMatch = useCallback(() => {
+    void (async () => {
+      try {
+        await fetch("/api/nearby/cancel", { method: "POST" });
+      } catch {
+        // The stale match TTL will still catch this within NEARBY_HANDSHAKE_TTL_MS.
+      }
+    })();
+
+    goHome();
+  }, [goHome]);
+
   const startNearbyMatchPolling = useCallback((role: "owner" | "payer") => {
     let cancelled = false;
 
@@ -518,7 +569,17 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
 
       try {
         const response = await fetch(`/api/nearby/status?code=${encodeURIComponent(code)}`, { cache: "no-store" });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (response.status === 404 && !cancelled) {
+            if (role === "owner") {
+              dispatch((s) => (s.nearbyHandoff?.code === code ? { nearbyHandoff: null } : null));
+            } else {
+              dispatch((s) => (s.payerMatch?.code === code ? { payerMatch: null, nearbyOptions: [] } : null));
+              toast.error("That nearby match expired. Choose another code.");
+            }
+          }
+          return;
+        }
 
         const payload = (await response.json()) as {
           match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean; recipient?: NonNullable<SquadState["recipientPreview"]> };
@@ -681,6 +742,7 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
     },
     actions: {
       goHome,
+      goAccounts,
       goActivity,
       goProfile,
       goNotifications,
@@ -709,6 +771,8 @@ export function useSquadApp(initialUser?: InitialSquadUser) {
       submitNearbyOption,
       acceptPayerMatch,
       acceptOwnerMatch,
+      cancelPayerMatch,
+      cancelOwnerMatch,
       startNearbyMatchPolling,
       submitScannedToken,
       submitManualScanCode,

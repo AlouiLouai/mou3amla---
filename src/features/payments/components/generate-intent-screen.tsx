@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, Delete, Loader2, ShieldCheck } from "lucide-react";
+import { Delete, Loader2, ShieldCheck } from "lucide-react";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -60,29 +62,12 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
     state.recipientInput.trim().length > 0 &&
     !state.isSendingPayment;
   const header = (
-    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={actions.goHome}
-          className="flex size-10 items-center justify-center rounded-full border"
-          style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
-        >
-          <ChevronLeft className="size-4" />
-        </button>
-
-        <div>
-          <div className="text-[1.1rem] font-black tracking-tight">New payment</div>
-          <div className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
-            Routed from @{account.profile.username}
-          </div>
-        </div>
-      </div>
-    </div>
+    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
   );
+  const footer = renderAppFooter("generate-intent", actions);
 
   return (
-    <ScreenFrame header={header} contentClassName="px-4 pb-6">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-6">
       <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: squad.textMuted }}>
         FROM
       </div>
@@ -139,7 +124,7 @@ export function GenerateIntentScreen({ squadApp }: { squadApp: UseSquadApp }) {
           className="flex-1 border-none bg-transparent font-mono text-[15px] outline-none"
           style={{ color: squad.text }}
         />
-        <button type="button" onClick={actions.goScanQr} className="text-xs font-bold" style={{ color: squad.accent }}>
+        <button type="button" onClick={() => actions.goScanQr()} className="text-xs font-bold" style={{ color: squad.accent }}>
           Scan
         </button>
       </div>

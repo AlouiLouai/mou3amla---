@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut, ShieldAlert, Smartphone } from "lucide-react";
-import { BottomNav } from "@/features/squad/components/bottom-nav";
+import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut } from "lucide-react";
+import { AppHeader } from "@/features/squad/components/app-header";
+import { renderAppFooter } from "@/features/squad/components/bottom-nav";
 import { ScreenFrame } from "@/features/squad/components/screen-frame";
 import { alpha, cardShadow, squad } from "@/features/squad/constants";
 import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
@@ -23,13 +24,9 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
     .toUpperCase();
   const verification = verificationTone(account.profile.verificationStatus);
   const header = (
-    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-      <div className="text-[1.3rem] font-black tracking-tight">Profile</div>
-    </div>
+    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
   );
-  const footer = (
-    <BottomNav active="profile" onHome={actions.goHome} onSend={actions.goGenerateIntent} onActivity={actions.goActivity} onProfile={actions.goProfile} />
-  );
+  const footer = renderAppFooter("profile", actions);
 
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
@@ -88,26 +85,6 @@ export function ProfileScreen({ squadApp }: { squadApp: UseSquadApp }) {
             value={derived.sourceWallet?.name ?? "None"}
             onClick={actions.goHome}
           />
-        </div>
-
-        <div className="mb-4 rounded-[24px] border p-4" style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.15) }}>
-          <div className="mb-2 flex items-center gap-2">
-            <Smartphone className="size-4" style={{ color: squad.accent }} />
-            <span className="text-[12px] font-black">Mobile-first identity</span>
-          </div>
-          <p className="text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
-            Your phone, handle, verification status, and public routing destinations stay synced with Supabase.
-          </p>
-        </div>
-
-        <div className="mb-4 rounded-[24px] border p-4" style={{ background: squad.cardAlt, borderColor: alpha(squad.accent, 0.15) }}>
-          <div className="mb-2 flex items-center gap-2">
-            <ShieldAlert className="size-4" style={{ color: squad.accent }} />
-            <span className="text-[12px] font-black">Zero-liability routing</span>
-          </div>
-          <p className="text-[11px] leading-relaxed" style={{ color: squad.textMuted }}>
-            SQUAD never holds your funds. Even after verification, the final transfer still executes in your bank or wallet app.
-          </p>
         </div>
 
         <form action="/auth/logout" method="post">

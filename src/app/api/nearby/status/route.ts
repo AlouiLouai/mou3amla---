@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { buildNearbyMatchPayload, loadNearbyMatchByCode } from "@/features/payments/server/nearby-match";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET(request: Request) {
+export const GET = withRouteErrorHandling(async (request: Request) => {
   const url = new URL(request.url);
   const code = url.searchParams.get("code") ?? "";
 
@@ -24,4 +25,4 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ match: await buildNearbyMatchPayload(lookup.row, lookup.role) });
-}
+});

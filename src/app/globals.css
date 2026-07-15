@@ -49,7 +49,7 @@
 }
 
 :root {
-  --background: #fff7fb;
+  --background: #fafafa;
   --foreground: #050505;
   --card: #ffffff;
   --card-foreground: #050505;
@@ -57,9 +57,9 @@
   --popover-foreground: #050505;
   --primary: #ff0083;
   --primary-foreground: #ffffff;
-  --secondary: #fff1f7;
+  --secondary: #f4f4f5;
   --secondary-foreground: #050505;
-  --muted: #fff5fa;
+  --muted: #f5f5f5;
   --muted-foreground: rgba(5, 5, 5, 0.62);
   --accent: #ff8d28;
   --accent-foreground: #050505;
@@ -127,8 +127,8 @@
     min-height: 100vh; /* fallback for browsers without dvh support (older Android WebViews / Samsung Internet) */
     min-height: 100dvh;
     background-image:
-      radial-gradient(circle at top right, rgba(255, 0, 131, 0.1), transparent 28%),
-      radial-gradient(circle at bottom left, rgba(255, 141, 40, 0.12), transparent 26%);
+      radial-gradient(circle at top right, rgba(255, 0, 131, 0.04), transparent 28%),
+      radial-gradient(circle at bottom left, rgba(255, 141, 40, 0.05), transparent 26%);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: contain;
     text-rendering: optimizeLegibility;

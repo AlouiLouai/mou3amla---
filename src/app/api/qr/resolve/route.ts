@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { env } from "@/config/env";
-import { isQrTokenExpired, verifyQrToken } from "@/features/payments/lib/qr-token";
+import { getQrTokenSecret, isQrTokenExpired, verifyQrToken } from "@/features/payments/lib/qr-token";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
+import { withRouteErrorHandling } from "@/lib/api-handler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,10 +18,9 @@ type RecipientDestinationRow = {
   routing_value: string;
 };
 
-export async function GET(request: Request) {
+export const GET = withRouteErrorHandling(async (request: Request) => {
   const url = new URL(request.url);
   const rawToken = url.searchParams.get("token");
-  const rawUsername = url.searchParams.get("username");
 
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
@@ -29,32 +28,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  let username = rawUsername?.replace(/^@+/, "").trim().toLowerCase() ?? null;
-  let recipientUserId: string | null = null;
-
-  if (rawToken) {
-    const token = verifyQrToken(rawToken, env.QR_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY);
-    if (!token) {
-      return NextResponse.json({ message: "Invalid QR token." }, { status: 400 });
-    }
-
-    if (isQrTokenExpired(token)) {
-      return NextResponse.json({ message: "This QR code expired. Ask the recipient to refresh it." }, { status: 410 });
-    }
-
-    recipientUserId = token.recipientUserId;
-    username = token.recipient.replace(/^@+/, "").trim().toLowerCase();
+  if (!rawToken) {
+    return NextResponse.json({ message: "Provide a QR token." }, { status: 400 });
   }
 
-  if (!username) {
-    return NextResponse.json({ message: "Provide a token or username." }, { status: 400 });
+  const token = verifyQrToken(rawToken, getQrTokenSecret());
+  if (!token) {
+    return NextResponse.json({ message: "Invalid QR token." }, { status: 400 });
+  }
+
+  if (isQrTokenExpired(token)) {
+    return NextResponse.json({ message: "This QR code expired. Ask the recipient to refresh it." }, { status: 410 });
   }
 
   const admin = createAdminClient();
-  const recipientQuery = admin.from("profiles").select("id, username, display_name, verification_status");
-  const { data: recipient, error: recipientError } = recipientUserId
-    ? await recipientQuery.eq("id", recipientUserId).maybeSingle<RecipientProfileRow>()
-    : await recipientQuery.eq("username", username).maybeSingle<RecipientProfileRow>();
+  const { data: recipient, error: recipientError } = await admin
+    .from("profiles")
+    .select("id, username, display_name, verification_status")
+    .eq("id", token.recipientUserId)
+    .maybeSingle<RecipientProfileRow>();
 
   if (recipientError || !recipient) {
     return NextResponse.json({ message: "Recipient not found." }, { status: 404 });
@@ -80,4 +72,4 @@ export async function GET(request: Request) {
         : null,
     },
   });
-}
+});

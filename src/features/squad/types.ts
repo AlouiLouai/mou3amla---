@@ -10,6 +10,7 @@ export type { ConfettiPiece };
 export type Screen =
   | "home"
   | "wallet-registry"
+  | "accounts"
   | "generate-intent"
   | "receive-qr"
   | "scan-qr"
@@ -40,8 +41,11 @@ export interface InitialSquadUser {
   invoices: Invoice[];
 }
 
+export type HandoffMode = "qr" | "nearby";
+
 export interface SquadState {
   screen: Screen;
+  initialHandoffMode: HandoffMode;
   linkOpen: boolean;
   linkStep: "provider" | "identifier";
   linkProviderId: string | null;
