@@ -50,11 +50,14 @@ export async function POST(request: Request) {
       },
       DIDIT_TIMEOUT_MS,
     );
-  } catch {
+  } catch (error) {
+    console.error("[didit] session request threw", error);
     return NextResponse.redirect(new URL("/verify-identity/return?status=Launch%20failed", request.url));
   }
 
   if (!diditResponse.ok) {
+    const body = await diditResponse.text().catch(() => "<unreadable body>");
+    console.error(`[didit] session request failed: ${diditResponse.status} ${diditResponse.statusText}`, body);
     return NextResponse.redirect(new URL("/verify-identity/return?status=Launch%20failed", request.url));
   }
 
