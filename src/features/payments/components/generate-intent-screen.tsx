@@ -1,6 +1,6 @@
 "use client";
 
-import { Delete, Loader2, ShieldCheck } from "lucide-react";
+import { Camera, Delete, Loader2, Send, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -17,21 +17,25 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
   const { results: recipientResults, isSearching } = useRecipientSearch(state.recipientInput, searchEnabled);
   const account = derived.account;
   const amountDisplay = state.amount || "0";
+  const recipientVerified = !state.recipientPreview || state.recipientPreview.verificationStatus === "verified";
   const canGenerate =
     derived.hasAnyWallets &&
     Number.parseFloat(state.amount) > 0 &&
     state.recipientInput.trim().length > 0 &&
+    recipientVerified &&
     !state.isSendingPayment;
   const header = (
-    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+    <AppHeader
+      profile={account.profile}
+      unreadNotifications={derived.unreadNotifications}
+      onNotifications={actions.goNotifications}
+      onBack={actions.goHome}
+    />
   );
   const footer = renderAppFooter("generate-intent", actions);
 
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-6">
-      <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
-        FROM
-      </div>
       {!derived.hasAnyWallets ? (
         <div
           className="mb-4 rounded-2xl border p-4 text-[12px] leading-relaxed"
@@ -40,54 +44,73 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
           Link at least one account on the dashboard before creating a payment intent.
         </div>
       ) : null}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {account.wallets.map((wallet) => {
-          const selected = wallet.id === account.sourceWalletId;
-          return (
-            <button
-              key={wallet.id}
-              type="button"
-              onClick={() => actions.selectSource(wallet.id)}
-              className="flex items-center gap-1.5 rounded-full border px-3 py-2 transition-colors"
-              style={{
-                background: selected ? alpha(wallet.color, 0.16) : mou3amla.card,
-                borderColor: selected ? wallet.color : mou3amla.border,
-              }}
-            >
-              <div
-                className="flex size-4.5 items-center justify-center rounded-full text-[8px] font-extrabold"
-                style={{ background: alpha(wallet.color, 0.16), color: wallet.color }}
-              >
-                <WalletIcon id={wallet.providerId} initials={wallet.initials} className="size-[10px]" />
-              </div>
-              <span className="text-xs font-semibold" style={{ color: selected ? mou3amla.text : mou3amla.textMuted }}>
-                {wallet.name}
-              </span>
-            </button>
-          );
-        })}
-      </div>
 
-      <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
-        TO
-      </div>
-      <div
-        className="mb-3 flex items-center gap-2.5 rounded-2xl border px-4 py-3"
-        style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
-      >
-        <span className="font-mono text-[15px]" style={{ color: mou3amla.accent }}>
-          @
-        </span>
-        <input
-          value={state.recipientInput.replace(/^@/, "")}
-          onChange={(e) => actions.onRecipientChange(e.target.value)}
-          placeholder="recipient_username"
-          className="flex-1 border-none bg-transparent font-mono text-[15px] outline-none"
-          style={{ color: mou3amla.text }}
-        />
-        <button type="button" onClick={() => actions.goScanQr()} className="text-xs font-bold" style={{ color: mou3amla.accent }}>
-          Scan
-        </button>
+      <div className="mb-3 grid grid-cols-2 gap-2.5">
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
+            FROM
+          </div>
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border px-2 py-2"
+            style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
+          >
+            {account.wallets.map((wallet) => {
+              const selected = wallet.id === account.sourceWalletId;
+              return (
+                <button
+                  key={wallet.id}
+                  type="button"
+                  onClick={() => actions.selectSource(wallet.id)}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 transition-colors"
+                  style={{
+                    background: selected ? alpha(wallet.color, 0.16) : "transparent",
+                    borderColor: selected ? wallet.color : mou3amla.border,
+                  }}
+                >
+                  <div
+                    className="flex size-4 items-center justify-center rounded-full text-[8px] font-extrabold"
+                    style={{ background: alpha(wallet.color, 0.16), color: wallet.color }}
+                  >
+                    <WalletIcon id={wallet.providerId} initials={wallet.initials} className="size-[9px]" />
+                  </div>
+                  <span className="whitespace-nowrap text-[11px] font-semibold" style={{ color: selected ? mou3amla.text : mou3amla.textMuted }}>
+                    {wallet.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
+            TO
+          </div>
+          <div
+            className="flex items-center gap-1.5 rounded-2xl border px-3 py-2"
+            style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
+          >
+            <span className="font-mono text-[14px]" style={{ color: mou3amla.accent }}>
+              @
+            </span>
+            <input
+              value={state.recipientInput.replace(/^@/, "")}
+              onChange={(e) => actions.onRecipientChange(e.target.value)}
+              placeholder="username"
+              className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13.5px] outline-none"
+              style={{ color: mou3amla.text }}
+            />
+            <button
+              type="button"
+              onClick={() => actions.goScanQr()}
+              aria-label="Scan QR"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full"
+              style={{ background: alpha(mou3amla.accent, 0.1), color: mou3amla.accent }}
+            >
+              <Camera className="size-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {searchEnabled && (isSearching || recipientResults.length > 0) ? (
@@ -117,7 +140,9 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
                 </div>
                 {result.verificationStatus === "verified" ? (
                   <ShieldCheck className="size-4 shrink-0" style={{ color: mou3amla.accent }} />
-                ) : null}
+                ) : (
+                  <TriangleAlert className="size-4 shrink-0" style={{ color: mou3amla.subtle }} />
+                )}
               </button>
             ))
           )}
@@ -127,7 +152,11 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
       {state.recipientPreview ? (
         <div
           className="mb-4 rounded-[22px] border p-4"
-          style={{ background: mou3amla.cardAlt, borderColor: alpha(mou3amla.accent, 0.2), boxShadow: cardShadow }}
+          style={{
+            background: recipientVerified ? mou3amla.cardAlt : alpha(mou3amla.destructive, 0.05),
+            borderColor: recipientVerified ? alpha(mou3amla.accent, 0.2) : alpha(mou3amla.destructive, 0.24),
+            boxShadow: cardShadow,
+          }}
         >
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
@@ -138,24 +167,42 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             </div>
             <span
               className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black capitalize"
-              style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
+              style={{
+                background: recipientVerified ? alpha(mou3amla.accent, 0.12) : alpha(mou3amla.destructive, 0.12),
+                color: recipientVerified ? mou3amla.accent : mou3amla.destructive,
+              }}
             >
-              <ShieldCheck className="size-3.5" />
+              {recipientVerified ? <ShieldCheck className="size-3.5" /> : <TriangleAlert className="size-3.5" />}
               {state.recipientPreview.verificationStatus}
             </span>
           </div>
-          <div className="text-[11px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-            {state.recipientPreview.primaryRouteLabel ?? "The recipient has no default public route yet."}
+          <div className="text-[11px] leading-relaxed" style={{ color: recipientVerified ? mou3amla.textMuted : mou3amla.destructive }}>
+            {recipientVerified
+              ? (state.recipientPreview.primaryRouteLabel ?? "The recipient has no default public route yet.")
+              : "This recipient hasn't completed identity verification yet - sending is disabled until they do."}
           </div>
         </div>
       ) : null}
 
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="font-mono text-[42px] font-semibold tracking-tight">
-          {amountDisplay}{" "}
-          <span className="text-xl" style={{ color: mou3amla.accent }}>
-            DT
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="font-mono text-[42px] font-semibold tracking-tight">
+            {amountDisplay}{" "}
+            <span className="text-xl" style={{ color: mou3amla.accent }}>
+              DT
+            </span>
+          </div>
+          {state.amount ? (
+            <button
+              type="button"
+              onClick={actions.clearAmount}
+              aria-label="Clear amount"
+              className="flex size-7 items-center justify-center rounded-full"
+              style={{ background: alpha(mou3amla.text, 0.08), color: mou3amla.textMuted }}
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
         </div>
         <button
           type="button"
@@ -185,10 +232,11 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         type="button"
         onClick={actions.generateIntent}
         disabled={!canGenerate}
-        className="rounded-2xl py-3.5 text-[15px] font-bold transition-opacity disabled:opacity-40"
+        aria-label="Send via TUNPAY"
+        className="flex items-center justify-center rounded-2xl py-3.5 transition-opacity disabled:opacity-40"
         style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
       >
-        {state.isSendingPayment ? "Saving..." : "Send via TUNPAY"}
+        {state.isSendingPayment ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
       </button>
     </ScreenFrame>
   );

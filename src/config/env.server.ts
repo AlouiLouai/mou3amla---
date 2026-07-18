@@ -10,6 +10,10 @@ const serverSchema = z.object({
   DIDIT_API_KEY: z.string().min(1).optional(),
   DIDIT_WORKFLOW_ID: z.string().uuid().optional(),
   DIDIT_WEBHOOK_SECRET: z.string().min(1).optional(),
+  KYC_DEMO_MODE: z
+    .string()
+    .optional()
+    .transform((value) => value === "true"),
 });
 
 const parsedServer = serverSchema.safeParse({
@@ -19,6 +23,7 @@ const parsedServer = serverSchema.safeParse({
   DIDIT_API_KEY: process.env.DIDIT_API_KEY,
   DIDIT_WORKFLOW_ID: process.env.DIDIT_WORKFLOW_ID,
   DIDIT_WEBHOOK_SECRET: process.env.DIDIT_WEBHOOK_SECRET,
+  KYC_DEMO_MODE: process.env.KYC_DEMO_MODE,
 });
 
 if (!parsedServer.success) {

@@ -129,6 +129,10 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     return { ok: false, message: "Use another Mou3amla handle to test a transfer." };
   }
 
+  if (recipient.verification_status !== "verified") {
+    return { ok: false, message: "This recipient hasn't completed identity verification yet - you can't send to them." };
+  }
+
   const { data: recipientDestination, error: recipientDestinationError } = await admin
     .from("linked_destinations")
     .select("id, user_id, name, routing_value")

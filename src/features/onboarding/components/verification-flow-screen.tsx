@@ -2,13 +2,16 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock3, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { AuthenticatedAppUser, VerificationStatus } from "@/features/auth/types";
 import { formatUsernameHandle } from "@/features/auth/lib/identity";
+import { DemoVerificationPanel } from "@/features/onboarding/components/demo-verification-panel";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 
-function statusMeta(status: VerificationStatus) {
+function statusMeta(status: VerificationStatus, isDemoApproval: boolean) {
   if (status === "verified") {
     return {
-      label: "Verified",
-      body: "RIB linking and trusted routes are unlocked for this profile.",
+      label: isDemoApproval ? "Verified (demo)" : "Verified",
+      body: isDemoApproval
+        ? "Simulated for this preview - production will run through an eKYC provider accepted by INPDP."
+        : "RIB linking and trusted routes are unlocked for this profile.",
       tone: "#139A63",
       bg: "rgba(19,154,99,0.12)",
       icon: CheckCircle2,
@@ -44,8 +47,8 @@ function statusMeta(status: VerificationStatus) {
   };
 }
 
-export function VerificationFlowScreen({ user }: { user: AuthenticatedAppUser }) {
-  const status = statusMeta(user.verificationStatus);
+export function VerificationFlowScreen({ user, demoMode }: { user: AuthenticatedAppUser; demoMode: boolean }) {
+  const status = statusMeta(user.verificationStatus, user.diditLatestStatus === "Demo Approved");
   const StatusIcon = status.icon;
   const canStart = user.verificationStatus === "unverified" || user.verificationStatus === "rejected";
 
@@ -98,24 +101,28 @@ export function VerificationFlowScreen({ user }: { user: AuthenticatedAppUser })
           </div>
 
           {canStart ? (
-            <>
-              <p className="mb-4 text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                Mou3amla hands identity verification off to Didit, our identity-verification partner. You&rsquo;ll
-                photograph your CIN and take a live selfie on Didit&rsquo;s hosted screen, then land back here
-                automatically.
-              </p>
+            demoMode ? (
+              <DemoVerificationPanel />
+            ) : (
+              <>
+                <p className="mb-4 text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
+                  Mou3amla hands identity verification off to Didit, our identity-verification partner. You&rsquo;ll
+                  photograph your CIN and take a live selfie on Didit&rsquo;s hosted screen, then land back here
+                  automatically.
+                </p>
 
-              <form action="/api/didit/session" method="POST">
-                <button
-                  type="submit"
-                  className="flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[14px] font-black"
-                  style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
-                >
-                  Continue with Didit
-                  <ArrowRight className="size-4" />
-                </button>
-              </form>
-            </>
+                <form action="/api/didit/session" method="POST">
+                  <button
+                    type="submit"
+                    className="flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[14px] font-black"
+                    style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
+                  >
+                    Continue with Didit
+                    <ArrowRight className="size-4" />
+                  </button>
+                </form>
+              </>
+            )
           ) : user.verificationStatus === "verified" ? (
             <Link
               href="/home"

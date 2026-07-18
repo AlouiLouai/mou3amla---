@@ -98,6 +98,14 @@ Do not place `"use server"` functions inside client component files.
   authenticated session's user against the `phone`/`username` typed on the
   landing screen before redirecting to `/home` — this guards against a
   browser passkey picker resolving to the wrong saved identity.
+- `startPhoneAuth` never confirms *which* identity a phone or handle belongs
+  to beyond "an account already exists" - only that a partial match exists,
+  never the other party's actual phone/handle. Revealing more would let an
+  unauthenticated caller enumerate registered phone numbers or handles. The
+  three mismatch messages (phone known under a different handle, handle
+  taken under a different phone, phone and handle belong to two different
+  accounts) are deliberately distinct so a genuine returning user can tell
+  what to fix, without leaking someone else's identity.
 - Authenticated page gating belongs in server code such as
   `redirectIfAuthenticated()` and `requireCurrentAppUser()`.
 - Keep Supabase session/client creation inside `src/lib/supabase/**`.
@@ -135,6 +143,21 @@ Do not place `"use server"` functions inside client component files.
   for under circular 2025-06 Art. 35-style record-keeping expectations. Do
   not update `profiles.verification_status` from anywhere else without also
   writing an event row.
+- The webhook route claims each `event_id` against `public.didit_webhook_events`
+  (`claimWebhookEvent` in `didit.ts`) before doing any work - Didit retries an
+  undelivered webhook up to twice (5xx/404), and this makes a retry a no-op
+  instead of a reprocess. A verified payload with no `status` field (e.g.
+  `data.updated`, `activity.created`, business/transaction events this app
+  doesn't act on) gets a quick `200` acknowledgement, not a `401` - a `401`
+  is reserved for an actual signature failure, since Didit will keep retrying
+  anything that doesn't come back `2xx`.
+- `updateProfileStatus` also guards against a retried webhook arriving *after*
+  a newer one already landed: it compares the payload's `timestamp`/`created_at`
+  against `profiles.didit_status_event_at` and no-ops if the incoming event is
+  older. This guard only applies to webhook deliveries - a direct status poll
+  (`syncDiditSessionStatus`) has no event timestamp and always applies, since
+  it's reading Didit's current truth directly rather than replaying a queued
+  delivery.
 - `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET` are optional in
   `src/config/env.server.ts` - when `DIDIT_API_KEY` is unset, session creation
   and status polling short-circuit gracefully instead of throwing.
@@ -145,9 +168,30 @@ Do not place `"use server"` functions inside client component files.
 - Do not resurrect the old in-app CIN/selfie capture mock
   (`cin-capture-step.tsx`, `selfie-capture-step.tsx`,
   `setMockVerificationStatus`) - it was deliberately removed in favor of the
-  real Didit integration. If Didit is ever unreachable for a demo, gate that
-  with an explicit, visibly-labeled test mode rather than quietly faking a
-  `verified` status again.
+  real Didit integration.
+- **`KYC_DEMO_MODE` is the sanctioned, visibly-labeled stand-in** for when
+  Didit is unreachable (credits exhausted, no INPDP-cleared provider chosen
+  yet, demoing to BCT before a provider is finalized). When
+  `serverEnv.KYC_DEMO_MODE` is `true`:
+  - `VerificationFlowScreen` renders `DemoVerificationPanel` instead of the
+    "Continue with Didit" form - it runs a purely client-side simulated
+    step sequence (`useDemoVerification`) with an always-visible "Demo mode"
+    banner, then calls the `runDemoVerification` server action
+    (`src/features/onboarding/server/actions.ts`).
+  - `runDemoVerification` re-checks `KYC_DEMO_MODE` server-side before doing
+    anything (defense-in-depth against the flag flipping off mid-flight or
+    the action being invoked directly), then sets
+    `verification_status = "verified"` and `didit_latest_status =
+    "Demo Approved"`, and writes a `verification_events` row with
+    `source: "demo_kyc"` and a provider_status that spells out "simulated" -
+    so this can never be confused with a real Didit decision in the audit
+    trail a BCT reviewer would inspect.
+  - `POST /api/didit/session` redirects straight back to `/verify-identity`
+    without calling Didit at all while demo mode is on, even if someone
+    bypasses the UI.
+  - This is never silent: `statusMeta` in `verification-flow-screen.tsx`
+    labels a demo-verified profile "Verified (demo)" with body copy stating
+    it's simulated, everywhere that status is shown.
 
 ## Nearby AirDrop-style handoff (mutual accept)
 
@@ -178,9 +222,13 @@ Read this before "fixing" something that looks incomplete:
 
 - **Authentication is real now.** Landing, passkey registration/sign-in,
   session cookies, and profile lookup are backed by Supabase.
-- **KYC is real now, via Didit.** Verification status in the `profiles` table
-  is driven by an actual hosted eKYC session (document capture, liveness,
-  face-match), not a local mock or self-attestation toggle.
+- **KYC is real via Didit when `KYC_DEMO_MODE` is off** (the default).
+  Verification status in the `profiles` table is driven by an actual hosted
+  eKYC session (document capture, liveness, face-match), not a local mock or
+  self-attestation toggle. When `KYC_DEMO_MODE=true`, a visibly-labeled demo
+  flow (`DemoVerificationPanel`) stands in instead - see "Do not resurrect
+  the old in-app CIN/selfie capture mock" under KYC conventions above for
+  why this exists and how it stays distinguishable from a real decision.
 - **Linked destinations, payment history, and notifications are real now.**
   The home shell hydrates them from Supabase, and payment creation writes back
   to the database before the TUNPAY handoff.
@@ -228,7 +276,8 @@ Read this before "fixing" something that looks incomplete:
   `QR_TOKEN_SECRET`,
   `DIDIT_API_KEY`,
   `DIDIT_WORKFLOW_ID`,
-  `DIDIT_WEBHOOK_SECRET`.
+  `DIDIT_WEBHOOK_SECRET`,
+  `KYC_DEMO_MODE`.
 
 ## Package manager
 

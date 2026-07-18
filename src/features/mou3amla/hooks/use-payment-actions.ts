@@ -43,6 +43,7 @@ export function usePaymentActions({
 
   const keypadBackspace = useCallback(() => dispatch((s) => ({ amount: s.amount.slice(0, -1) })), [dispatch]);
   const quickAmount5 = useCallback(() => dispatch({ amount: "5" }), [dispatch]);
+  const clearAmount = useCallback(() => dispatch({ amount: "" }), [dispatch]);
 
   const generateIntent = useCallback(() => {
     const amount = parseFloat(stateRef.current.amount);
@@ -159,6 +160,7 @@ export function usePaymentActions({
     keypadPress,
     keypadBackspace,
     quickAmount5,
+    clearAmount,
     generateIntent,
     doneIntent,
     shareReceipt,

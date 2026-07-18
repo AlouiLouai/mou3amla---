@@ -152,8 +152,19 @@ export async function startPhoneAuth(
   const phoneMatch = profiles.find((profile) => profile.phone === phone) ?? null;
   const usernameMatch = profiles.find((profile) => profile.username === username) ?? null;
 
-  if ((phoneMatch && usernameMatch && phoneMatch.id !== usernameMatch.id) || (phoneMatch && !usernameMatch) || (!phoneMatch && usernameMatch)) {
-    return { message: "That phone number and username don't belong to the same Mou3amla identity." };
+  // Never confirm *which* identity a phone/username belongs to beyond "an
+  // account already exists" - revealing more would let an unauthenticated
+  // caller enumerate registered phone numbers or handles.
+  if (phoneMatch && usernameMatch && phoneMatch.id !== usernameMatch.id) {
+    return { message: "This phone number and handle belong to two different Mou3amla accounts. Double-check both, or use the pair you originally signed up with." };
+  }
+
+  if (phoneMatch && !usernameMatch) {
+    return { message: "This phone number is already linked to a Mou3amla account under a different handle. If it's yours, enter the handle you signed up with." };
+  }
+
+  if (usernameMatch && !phoneMatch) {
+    return { message: "That handle is already taken. If it's yours, double-check the phone number you signed up with." };
   }
 
   let profileId = phoneMatch?.id ?? usernameMatch?.id ?? null;

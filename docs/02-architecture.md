@@ -151,6 +151,14 @@ shrink, or otherwise react to scrolling. Sheets/overlays like
 `WalletRegistrySheet` are not full-page screens and stay exempt from this
 pattern.
 
+`AppHeader` takes an optional `onBack` prop that swaps the avatar/greeting
+block for a back-chevron (still wired to `actions.goHome`, not a real
+navigation stack) - used on the send (`generate-intent-screen.tsx`) and
+activity screens, where a chevron reads clearer than a greeting on a
+mid-task screen. Every other screen omits `onBack` and keeps the
+avatar/greeting default; don't spread the chevron to screens reachable
+directly from the bottom nav.
+
 The shell now bootstraps its real user state from Supabase-backed server data:
 profile, linked destinations, activity history, and notifications are passed
 through `initialUser`. Only transient UI state stays in the reducer.

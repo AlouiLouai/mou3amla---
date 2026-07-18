@@ -188,7 +188,33 @@ describe("startPhoneAuth", () => {
 
     const result = await startPhoneAuth(undefined, landingFormData());
 
-    expect(result?.message).toMatch(/don't belong to the same/i);
+    expect(result?.message).toMatch(/two different mou3amla accounts/i);
+    expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects a known phone paired with a handle that isn't its own, without revealing the real handle", async () => {
+    const admin = makeFakeAdmin({
+      fromQueue: [{ data: [{ id: "profile-a", phone: NORMALIZED_PHONE, username: "someoneelse", verification_status: "unverified" }], error: null }],
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await startPhoneAuth(undefined, landingFormData());
+
+    expect(result?.message).toMatch(/already linked to a mou3amla account under a different handle/i);
+    expect(result?.message).not.toContain("someoneelse");
+    expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects a known handle paired with a phone that isn't its own, without revealing the real phone", async () => {
+    const admin = makeFakeAdmin({
+      fromQueue: [{ data: [{ id: "profile-a", phone: "+21611111111", username: USERNAME, verification_status: "unverified" }], error: null }],
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await startPhoneAuth(undefined, landingFormData());
+
+    expect(result?.message).toMatch(/that handle is already taken/i);
+    expect(result?.message).not.toContain("21611111111");
     expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
   });
 });

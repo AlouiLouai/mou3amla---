@@ -13,6 +13,8 @@ type DiditPayload = {
   session_id?: string;
   status?: string;
   vendor_data?: string;
+  timestamp?: number;
+  created_at?: number;
 };
 
 type SyncedProfileRow = {
@@ -21,6 +23,8 @@ type SyncedProfileRow = {
   didit_latest_status: string | null;
   didit_session_id: string | null;
 };
+
+type ProfileStatusRow = SyncedProfileRow & { didit_status_event_at: string | null };
 
 export type DiditSyncResult = {
   diditLatestStatus: string | null;
@@ -46,6 +50,14 @@ function extractField(payload: DiditPayload, key: "session_id" | "status" | "ven
   if (nestedData) return nestedData;
 
   return extractString(payload.decision?.[key]);
+}
+
+/** Didit's webhook envelope carries `timestamp`/`created_at` as Unix seconds - used only to
+ * detect a retried delivery arriving after a newer one already landed, never as the sole
+ * freshness check (a direct status poll always wins regardless of timestamp). */
+function extractEventTimestamp(payload: DiditPayload): number | null {
+  const raw = payload.timestamp ?? payload.created_at;
+  return typeof raw === "number" ? raw : null;
 }
 
 export function mapDiditStatus(status: string | null): VerificationStatus {
@@ -98,26 +110,16 @@ async function updateProfileStatus({
   sessionId,
   status,
   source,
+  eventTimestamp,
 }: {
   profileId?: string | null;
   sessionId?: string | null;
   status: string;
   source: string;
+  eventTimestamp?: number | null;
 }): Promise<SyncedProfileRow | null> {
   const admin = createAdminClient();
   const nextStatus = mapDiditStatus(status);
-  const update: {
-    verification_status: VerificationStatus;
-    didit_latest_status: string;
-    didit_session_id?: string;
-  } = {
-    verification_status: nextStatus,
-    didit_latest_status: status,
-  };
-
-  if (sessionId) {
-    update.didit_session_id = sessionId;
-  }
 
   const matchColumn = isUuid(profileId ?? null) ? "id" : sessionId ? "didit_session_id" : null;
   const matchValue = matchColumn === "id" ? profileId : sessionId;
@@ -128,9 +130,41 @@ async function updateProfileStatus({
 
   const { data: previous } = await admin
     .from("profiles")
-    .select("verification_status")
+    .select("id, verification_status, didit_latest_status, didit_session_id, didit_status_event_at")
     .eq(matchColumn, matchValue)
-    .maybeSingle<{ verification_status: VerificationStatus }>();
+    .maybeSingle<ProfileStatusRow>();
+
+  if (!previous) {
+    return null;
+  }
+
+  // A retried/out-of-order webhook delivery carrying an older event than the
+  // one already applied - a direct status poll (eventTimestamp null) always
+  // bypasses this and applies, since it reflects Didit's current truth.
+  if (eventTimestamp != null && previous.didit_status_event_at) {
+    const isStale = eventTimestamp * 1000 < new Date(previous.didit_status_event_at).getTime();
+    if (isStale) {
+      return previous;
+    }
+  }
+
+  const update: {
+    verification_status: VerificationStatus;
+    didit_latest_status: string;
+    didit_session_id?: string;
+    didit_status_event_at?: string;
+  } = {
+    verification_status: nextStatus,
+    didit_latest_status: status,
+  };
+
+  if (sessionId) {
+    update.didit_session_id = sessionId;
+  }
+
+  if (eventTimestamp != null) {
+    update.didit_status_event_at = new Date(eventTimestamp * 1000).toISOString();
+  }
 
   const { data, error } = await admin
     .from("profiles")
@@ -143,10 +177,10 @@ async function updateProfileStatus({
     return null;
   }
 
-  if (!previous || previous.verification_status !== nextStatus) {
+  if (previous.verification_status !== nextStatus) {
     await recordVerificationEvent({
       userId: data.id,
-      previousStatus: previous?.verification_status ?? null,
+      previousStatus: previous.verification_status,
       nextStatus,
       source,
       sessionId: data.didit_session_id,
@@ -161,6 +195,7 @@ export async function applyDiditPayload(payload: DiditPayload, source: string, p
   const sessionId = extractField(payload, "session_id");
   const status = extractField(payload, "status");
   const vendorData = extractField(payload, "vendor_data");
+  const eventTimestamp = extractEventTimestamp(payload);
 
   if (!status) {
     return {
@@ -178,12 +213,14 @@ export async function applyDiditPayload(payload: DiditPayload, source: string, p
       sessionId,
       status,
       source,
+      eventTimestamp,
     })) ??
     (await updateProfileStatus({
       profileId: vendorData,
       sessionId,
       status,
       source,
+      eventTimestamp,
     }));
 
   return {
@@ -223,4 +260,18 @@ export async function syncDiditSessionStatus(sessionId: string, preferredProfile
 
   const payload = (await response.json()) as DiditPayload;
   return applyDiditPayload(payload, "didit_status_poll", preferredProfileId);
+}
+
+/** Didit retries a webhook delivery up to twice on 5xx/404. Claims `event_id`
+ * via the table's primary key so a retried delivery is a cheap no-op instead
+ * of reprocessing - returns false when this event was already claimed. */
+export async function claimWebhookEvent(eventId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { error } = await admin.from("didit_webhook_events").insert({ event_id: eventId });
+
+  if (error && (error as { code?: string }).code === "23505") {
+    return false;
+  }
+
+  return true;
 }

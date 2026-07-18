@@ -15,7 +15,12 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
   const { derived, actions } = mou3amlaApp;
   const account = derived.account;
   const header = (
-    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+    <AppHeader
+      profile={account.profile}
+      unreadNotifications={derived.unreadNotifications}
+      onNotifications={actions.goNotifications}
+      onBack={actions.goHome}
+    />
   );
   const footer = renderAppFooter("activity", actions);
 

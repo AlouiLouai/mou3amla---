@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/config/env.server";
-import { applyDiditPayload } from "@/features/onboarding/server/didit";
+import { applyDiditPayload, claimWebhookEvent } from "@/features/onboarding/server/didit";
 
 type DiditWebhookPayload = {
   event_id?: string;
@@ -75,10 +75,23 @@ export async function POST(request: Request) {
   const expectedSignature = createHmac("sha256", serverEnv.DIDIT_WEBHOOK_SECRET).update(canonicalize(payload)).digest("hex");
   const verified = safeEqual(expectedSignature, request.headers.get("x-signature-v2"));
 
+  if (!verified) {
+    return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+  }
+
+  // Didit retries undelivered (5xx/404) webhooks up to twice - claim the
+  // event_id so a retry is a cheap no-op instead of reprocessing.
+  if (payload.event_id && !(await claimWebhookEvent(payload.event_id))) {
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
   const status = extractField(payload, "status");
 
-  if (!verified || !status) {
-    return NextResponse.json({ error: "Invalid webhook signature or payload" }, { status: 401 });
+  if (!status) {
+    // A validly-signed event we simply don't act on (data.updated,
+    // activity.created, business/transaction events, ...). Acknowledge it so
+    // Didit doesn't keep retrying a delivery this app has no use for.
+    return NextResponse.json({ ok: true, ignored: true });
   }
 
   const result = await applyDiditPayload(payload, "didit_webhook");

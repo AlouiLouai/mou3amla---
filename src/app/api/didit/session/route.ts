@@ -18,6 +18,10 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL("/home", request.url));
   }
 
+  if (serverEnv.KYC_DEMO_MODE) {
+    return NextResponse.redirect(new URL("/verify-identity", request.url));
+  }
+
   if (!serverEnv.DIDIT_API_KEY) {
     return NextResponse.redirect(new URL("/verify-identity/return?status=Didit%20not%20configured", request.url));
   }
