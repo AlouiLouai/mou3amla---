@@ -233,10 +233,10 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         onClick={actions.generateIntent}
         disabled={!canGenerate}
         aria-label="Send via TUNPAY"
-        className="flex items-center justify-center rounded-2xl py-3.5 transition-opacity disabled:opacity-40"
+        className="mx-auto flex size-16 items-center justify-center rounded-full transition-opacity disabled:opacity-40"
         style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
       >
-        {state.isSendingPayment ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
+        {state.isSendingPayment ? <Loader2 className="size-6 animate-spin" /> : <Send className="size-6" />}
       </button>
     </ScreenFrame>
   );

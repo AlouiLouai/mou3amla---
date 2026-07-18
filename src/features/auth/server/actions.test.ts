@@ -172,6 +172,16 @@ describe("startPhoneAuth", () => {
     expect(setPasskeyBridgeCookie).toHaveBeenCalledWith(expect.objectContaining({ mode: "register" }));
   });
 
+  it("returns a friendly message instead of throwing when the database call errors unexpectedly", async () => {
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("connection reset");
+    });
+
+    const result = await startPhoneAuth(undefined, landingFormData());
+
+    expect(result).toEqual({ message: expect.any(String) });
+  });
+
   it("rejects when the phone and username resolve to two different identities", async () => {
     const admin = makeFakeAdmin({
       fromQueue: [
@@ -241,6 +251,18 @@ describe("finalizeAuth", () => {
 
     expect(server.auth.signOut).toHaveBeenCalledOnce();
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/different .* identity/i) });
+  });
+
+  it("returns a friendly message instead of throwing when the database call errors unexpectedly", async () => {
+    const server = makeFakeServerClient({ getClaims: { data: { claims: { sub: USER_ID } }, error: null } });
+    vi.mocked(createClient).mockResolvedValue(server as never);
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("connection reset");
+    });
+
+    const result = await finalizeAuth(NORMALIZED_PHONE, USERNAME);
+
+    expect(result).toEqual({ ok: false, message: expect.any(String) });
   });
 
   it("clears the bridge and redirects home when the session matches the typed identity", async () => {

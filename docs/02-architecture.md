@@ -13,10 +13,9 @@ src/
     page.tsx              # Stage 1 auth landing: phone + username
     verify/page.tsx       # Stage 2 passkey (WebAuthn) gate
     home/page.tsx         # Stage 3 authenticated dashboard
-    verify-identity/      # Identity verification entry + Didit return callback
+    verify-identity/      # Identity verification entry (demo KYC flow only, see conventions)
     api/qr/               # Signed QR mint + recipient resolve
     api/nearby/           # Nearby 3-digit handoff publish/options/claim
-    api/didit/             # Didit session create, webhook, status poll
     auth/logout/route.ts  # Session teardown
 
   features/
@@ -35,8 +34,9 @@ src/
       types.ts
 
     onboarding/           # Post-login identity verification UX
-      components/         # verification-flow-screen.tsx
-      server/             # didit.ts - session status mapping, webhook/poll sync, audit logging
+      components/         # verification-flow-screen.tsx, demo-verification-panel.tsx
+      hooks/               # use-demo-verification.ts
+      server/             # actions.ts - runDemoVerification + audit logging (no real provider wired up yet)
 
     wallets/              # Destination linking only; never balances
       components/
@@ -89,11 +89,11 @@ supabase/
 - **Authenticated user lookup** belongs to
   `src/features/auth/server/dal.ts`, not inside pages.
 - **Supabase client setup** belongs to `src/lib/supabase/**`.
-- **Didit identity verification** belongs to the `onboarding` feature
-  (`verification-flow-screen.tsx`) for UI and `src/features/onboarding/server/didit.ts`
-  for session-status mapping and Supabase sync. Route handlers under
-  `src/app/api/didit/**` are thin - they call into `didit.ts`, not the other
-  way around.
+- **Identity verification** belongs to the `onboarding` feature
+  (`verification-flow-screen.tsx`, `demo-verification-panel.tsx`) for UI and
+  `src/features/onboarding/server/actions.ts` for the (currently simulated)
+  status update and Supabase sync. No real eKYC provider is wired up - see
+  [06-conventions.md](./06-conventions.md#kyc-conventions).
 - **Signed QR and nearby discovery** belong to the `payments` feature for UI
   and helpers, with thin route handlers under `src/app/api/qr/**` and
   `src/app/api/nearby/**`. The nearby flow is a mutual-accept, AirDrop-style

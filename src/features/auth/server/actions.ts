@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/request-ip";
+import { logger } from "@/lib/logger";
 
 type ProfileLookup = {
   id: string;
@@ -113,10 +114,14 @@ async function createIdentity(
   return { ok: true, profileId };
 }
 
-export async function startPhoneAuth(
-  _prevState: AuthFormState | undefined,
-  formData: FormData,
-): Promise<AuthFormState | undefined> {
+type StartPhoneAuthOutcome = AuthFormState | { redirectTo: string };
+
+// `redirect()` throws internally, so - per Next.js's own docs - it must be
+// called outside any try/catch. This inner function returns a plain
+// `{ redirectTo }` instruction instead of calling `redirect()` itself; the
+// exported wrapper below is the only place that actually calls it, after the
+// try/catch has already run.
+async function startPhoneAuthUnsafe(formData: FormData): Promise<StartPhoneAuthOutcome> {
   const parsed = landingInputSchema.safeParse({
     phone: formData.get("phone"),
     username: formData.get("username"),
@@ -186,7 +191,7 @@ export async function startPhoneAuth(
 
   if (passkeys && passkeys.length > 0) {
     await setPasskeyBridgeCookie({ phone, username, mode: "authenticate" });
-    redirect(`/verify?${new URLSearchParams({ phone, username })}`);
+    return { redirectTo: `/verify?${new URLSearchParams({ phone, username })}` };
   }
 
   const bridgeEmail = buildBridgeEmail(phone, username);
@@ -206,10 +211,27 @@ export async function startPhoneAuth(
     tokenHash: linkData.properties.hashed_token,
   });
 
-  redirect(`/verify?${new URLSearchParams({ phone, username })}`);
+  return { redirectTo: `/verify?${new URLSearchParams({ phone, username })}` };
 }
 
-export async function establishBridgeSession(phone: string, username: string): Promise<PasskeyBridgeResult> {
+export async function startPhoneAuth(_prevState: AuthFormState | undefined, formData: FormData): Promise<AuthFormState | undefined> {
+  let outcome: StartPhoneAuthOutcome;
+
+  try {
+    outcome = await startPhoneAuthUnsafe(formData);
+  } catch (error) {
+    logger.error("Unhandled error in startPhoneAuth", error);
+    return { message: "We couldn't process that right now. Please try again." };
+  }
+
+  if ("redirectTo" in outcome) {
+    redirect(outcome.redirectTo);
+  }
+
+  return outcome;
+}
+
+async function establishBridgeSessionUnsafe(phone: string, username: string): Promise<PasskeyBridgeResult> {
   const bridge = await readPasskeyBridgeCookie(phone, username);
 
   if (!bridge || bridge.mode !== "register" || !bridge.tokenHash) {
@@ -229,7 +251,18 @@ export async function establishBridgeSession(phone: string, username: string): P
   return { ok: true };
 }
 
-export async function finalizeAuth(phone: string, username: string): Promise<PasskeyBridgeResult> {
+export async function establishBridgeSession(phone: string, username: string): Promise<PasskeyBridgeResult> {
+  try {
+    return await establishBridgeSessionUnsafe(phone, username);
+  } catch (error) {
+    logger.error("Unhandled error in establishBridgeSession", error);
+    return { ok: false, message: "We couldn't start passkey setup right now. Please retry." };
+  }
+}
+
+type FinalizeAuthOutcome = PasskeyBridgeResult | { redirectTo: string };
+
+async function finalizeAuthUnsafe(phone: string, username: string): Promise<FinalizeAuthOutcome> {
   const supabase = await createClient();
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
 
@@ -251,5 +284,22 @@ export async function finalizeAuth(phone: string, username: string): Promise<Pas
 
   await clearPasskeyBridgeCookie();
   revalidatePath("/home");
-  redirect("/home");
+  return { redirectTo: "/home" };
+}
+
+export async function finalizeAuth(phone: string, username: string): Promise<PasskeyBridgeResult> {
+  let outcome: FinalizeAuthOutcome;
+
+  try {
+    outcome = await finalizeAuthUnsafe(phone, username);
+  } catch (error) {
+    logger.error("Unhandled error in finalizeAuth", error);
+    return { ok: false, message: "We couldn't finish signing you in right now. Please retry." };
+  }
+
+  if ("redirectTo" in outcome) {
+    redirect(outcome.redirectTo);
+  }
+
+  return outcome;
 }

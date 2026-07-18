@@ -18,9 +18,10 @@ to the home dashboard — new identities register a device passkey, returning
 identities sign in with it, both via Supabase Auth's native passkey support
 (`auth.experimental.passkey`). No SMS provider, OTP, or password is stored or
 transmitted. Digital identity verification is a separate flow launched from
-the dashboard banner or profile that hands off to Didit's hosted eKYC
-(document capture, liveness, face-match) — Mou3amla itself never captures or
-stores identity documents or biometric data. The same Supabase
+the dashboard banner or profile. It currently runs as a visibly-labeled
+simulated demo (no real eKYC provider is wired up yet — Mou3amla itself
+never captures or stores identity documents or biometric data, and won't
+once a real provider accepted under INPDP is integrated either). The same Supabase
 `verification_status` controls which high-trust features unlock, including
 linking any wallet or bank destination, and every status change is recorded
 in `verification_events` for audit.

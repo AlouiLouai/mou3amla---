@@ -4,14 +4,13 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { type CoarseLocation, getCoarseLocation } from "@/features/payments/lib/geolocation";
-import type { HandoffMode, InitialMou3amlaUser, Mou3amlaState } from "@/features/mou3amla/types";
+import type { HandoffMode, InitialMou3amlaUser } from "@/features/mou3amla/types";
 import { PROVIDERS } from "@/features/wallets/constants";
 import { initialState, reducer } from "@/features/mou3amla/hooks/reducer";
 import { useNotificationActions } from "@/features/mou3amla/hooks/use-notification-actions";
 import { usePaymentActions } from "@/features/mou3amla/hooks/use-payment-actions";
 import { useQrNearbyActions } from "@/features/mou3amla/hooks/use-qr-nearby-actions";
 import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const router = useRouter();
@@ -42,95 +41,6 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       }
     };
   }, []);
-
-  // Polls Didit's verification status while a session is pending: fast at
-  // first (2.5s), then backs off to 12s, capped at 10 attempts. The webhook
-  // in `/api/didit/webhook` is the actual source of truth - this just closes
-  // the gap for a user who's still looking at the screen.
-  useEffect(() => {
-    if (state.profile.verificationStatus !== "pending" || !state.profile.diditSessionId) {
-      return;
-    }
-
-    const activeTimers = timers.current;
-    let cancelled = false;
-    let pollTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempts = 0;
-
-    const schedulePoll = () => {
-      if (cancelled || attempts >= 10) {
-        return;
-      }
-
-      pollTimer = setTimeout(() => {
-        void pollStatus();
-      }, attempts === 0 ? 2500 : 12000);
-      activeTimers.add(pollTimer);
-    };
-
-    const pollStatus = async () => {
-      attempts += 1;
-
-      try {
-        const response = await fetchWithTimeout("/api/didit/status", {
-          method: "GET",
-          cache: "no-store",
-        });
-        const payload = (await response.json()) as {
-          profile?: {
-            verificationStatus: Mou3amlaState["profile"]["verificationStatus"];
-            diditLatestStatus: string | null;
-            diditSessionId: string | null;
-          };
-        };
-
-        if (!response.ok || !payload.profile || cancelled) {
-          schedulePoll();
-          return;
-        }
-
-        const currentProfile = stateRef.current.profile;
-        const nextProfile = payload.profile;
-        const statusChanged = currentProfile.verificationStatus !== nextProfile.verificationStatus;
-        const latestChanged = currentProfile.diditLatestStatus !== nextProfile.diditLatestStatus;
-
-        if (statusChanged || latestChanged) {
-          dispatch((s) => ({
-            profile: {
-              ...s.profile,
-              verificationStatus: nextProfile.verificationStatus,
-              diditLatestStatus: nextProfile.diditLatestStatus,
-              diditSessionId: nextProfile.diditSessionId,
-            },
-          }));
-
-          if (currentProfile.verificationStatus !== "verified" && nextProfile.verificationStatus === "verified") {
-            toast.success("Identity verified. RIB linking is now unlocked.");
-          }
-
-          if (currentProfile.verificationStatus !== "rejected" && nextProfile.verificationStatus === "rejected") {
-            toast.error("Didit requested another verification attempt.");
-          }
-        }
-
-        if (nextProfile.verificationStatus === "pending") {
-          schedulePoll();
-        }
-      } catch {
-        schedulePoll();
-      }
-    };
-
-    schedulePoll();
-
-    return () => {
-      cancelled = true;
-      if (pollTimer) {
-        clearTimeout(pollTimer);
-        activeTimers.delete(pollTimer);
-      }
-    };
-  }, [state.profile.diditSessionId, state.profile.verificationStatus]);
 
   const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false, payerMatch: null }), []);
   const goAccounts = useCallback(() => dispatch({ screen: "accounts" }), []);

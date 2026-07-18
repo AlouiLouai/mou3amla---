@@ -46,7 +46,10 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
   const { data: profiles, error } = await admin
     .from("profiles")
     .select("id, username, display_name, verification_status")
-    .ilike("username", `${query}%`)
+    // Cast matches the `(username::text) gin_trgm_ops` index exactly - a
+    // bare `.ilike("username", ...)` degrades to a sequential scan at scale
+    // since citext's collation can't use a plain B-tree for pattern search.
+    .filter("username::text", "ilike", `${query}%`)
     .neq("id", authData.claims.sub)
     .order("username", { ascending: true })
     .limit(8);

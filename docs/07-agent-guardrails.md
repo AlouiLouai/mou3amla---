@@ -41,6 +41,33 @@ rules most likely to be broken by stale training data or over-eager refactors.
     (see [08-testing.md](./08-testing.md)). If a test suddenly can't import a
     server module, fix the mock - don't reach for a `@vitest-environment`
     pragma or `resolve.conditions`, neither actually fixes it.
+19. **New authenticated write server actions/routes need the same audit bar
+    as auth, KYC, and wallet linking already passed** (see
+    [06-conventions.md](./06-conventions.md)) before calling a ticket done:
+    - Auth-gated (reject with a clear message if no session).
+    - Rate-limited per user (or per IP pre-auth) - `checkRateLimit` from
+      `src/lib/rate-limit.ts`, following the `<action>:<userId or ip>` key
+      convention already used by `startPhoneAuth`, `linkDestination`, and
+      `runDemoVerification`.
+    - Error messages never leak another user's identity/data beyond
+      confirming "a conflict exists" - see the phone/username mismatch
+      messages in `actions.ts` and the cross-user destination-exclusivity
+      message in `wallets/server/actions.ts` for the pattern.
+    - Has unit tests covering: missing session, validation failures, the
+      main success path, and whatever conflict/exclusivity check exists -
+      `src/features/wallets/server/actions.test.ts` is the reference shape.
+    - Wrapped in the `xUnsafe` + try/catch-logging outer function pattern so
+      an unexpected error never throws past a Server Action boundary - see
+      "Exception handling, logging, and user-facing errors" in
+      [06-conventions.md](./06-conventions.md#server-actions).
+20. **Never put `redirect()` inside a `try/catch` block.** It throws
+    internally to interrupt rendering, and Next.js's own docs say it must
+    be called outside any `try`. When a Server Action needs both
+    error-catching *and* a redirect (auth's `startPhoneAuth`/`finalizeAuth`
+    are the reference), have the inner `Unsafe` function return
+    `{ redirectTo: string }` instead of calling `redirect()` itself, and
+    call `redirect()` in the exported wrapper after the `try/catch` has
+    already run - don't reach for `unstable_rethrow` as a first instinct.
 
 ## Before you finish a change
 

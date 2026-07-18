@@ -71,6 +71,49 @@ For forms, prefer the modern App Router pattern already used in auth:
 
 Do not place `"use server"` functions inside client component files.
 
+### Exception handling, logging, and user-facing errors
+
+Every Server Action that does real work (touches Supabase, calls an
+external API) follows the same `xUnsafe` + wrapper split - see
+`linkDestination`/`linkDestinationUnsafe` in
+`src/features/wallets/server/actions.ts` as the reference:
+
+- The `Unsafe` inner function contains the actual logic and returns a
+  typed `{ ok: true, ... } | { ok: false, message }` result (or, for
+  `useActionState` forms, an `AuthFormState`-shaped value) for every
+  *expected* failure (validation, missing session, not found, conflict).
+- The exported wrapper calls it inside a `try/catch`. The `catch` block
+  calls `logger.error(...)` (`src/lib/logger.ts` - structured JSON so
+  Vercel's log viewer can filter by level/context) with enough context to
+  diagnose the failure (user id, the input that triggered it - never a
+  secret), then returns the same kind of friendly, generic message the
+  expected-failure paths already use. This is what turns "the server
+  action throws and the user sees a raw Next.js error overlay" into "the
+  user sees the same kind of friendly message either way, and there's a
+  greppable log line explaining what actually broke."
+- **`redirect()` must never be called inside that `try` block** - per
+  Next.js's own docs, `redirect` throws internally and should be called
+  **outside** any `try/catch`. Don't reach for `unstable_rethrow` as the
+  first instinct here; restructure instead, the way `startPhoneAuth` and
+  `finalizeAuth` do in `src/features/auth/server/actions.ts`: the `Unsafe`
+  inner function returns `{ redirectTo: string }` instead of calling
+  `redirect()` itself, and the exported wrapper calls `redirect()` after
+  the `try/catch` has already completed, based on that returned value.
+- API routes (`src/app/api/**/route.ts`) get the same safety net for free
+  by wrapping the handler in `withRouteErrorHandling`
+  (`src/lib/api-handler.ts`) instead of writing this by hand - every route
+  under `src/app/api/**` already does this.
+- Client-side, a Server Action's `{ ok: false, message }` result is
+  surfaced via `toast.error(result.message)` (see `use-wallet-actions.ts`,
+  `use-payment-actions.ts`) or a component-local `message` state (see
+  `passkey-screen.tsx`, `auth-screen.tsx`'s `AuthFormState.message`) -
+  never silently swallowed. `src/app/error.tsx`/`global-error.tsx` are the
+  last-resort boundary for anything that still escapes all of the above;
+  they already log structured JSON via `console.error` and show a
+  friendly retry/home UI, so they don't need to change when you add a new
+  feature - just make sure your feature's own actions don't rely on them
+  as the primary error path.
+
 ## Auth conventions
 
 - The auth flow is **single-entry only**: no separate sign-in and sign-up
@@ -116,82 +159,74 @@ Do not place `"use server"` functions inside client component files.
 
 ## KYC conventions
 
+- **There is currently no real eKYC provider wired up.** The prior Didit
+  integration (hosted session creation, webhook, status polling) was fully
+  removed - not paused behind a flag - because the plan is to launch this
+  demo to BCT on identity-verification *design*, then integrate a provider
+  once one accepted under INPDP is chosen. Do not re-add a specific
+  provider's SDK/API calls without discussing which provider first.
 - Identity verification is launched only after authentication, from the
   dashboard/profile entry points (`/verify-identity`).
-- Verification is real, via Didit's hosted eKYC flow, not an in-app mock:
-  `POST /api/didit/session` creates a Didit v3 session (`workflow_id` from
-  `DIDIT_KYC_WORKFLOW_ID` in `src/config/kyc.ts`) and redirects the user to
-  Didit's own hosted capture/liveness/face-match UI. Mou3amla never captures or
-  stores CIN photos or selfies itself.
-- Didit redirects back to `/verify-identity/return`, which re-syncs status via
-  `syncDiditSessionStatus`. The webhook at `/api/didit/webhook` is the
-  background source of truth regardless of whether the user's browser makes
-  it back to the return page.
-- **Webhook signature verification uses only Didit's documented
-  `X-Signature-V2` scheme** (HMAC-SHA256 over a canonical JSON form: sorted
-  keys, compact separators, unescaped Unicode) plus a 5-minute
-  `X-Timestamp` replay window. Do not accept any other signature header or
-  reintroduce a multi-scheme fallback - that was tried before and is exactly
-  what made the integration unreliable enough to get reverted once already.
-- `mapDiditStatus` in `src/features/onboarding/server/didit.ts` is the single
-  place that maps Didit's status vocabulary (`Approved`, `Declined`,
-  `Expired`, `Abandoned`, `Kyc Expired`, `In Review`, ...) to
-  `profiles.verification_status`. Don't duplicate that mapping elsewhere.
+- The only verification path today is the simulated demo flow:
+  `VerificationFlowScreen` renders `DemoVerificationPanel`
+  (`src/features/onboarding/components/`) whenever
+  `user.verificationStatus` is `unverified` or `rejected`. It runs a purely
+  client-side simulated step sequence (`useDemoVerification`) with an
+  always-visible "Demo mode" banner, then calls the `runDemoVerification`
+  server action (`src/features/onboarding/server/actions.ts`).
+- `runDemoVerification` sets `verification_status = "verified"` and
+  `kyc_provider_status = "Demo Approved"`, and writes a
+  `verification_events` row with `source: "demo_kyc"` and a
+  provider_status that spells out "simulated" - so this can never be
+  confused with a real provider decision in the audit trail a BCT reviewer
+  would inspect. **Never make this silent**: `statusMeta` in
+  `verification-flow-screen.tsx` and `verificationTone` in
+  `profile-screen.tsx` both label a demo-verified profile "(demo)"
+  everywhere status is shown, checking `kycProviderStatus === "Demo Approved"`.
+  Keep that check when a real provider is eventually added.
 - Every status transition is logged to `public.verification_events`
-  (previous status, next status, source, Didit session id) inside
-  `updateProfileStatus` - this is the audit trail a BCT reviewer would ask
-  for under circular 2025-06 Art. 35-style record-keeping expectations. Do
-  not update `profiles.verification_status` from anywhere else without also
-  writing an event row.
-- The webhook route claims each `event_id` against `public.didit_webhook_events`
-  (`claimWebhookEvent` in `didit.ts`) before doing any work - Didit retries an
-  undelivered webhook up to twice (5xx/404), and this makes a retry a no-op
-  instead of a reprocess. A verified payload with no `status` field (e.g.
-  `data.updated`, `activity.created`, business/transaction events this app
-  doesn't act on) gets a quick `200` acknowledgement, not a `401` - a `401`
-  is reserved for an actual signature failure, since Didit will keep retrying
-  anything that doesn't come back `2xx`.
-- `updateProfileStatus` also guards against a retried webhook arriving *after*
-  a newer one already landed: it compares the payload's `timestamp`/`created_at`
-  against `profiles.didit_status_event_at` and no-ops if the incoming event is
-  older. This guard only applies to webhook deliveries - a direct status poll
-  (`syncDiditSessionStatus`) has no event timestamp and always applies, since
-  it's reading Didit's current truth directly rather than replaying a queued
-  delivery.
-- `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET` are optional in
-  `src/config/env.server.ts` - when `DIDIT_API_KEY` is unset, session creation
-  and status polling short-circuit gracefully instead of throwing.
-- 20-digit RIB binding, and now *all* wallet/bank destination linking, stays
+  (previous status, next status, source) inside `runDemoVerification` -
+  this is the audit trail a BCT reviewer would ask for under circular
+  2025-06 Art. 35-style record-keeping expectations. Do not update
+  `profiles.verification_status` from anywhere else without also writing
+  an event row.
+- 20-digit RIB binding, and *all* wallet/bank destination linking, stays
   locked unless `verificationStatus === "verified"` - enforced server-side in
   `linkDestination` (`src/features/wallets/server/actions.ts`), not just in
   the UI.
+- **A `(provider_id, routing_value)` pair is globally exclusive across all
+  users**, not just per-user - `linked_destinations_provider_routing_unique`
+  is a unique index scoped to the whole table. A RIB or wallet tag belongs to
+  one real bank/wallet account, so once user A links it, user B must not be
+  able to link the same one. `linkDestination` pre-checks this across all
+  users (not just the caller's own rows) to give an accurate message without
+  revealing whose account already holds it, with the unique index itself as
+  the authoritative race-condition backstop.
+- **`linkDestination` is rate-limited per user** (`link-destination:<userId>`,
+  10/5min) - a deliberate consequence of the cross-user exclusivity check
+  above: without a limit, an authenticated+verified caller could rapidly
+  probe arbitrary RIBs/wallet tags and use the "already linked to another
+  account" response as an oracle for whether a specific banking identifier
+  is registered in Mou3amla. The rate limit is what makes that message safe
+  to keep specific rather than vague - don't remove one without
+  reconsidering the other.
+- **`runDemoVerification` is rate-limited per user** too
+  (`demo-verification:<userId>`, 5/5min) for the same defense-in-depth
+  consistency, even though abuse impact there is low (it's a no-op once
+  `verification_status` is already `"verified"`).
 - Do not resurrect the old in-app CIN/selfie capture mock
   (`cin-capture-step.tsx`, `selfie-capture-step.tsx`,
-  `setMockVerificationStatus`) - it was deliberately removed in favor of the
-  real Didit integration.
-- **`KYC_DEMO_MODE` is the sanctioned, visibly-labeled stand-in** for when
-  Didit is unreachable (credits exhausted, no INPDP-cleared provider chosen
-  yet, demoing to BCT before a provider is finalized). When
-  `serverEnv.KYC_DEMO_MODE` is `true`:
-  - `VerificationFlowScreen` renders `DemoVerificationPanel` instead of the
-    "Continue with Didit" form - it runs a purely client-side simulated
-    step sequence (`useDemoVerification`) with an always-visible "Demo mode"
-    banner, then calls the `runDemoVerification` server action
-    (`src/features/onboarding/server/actions.ts`).
-  - `runDemoVerification` re-checks `KYC_DEMO_MODE` server-side before doing
-    anything (defense-in-depth against the flag flipping off mid-flight or
-    the action being invoked directly), then sets
-    `verification_status = "verified"` and `didit_latest_status =
-    "Demo Approved"`, and writes a `verification_events` row with
-    `source: "demo_kyc"` and a provider_status that spells out "simulated" -
-    so this can never be confused with a real Didit decision in the audit
-    trail a BCT reviewer would inspect.
-  - `POST /api/didit/session` redirects straight back to `/verify-identity`
-    without calling Didit at all while demo mode is on, even if someone
-    bypasses the UI.
-  - This is never silent: `statusMeta` in `verification-flow-screen.tsx`
-    labels a demo-verified profile "Verified (demo)" with body copy stating
-    it's simulated, everywhere that status is shown.
+  `setMockVerificationStatus`) - the current `DemoVerificationPanel` is the
+  sanctioned replacement: it never claims to check a real document/selfie,
+  says so in its own UI copy, and tags every write with `source: "demo_kyc"`.
+- **When a real provider is chosen**: add its session-creation/webhook/status
+  logic back under `src/features/onboarding/server/`, keep
+  `mapProviderStatus`-style logic in one place (don't duplicate the status
+  vocabulary mapping across files), keep writing to
+  `verification_events` with a distinct `source` value, and gate the choice
+  between the demo panel and the real flow explicitly (e.g. an env flag)
+  rather than deleting the demo path outright - it's a useful fallback if
+  the provider is ever unreachable during a live demo.
 
 ## Nearby AirDrop-style handoff (mutual accept)
 
@@ -222,13 +257,11 @@ Read this before "fixing" something that looks incomplete:
 
 - **Authentication is real now.** Landing, passkey registration/sign-in,
   session cookies, and profile lookup are backed by Supabase.
-- **KYC is real via Didit when `KYC_DEMO_MODE` is off** (the default).
-  Verification status in the `profiles` table is driven by an actual hosted
-  eKYC session (document capture, liveness, face-match), not a local mock or
-  self-attestation toggle. When `KYC_DEMO_MODE=true`, a visibly-labeled demo
-  flow (`DemoVerificationPanel`) stands in instead - see "Do not resurrect
-  the old in-app CIN/selfie capture mock" under KYC conventions above for
-  why this exists and how it stays distinguishable from a real decision.
+- **KYC is a visibly-labeled demo, not a real provider integration right
+  now.** `DemoVerificationPanel` simulates the document/liveness/face-match
+  steps and always says so in its own UI copy - see the KYC conventions
+  section above for how it stays distinguishable from a real decision in
+  both the UI and the audit trail once a real provider is added.
 - **Linked destinations, payment history, and notifications are real now.**
   The home shell hydrates them from Supabase, and payment creation writes back
   to the database before the TUNPAY handoff.
@@ -269,15 +302,12 @@ Read this before "fixing" something that looks incomplete:
   bundle — that includes anything reachable from a `"use client"` component,
   not just files literally marked `"use client"` themselves.
 - Client-visible vars must use the `NEXT_PUBLIC_` prefix.
-- Current auth/KYC-related vars include:
+- Current auth-related vars include:
   `NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`,
-  `QR_TOKEN_SECRET`,
-  `DIDIT_API_KEY`,
-  `DIDIT_WORKFLOW_ID`,
-  `DIDIT_WEBHOOK_SECRET`,
-  `KYC_DEMO_MODE`.
+  `QR_TOKEN_SECRET`.
+  (No KYC-provider vars exist right now - see KYC conventions above.)
 
 ## Package manager
 

@@ -6,6 +6,7 @@ import { getSessionIdentity } from "@/features/auth/server/dal";
 import { PROVIDERS } from "@/features/wallets/constants";
 import type { LinkedWallet, RoutingType } from "@/features/wallets/types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
 type ProfileVerificationRow = {
@@ -87,6 +88,15 @@ async function linkDestinationUnsafe(input: { providerId: string; routingValue: 
     return { ok: false, message: "Your session expired. Sign in again." };
   }
 
+  // Now that a routing value's existence is checked across *all* users (not
+  // just the caller's own), an unlimited number of attempts would turn this
+  // into an oracle for probing whether a specific RIB/wallet tag is already
+  // registered by someone else - rate-limit per user to blunt that.
+  const withinLimit = await checkRateLimit(`link-destination:${identity.userId}`, { max: 10, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many linking attempts. Please wait a few minutes and try again." };
+  }
+
   const provider = PROVIDERS.find((entry) => entry.id === parsed.data.providerId);
   if (!provider) {
     return { ok: false, message: "That provider is not supported yet." };
@@ -114,6 +124,31 @@ async function linkDestinationUnsafe(input: { providerId: string; routingValue: 
     return { ok: false, message: "Complete identity verification before linking a wallet or bank account." };
   }
 
+  // A RIB or wallet tag is real-world exclusive - one destination belongs to
+  // one account, so this checks across *all* users, not just the caller's
+  // own destinations, and gives an accurate message either way without
+  // revealing whose account already holds it.
+  const { data: existingDestination, error: existingError } = await admin
+    .from("linked_destinations")
+    .select("user_id")
+    .eq("provider_id", provider.id)
+    .eq("routing_value", routingValue)
+    .maybeSingle<{ user_id: string }>();
+
+  if (existingError) {
+    return { ok: false, message: "We couldn't verify that destination right now. Please retry." };
+  }
+
+  if (existingDestination) {
+    return {
+      ok: false,
+      message:
+        existingDestination.user_id === identity.userId
+          ? "You've already linked this destination."
+          : "This RIB or wallet is already linked to another Mou3amla account.",
+    };
+  }
+
   const { count, error: countError } = await admin
     .from("linked_destinations")
     .select("id", { count: "exact", head: true })
@@ -139,8 +174,10 @@ async function linkDestinationUnsafe(input: { providerId: string; routingValue: 
     .select("id, provider_id, name, network, color, initials, routing_type, routing_value, is_default")
     .single<LinkedDestinationRow>();
 
+  // Race-condition fallback: two concurrent requests could both pass the
+  // pre-check above before either insert commits.
   if (insertError?.code === "23505") {
-    return { ok: false, message: "That destination is already linked to your profile." };
+    return { ok: false, message: "That destination was just linked (by you or another account). Please retry with a different one." };
   }
 
   if (insertError || !inserted) {

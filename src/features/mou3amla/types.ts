@@ -26,8 +26,7 @@ export interface UserProfile {
   fullName: string;
   isProfessional: boolean;
   verificationStatus: VerificationStatus;
-  diditLatestStatus?: string | null;
-  diditSessionId?: string | null;
+  kycProviderStatus?: string | null;
   matriculeFiscal?: string;
 }
 
@@ -36,8 +35,7 @@ export interface InitialMou3amlaUser {
   username: string;
   displayName: string;
   verificationStatus: VerificationStatus;
-  diditLatestStatus: string | null;
-  diditSessionId: string | null;
+  kycProviderStatus: string | null;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];

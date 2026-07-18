@@ -1,9 +1,8 @@
-import { serverEnv } from "@/config/env.server";
 import { requireCurrentAppUser } from "@/features/auth/server/dal";
 import { VerificationFlowScreen } from "@/features/onboarding/components/verification-flow-screen";
 
 export default async function VerifyIdentityPage() {
   const user = await requireCurrentAppUser();
 
-  return <VerificationFlowScreen user={user} demoMode={serverEnv.KYC_DEMO_MODE} />;
+  return <VerificationFlowScreen user={user} />;
 }

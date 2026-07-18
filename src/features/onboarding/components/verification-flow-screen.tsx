@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Clock3, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronLeft, Clock3, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { AuthenticatedAppUser, VerificationStatus } from "@/features/auth/types";
 import { formatUsernameHandle } from "@/features/auth/lib/identity";
 import { DemoVerificationPanel } from "@/features/onboarding/components/demo-verification-panel";
@@ -21,7 +21,7 @@ function statusMeta(status: VerificationStatus, isDemoApproval: boolean) {
   if (status === "pending") {
     return {
       label: "Pending review",
-      body: "Didit is reviewing your file. This screen updates automatically once a decision comes back.",
+      body: "A previous verification attempt is on file as pending review.",
       tone: mou3amla.subtle,
       bg: alpha(mou3amla.subtle, 0.14),
       icon: Clock3,
@@ -31,7 +31,7 @@ function statusMeta(status: VerificationStatus, isDemoApproval: boolean) {
   if (status === "rejected") {
     return {
       label: "Needs retry",
-      body: "Didit couldn't confirm your identity from that attempt. Start again with clearer photos.",
+      body: "Your previous verification attempt didn't go through. Run the demo verification below to continue.",
       tone: mou3amla.destructive,
       bg: alpha(mou3amla.destructive, 0.12),
       icon: TriangleAlert,
@@ -47,8 +47,8 @@ function statusMeta(status: VerificationStatus, isDemoApproval: boolean) {
   };
 }
 
-export function VerificationFlowScreen({ user, demoMode }: { user: AuthenticatedAppUser; demoMode: boolean }) {
-  const status = statusMeta(user.verificationStatus, user.diditLatestStatus === "Demo Approved");
+export function VerificationFlowScreen({ user }: { user: AuthenticatedAppUser }) {
+  const status = statusMeta(user.verificationStatus, user.kycProviderStatus === "Demo Approved");
   const StatusIcon = status.icon;
   const canStart = user.verificationStatus === "unverified" || user.verificationStatus === "rejected";
 
@@ -58,6 +58,15 @@ export function VerificationFlowScreen({ user, demoMode }: { user: Authenticated
       style={{ background: `linear-gradient(180deg, ${mou3amla.surface} 0%, ${mou3amla.bg} 100%)` }}
     >
       <div className="mx-auto flex w-full max-w-md flex-col">
+        <Link
+          href="/home"
+          aria-label="Back to home"
+          className="mb-3 flex size-9 items-center justify-center self-start rounded-full"
+          style={{ background: alpha(mou3amla.text, 0.06) }}
+        >
+          <ChevronLeft className="size-4.5" style={{ color: mou3amla.text }} />
+        </Link>
+
         <div
           className="relative mb-4 overflow-hidden rounded-[30px] px-5 pt-5 pb-6 text-white"
           style={{ background: mou3amla.hero, boxShadow: "0 26px 70px rgba(0,0,0,0.18)" }}
@@ -101,28 +110,7 @@ export function VerificationFlowScreen({ user, demoMode }: { user: Authenticated
           </div>
 
           {canStart ? (
-            demoMode ? (
-              <DemoVerificationPanel />
-            ) : (
-              <>
-                <p className="mb-4 text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                  Mou3amla hands identity verification off to Didit, our identity-verification partner. You&rsquo;ll
-                  photograph your CIN and take a live selfie on Didit&rsquo;s hosted screen, then land back here
-                  automatically.
-                </p>
-
-                <form action="/api/didit/session" method="POST">
-                  <button
-                    type="submit"
-                    className="flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[14px] font-black"
-                    style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
-                  >
-                    Continue with Didit
-                    <ArrowRight className="size-4" />
-                  </button>
-                </form>
-              </>
-            )
+            <DemoVerificationPanel />
           ) : user.verificationStatus === "verified" ? (
             <Link
               href="/home"

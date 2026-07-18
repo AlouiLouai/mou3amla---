@@ -2,23 +2,21 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { serverEnv } from "@/config/env.server";
 import { getCurrentAppUser } from "@/features/auth/server/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const DEMO_PROVIDER_STATUS = "Demo Approved (simulated - no real identity document was checked)";
 
-/** Simulated KYC approval for demo/pitch environments where no eKYC provider
- * is wired up yet (or the wired one is temporarily unusable). Gated on
- * `KYC_DEMO_MODE` server-side so it can't be invoked just because the UI
- * happens to render the demo panel. Writes the same `verification_events`
- * audit trail as a real Didit sync, with `source: "demo_kyc"` and a
- * provider_status that can never be mistaken for a genuine Didit decision. */
-export async function runDemoVerification(): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!serverEnv.KYC_DEMO_MODE) {
-    return { ok: false, message: "Demo verification mode is not enabled." };
-  }
+type RunDemoVerificationResult = { ok: true } | { ok: false; message: string };
 
+/** Simulated KYC approval - this is the only verification path right now;
+ * no real eKYC provider is wired up until one accepted by INPDP is chosen.
+ * Writes the same `verification_events` audit trail a real provider sync
+ * would, with `source: "demo_kyc"` and a provider_status that can never be
+ * mistaken for a genuine decision. */
+async function runDemoVerificationUnsafe(): Promise<RunDemoVerificationResult> {
   const user = await getCurrentAppUser();
   if (!user) {
     return { ok: false, message: "You need to be signed in to run the demo verification." };
@@ -28,6 +26,11 @@ export async function runDemoVerification(): Promise<{ ok: true } | { ok: false;
     return { ok: true };
   }
 
+  const withinLimit = await checkRateLimit(`demo-verification:${user.id}`, { max: 5, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
   const admin = createAdminClient();
   const sessionId = `demo-${randomUUID()}`;
 
@@ -35,16 +38,19 @@ export async function runDemoVerification(): Promise<{ ok: true } | { ok: false;
     .from("profiles")
     .update({
       verification_status: "verified",
-      didit_latest_status: "Demo Approved",
-      didit_session_id: sessionId,
+      kyc_provider_status: "Demo Approved",
     })
     .eq("id", user.id);
 
   if (updateError) {
+    logger.error("Failed to write demo verification status", updateError, { userId: user.id });
     return { ok: false, message: "The demo verification couldn't be recorded. Please retry." };
   }
 
-  await admin.from("verification_events").insert({
+  // The status update above already committed - a failure here would be an
+  // audit-trail gap, not a failed verification, so it's logged rather than
+  // reported back as an error (the user's status did in fact change).
+  const { error: eventError } = await admin.from("verification_events").insert({
     user_id: user.id,
     previous_status: user.verificationStatus,
     next_status: "verified",
@@ -53,8 +59,21 @@ export async function runDemoVerification(): Promise<{ ok: true } | { ok: false;
     provider_status: DEMO_PROVIDER_STATUS,
   });
 
+  if (eventError) {
+    logger.error("Failed to write demo verification audit event", eventError, { userId: user.id });
+  }
+
   revalidatePath("/verify-identity");
   revalidatePath("/home");
 
   return { ok: true };
+}
+
+export async function runDemoVerification(): Promise<RunDemoVerificationResult> {
+  try {
+    return await runDemoVerificationUnsafe();
+  } catch (error) {
+    logger.error("Unhandled error in runDemoVerification", error);
+    return { ok: false, message: "We couldn't run the demo verification right now. Please retry." };
+  }
 }

@@ -1,13 +1,12 @@
 import type { ReactNode } from "react";
 import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut } from "lucide-react";
-import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 
-function verificationTone(status: string) {
-  if (status === "verified") return { bg: alpha("#15A46B", 0.12), color: "#12885A", label: "Verified profile" };
+function verificationTone(status: string, isDemoApproval: boolean) {
+  if (status === "verified") return { bg: alpha("#15A46B", 0.12), color: "#12885A", label: isDemoApproval ? "Verified profile (demo)" : "Verified profile" };
   if (status === "pending") return { bg: alpha("#D28B11", 0.14), color: "#B6790E", label: "Verification in review" };
   if (status === "rejected") return { bg: alpha(mou3amla.destructive, 0.12), color: mou3amla.destructive, label: "Action required" };
   return { bg: alpha(mou3amla.accent, 0.1), color: mou3amla.accent, label: "Not verified" };
@@ -22,15 +21,11 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const verification = verificationTone(account.profile.verificationStatus);
-  const isVerificationSyncing = account.profile.verificationStatus === "pending" && Boolean(account.profile.diditSessionId);
-  const header = (
-    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
-  );
+  const verification = verificationTone(account.profile.verificationStatus, account.profile.kycProviderStatus === "Demo Approved");
   const footer = renderAppFooter("profile", actions);
 
   return (
-    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
+    <ScreenFrame footer={footer} contentClassName="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
         <div className="mb-4 rounded-[28px] border px-5 py-5" style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}>
           <div className="mb-4 flex items-center gap-4">
             <div
@@ -60,11 +55,6 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
             <BadgeCheck className="size-4" />
             <span>{verification.label}</span>
           </div>
-          {isVerificationSyncing ? (
-            <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: mou3amla.subtle }}>
-              Didit status refresh is running in the background.
-            </div>
-          ) : null}
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">

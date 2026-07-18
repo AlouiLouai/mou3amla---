@@ -16,9 +16,7 @@ declare const self: ServiceWorkerGlobalScope;
 const paymentApiRoutes: RuntimeCaching[] = [
   {
     matcher({ url }) {
-      return (
-        url.pathname.startsWith("/api/qr/") || url.pathname.startsWith("/api/nearby/") || url.pathname.startsWith("/api/didit/")
-      );
+      return url.pathname.startsWith("/api/qr/") || url.pathname.startsWith("/api/nearby/");
     },
     handler: new NetworkOnly(),
   },
@@ -34,7 +32,7 @@ const paymentApiRoutes: RuntimeCaching[] = [
 const authenticatedPageRoutes: RuntimeCaching[] = [
   {
     matcher({ url }) {
-      return url.pathname === "/home" || url.pathname === "/verify" || url.pathname.startsWith("/verify-identity");
+      return url.pathname === "/home" || url.pathname === "/verify" || url.pathname === "/verify-identity";
     },
     handler: new NetworkOnly(),
   },

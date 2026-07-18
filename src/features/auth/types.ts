@@ -24,8 +24,7 @@ export interface AppProfileRecord {
   username: string;
   displayName: string;
   verificationStatus: VerificationStatus;
-  diditLatestStatus: string | null;
-  diditSessionId: string | null;
+  kycProviderStatus: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,8 +35,7 @@ export interface AuthenticatedAppUser {
   username: string;
   displayName: string;
   verificationStatus: VerificationStatus;
-  diditLatestStatus: string | null;
-  diditSessionId: string | null;
+  kycProviderStatus: string | null;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];
