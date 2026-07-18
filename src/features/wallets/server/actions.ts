@@ -110,8 +110,8 @@ async function linkDestinationUnsafe(input: { providerId: string; routingValue: 
     return { ok: false, message: "We couldn't verify your identity status right now." };
   }
 
-  if (routingType === "rib" && profile.verification_status !== "verified") {
-    return { ok: false, message: "Complete identity verification before linking a 20-digit RIB." };
+  if (profile.verification_status !== "verified") {
+    return { ok: false, message: "Complete identity verification before linking a wallet or bank account." };
   }
 
   const { count, error: countError } = await admin

@@ -54,7 +54,7 @@ const sendPaymentSchema = z.object({
     .trim()
     .transform((value) => value.replace(/^@+/, "").toLowerCase())
     .refine((value) => /^[a-z0-9_]{3,24}$/.test(value), {
-      message: "Enter a valid SQUAD username.",
+      message: "Enter a valid Mou3amla username.",
     }),
   amount: z.number().positive().max(100_000),
 });
@@ -122,11 +122,11 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   }
 
   if (recipientError || !recipient) {
-    return { ok: false, message: "That recipient doesn't exist in SQUAD yet." };
+    return { ok: false, message: "That recipient doesn't exist in Mou3amla yet." };
   }
 
   if (recipient.id === senderProfile.id) {
-    return { ok: false, message: "Use another SQUAD handle to test a transfer." };
+    return { ok: false, message: "Use another Mou3amla handle to test a transfer." };
   }
 
   const { data: recipientDestination, error: recipientDestinationError } = await admin

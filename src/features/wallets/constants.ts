@@ -1,9 +1,9 @@
-import { squad } from "@/features/squad/constants";
+import { mou3amla } from "@/features/mou3amla/constants";
 import type { Provider } from "@/features/wallets/types";
 
 // Real Tunisian mobile-money / e-payment providers operating under the
 // TUNPAY interoperability label. Each only exposes the routing identifier
-// types it actually supports — SQUAD never stores a balance for any of
+// types it actually supports — Mou3amla never stores a balance for any of
 // these, only the destination-only string the user provides.
 export const PROVIDERS: Provider[] = [
   {
@@ -91,7 +91,7 @@ export const PROVIDERS: Provider[] = [
     id: "clictopay",
     name: "ClicToPay (SMT)",
     initials: "CP",
-    color: squad.text,
+    color: mou3amla.text,
     network: "SMT · Interbank",
     subtitle: "Bank Card / RIB · ClicToPay",
     acceptedRoutingTypes: ["rib"],

@@ -11,6 +11,11 @@ export async function createClient() {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      auth: {
+        experimental: {
+          passkey: true,
+        },
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll();

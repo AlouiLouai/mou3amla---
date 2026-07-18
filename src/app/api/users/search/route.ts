@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { RecipientPreview } from "@/features/payments/types";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
 import { withRouteErrorHandling } from "@/lib/api-handler";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +31,11 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
 
   if (authError || !authData?.claims?.sub) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const withinLimit = await checkRateLimit(`users-search:${authData.claims.sub}`, { max: 30, windowSeconds: 60 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many searches. Please slow down." }, { status: 429 });
   }
 
   if (query.length < 2) {

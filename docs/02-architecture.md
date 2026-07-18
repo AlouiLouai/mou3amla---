@@ -11,15 +11,16 @@ src/
   app/                    # App Router routes only: pages, layouts, route handlers,
                            # metadata files, service worker route, proxy-adjacent routes
     page.tsx              # Stage 1 auth landing: phone + username
-    verify/page.tsx       # Stage 2 OTP gate
+    verify/page.tsx       # Stage 2 passkey (WebAuthn) gate
     home/page.tsx         # Stage 3 authenticated dashboard
-    verify-identity/      # Local mock identity verification screens
+    verify-identity/      # Identity verification entry + Didit return callback
     api/qr/               # Signed QR mint + recipient resolve
     api/nearby/           # Nearby 3-digit handoff publish/options/claim
+    api/didit/             # Didit session create, webhook, status poll
     auth/logout/route.ts  # Session teardown
 
   features/
-    squad/                # Authenticated shell: screen router, shared reducer,
+    mou3amla/                # Authenticated shell: screen router, shared reducer,
                            # dashboard, bottom nav, shell-level theme tokens
       components/         # includes shell primitives like screen-frame.tsx
       hooks/
@@ -28,14 +29,14 @@ src/
       mark.tsx
 
     auth/                 # Stage 1 + Stage 2 auth UX and server logic
-      components/         # auth-screen.tsx, otp-screen.tsx
+      components/         # auth-screen.tsx, passkey-screen.tsx
       lib/                # phone/username normalization and zod schemas
       server/             # server actions + authenticated-user DAL
       types.ts
 
     onboarding/           # Post-login identity verification UX
       components/         # verification-flow-screen.tsx
-      server/             # mock verification status actions
+      server/             # didit.ts - session status mapping, webhook/poll sync, audit logging
 
     wallets/              # Destination linking only; never balances
       components/
@@ -44,6 +45,7 @@ src/
 
     payments/             # Intent generation, QR request/scan, result UX
       components/
+      hooks/              # useRecipientSearch, useQrCameraScanner - feature-specific, not shared
       lib/
       server/
       types.ts
@@ -56,9 +58,13 @@ src/
   components/             # Shared cross-feature UI only
     ui/                   # shadcn primitives
     layout/               # theme-provider and layout helpers
-    pwa/                  # install prompt / online-state shared UI
+    pwa/                  # install prompt / online-state shared UI, splash screen
 
-  hooks/                  # Shared hooks used across features
+  hooks/                  # Shared hooks used across features - only put a hook
+                           # here if it has zero feature-specific coupling
+                           # (use-online-status.ts, use-has-mounted.ts, use-now.ts).
+                           # Anything tied to one feature's domain logic belongs in
+                           # that feature's own hooks/, not here.
   lib/
     supabase/             # SSR, admin, and proxy Supabase clients
     utils.ts
@@ -78,13 +84,16 @@ supabase/
 - **Stage 1 landing** belongs to `src/app/page.tsx` plus
   `src/features/auth/components/auth-screen.tsx` and
   `src/features/auth/server/actions.ts`.
-- **Stage 2 OTP** belongs to `src/app/verify/page.tsx` plus
-  `src/features/auth/components/otp-screen.tsx`.
+- **Stage 2 passkey gate** belongs to `src/app/verify/page.tsx` plus
+  `src/features/auth/components/passkey-screen.tsx`.
 - **Authenticated user lookup** belongs to
   `src/features/auth/server/dal.ts`, not inside pages.
 - **Supabase client setup** belongs to `src/lib/supabase/**`.
-- **Mock identity verification** belongs to the `onboarding` feature for UI
-  and `src/features/onboarding/server/**` for Supabase status updates.
+- **Didit identity verification** belongs to the `onboarding` feature
+  (`verification-flow-screen.tsx`) for UI and `src/features/onboarding/server/didit.ts`
+  for session-status mapping and Supabase sync. Route handlers under
+  `src/app/api/didit/**` are thin - they call into `didit.ts`, not the other
+  way around.
 - **Signed QR and nearby discovery** belong to the `payments` feature for UI
   and helpers, with thin route handlers under `src/app/api/qr/**` and
   `src/app/api/nearby/**`. The nearby flow is a mutual-accept, AirDrop-style
@@ -113,41 +122,41 @@ supabase/
   their own `profiles` row) and is debounced client-side in
   `generate-intent-screen.tsx`.
 
-## The `squad` shell vs. domain features
+## The `mou3amla` shell vs. domain features
 
-`squad` is the authenticated app shell, not the auth system itself. It owns
+`mou3amla` is the authenticated app shell, not the auth system itself. It owns
 the home/dashboard experience, the shared screen reducer for client
 interaction state, and shared shell chrome such as the bottom nav. Auth,
 wallets, notifications, profile, invoices, and payments still keep their own
 domain code in their feature folders.
 
-The shell now uses a reusable frame pattern: header and footer/tab chrome stay
-fixed, while each screen's central content pane is the only scrollable region.
-That shared behavior belongs in `src/features/squad/components/screen-frame.tsx`
-instead of being reimplemented ad hoc per screen.
+The shell now uses a reusable frame pattern: header and footer/tab chrome are
+always fixed - they never move, resize, or hide - while each screen's central
+content pane is the only scrollable region. That shared behavior belongs in
+`src/features/mou3amla/components/screen-frame.tsx` instead of being
+reimplemented ad hoc per screen.
 
 Every full-page screen in the authenticated shell (home, send, receive, scan,
 intent result, activity, invoices, profile, notifications) shares the exact
 same header and bottom nav - not just the four screens the bottom nav can
 navigate directly to. This is a deliberate tab-app IA: there is no per-screen
 back-chevron header, and "back" is just tapping Home. Screens must not build
-their own header; use `src/features/squad/components/app-header.tsx`
+their own header; use `src/features/mou3amla/components/app-header.tsx`
 (`AppHeader`) and `renderAppFooter` from
-`src/features/squad/components/bottom-nav.tsx` instead. Screen-specific
+`src/features/mou3amla/components/bottom-nav.tsx` instead. Screen-specific
 context (a title, a subtitle) belongs as the first thing in the *scrollable
-body*, not in the fixed header. `ScreenFrame`'s footer prop accepts a
-`(compact: boolean) => ReactNode` render function specifically so the bottom
-nav can compact to an icon-only pill while scrolling and expand back at rest
-(mirrors Instagram's tab bar) - it must never fully disappear.
-Sheets/overlays like `WalletRegistrySheet` are not full-page screens and stay
-exempt from this pattern.
+body*, not in the fixed header. `ScreenFrame`'s `footer` prop is a plain
+`ReactNode` rendered `absolute` at the bottom of the shell - it does not hide,
+shrink, or otherwise react to scrolling. Sheets/overlays like
+`WalletRegistrySheet` are not full-page screens and stay exempt from this
+pattern.
 
 The shell now bootstraps its real user state from Supabase-backed server data:
 profile, linked destinations, activity history, and notifications are passed
 through `initialUser`. Only transient UI state stays in the reducer.
 
 To keep the first mobile load lighter, non-home shell screens are lazy-loaded
-from `src/features/squad/components/squad-app.tsx` with `next/dynamic`.
+from `src/features/mou3amla/components/mou3amla-app.tsx` with `next/dynamic`.
 
 ## Rule of thumb: where does new code go?
 

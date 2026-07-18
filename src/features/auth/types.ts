@@ -9,8 +9,12 @@ export interface AuthFormState {
   errors?: {
     phone?: string[];
     username?: string[];
-    otp?: string[];
   };
+  message?: string;
+}
+
+export interface PasskeyBridgeResult {
+  ok: boolean;
   message?: string;
 }
 
@@ -20,6 +24,8 @@ export interface AppProfileRecord {
   username: string;
   displayName: string;
   verificationStatus: VerificationStatus;
+  diditLatestStatus: string | null;
+  diditSessionId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +36,8 @@ export interface AuthenticatedAppUser {
   username: string;
   displayName: string;
   verificationStatus: VerificationStatus;
+  diditLatestStatus: string | null;
+  diditSessionId: string | null;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];

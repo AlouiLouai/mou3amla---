@@ -20,16 +20,6 @@ export const landingInputSchema = z.object({
     }),
 });
 
-export const otpInputSchema = z.object({
-  otp: z
-    .string()
-    .trim()
-    .transform((value) => value.replace(/\D/g, ""))
-    .refine((value) => /^\d{6}$/.test(value), {
-      message: "Enter the 6-digit code we sent to your phone.",
-    }),
-});
-
 export function normalizePhoneForAuth(phoneDigits: string): string {
   return `+216${phoneDigits}`;
 }

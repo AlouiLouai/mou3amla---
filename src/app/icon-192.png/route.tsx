@@ -1,9 +1,9 @@
 import { ImageResponse } from "next/og";
-import { SquadMark } from "@/features/squad/mark";
+import { Mou3amlaMark } from "@/features/mou3amla/mark";
 
 export const size = { width: 192, height: 192 };
 export const contentType = "image/png";
 
 export function GET() {
-  return new ImageResponse(<SquadMark size={size.width} />, { ...size });
+  return new ImageResponse(<Mou3amlaMark size={size.width} />, { ...size });
 }

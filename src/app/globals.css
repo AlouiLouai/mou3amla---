@@ -175,26 +175,58 @@
   }
 }
 
+/* Toast auto-dismiss progress bar. Matches sonner's default TOAST_LIFETIME
+   (4000ms) since no call site in this app overrides `duration`. Loading
+   toasts are dismissed programmatically (never auto-expire), so they're
+   excluded. */
+@keyframes mou3amla-toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+[data-sonner-toast]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #ff0083;
+  opacity: 0.55;
+  transform-origin: left;
+  animation: mou3amla-toast-progress 4000ms linear forwards;
+}
+
+[data-sonner-toast][data-type="loading"]::after,
+[data-sonner-toast][data-swiping="true"]::after {
+  animation-play-state: paused;
+  opacity: 0;
+}
+
 /* min-height: 100dvh with a 100vh fallback for browsers that don't parse the
    dvh unit (older Android WebViews, older Samsung Internet) - those browsers
    drop an unrecognized-unit declaration entirely, so without the fallback the
    shell would collapse to auto height instead of filling the viewport. */
-.squad-viewport-h {
+.mou3amla-viewport-h {
   min-height: 100vh;
   min-height: 100dvh;
 }
 
-.squad-scroll {
+.mou3amla-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
 }
 
-.squad-scroll::-webkit-scrollbar {
+.mou3amla-scroll::-webkit-scrollbar {
   display: none;
 }
 
-@keyframes squad-pulse-ring {
+@keyframes mou3amla-pulse-ring {
   0% {
     transform: scale(0.6);
     opacity: 0.9;
@@ -205,7 +237,7 @@
   }
 }
 
-@keyframes squad-scanline {
+@keyframes mou3amla-scanline {
   0%,
   100% {
     transform: translateY(0%);
@@ -215,7 +247,7 @@
   }
 }
 
-@keyframes squad-fall {
+@keyframes mou3amla-fall {
   0% {
     transform: translateY(-20px) rotate(0deg);
     opacity: 1;
@@ -226,7 +258,7 @@
   }
 }
 
-@keyframes squad-bars {
+@keyframes mou3amla-bars {
   0%,
   100% {
     transform: scaleY(0.3);
@@ -236,7 +268,7 @@
   }
 }
 
-@keyframes squad-glow {
+@keyframes mou3amla-glow {
   0%,
   100% {
     box-shadow: 0 0 0px rgba(255, 0, 131, 0);
@@ -246,7 +278,42 @@
   }
 }
 
-@keyframes squad-fadeup {
+/* PWA launch splash - see src/components/pwa/splash-screen.tsx. Pure CSS so
+   it paints on the very first frame with no client JS/hydration dependency:
+   visible for 1.1s, then a 0.3s fade, then removed from hit-testing. Covers
+   Android, which (unlike iOS's apple-touch-startup-image) has no manifest
+   field for a custom launch image. */
+@keyframes mou3amla-splash-out {
+  0%,
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.mou3amla-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  animation: mou3amla-splash-out 1.4s ease forwards;
+}
+
+.mou3amla-splash-image {
+  max-height: 42%;
+  max-width: 62%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+@keyframes mou3amla-fadeup {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -257,7 +324,7 @@
   }
 }
 
-@keyframes squad-screen-in {
+@keyframes mou3amla-screen-in {
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.99);

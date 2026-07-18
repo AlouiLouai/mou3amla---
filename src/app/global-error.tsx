@@ -45,7 +45,7 @@ export default function GlobalError({
           color: "#050505",
         }}
       >
-        <div style={{ fontSize: "1.125rem", fontWeight: 900 }}>SQUAD couldn&apos;t load.</div>
+        <div style={{ fontSize: "1.125rem", fontWeight: 900 }}>Mou3amla couldn&apos;t load.</div>
         <p style={{ maxWidth: 280, fontSize: "0.875rem", color: "rgba(5,5,5,0.62)" }}>
           Something broke while loading the app shell. Nothing was lost - try again.
         </p>

@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { QrCode, Quote, Send } from "lucide-react";
-import { AppHeader } from "@/features/squad/components/app-header";
-import { renderAppFooter } from "@/features/squad/components/bottom-nav";
-import { ScreenFrame } from "@/features/squad/components/screen-frame";
-import { alpha, cardShadow, squad } from "@/features/squad/constants";
-import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
+import { AppHeader } from "@/features/mou3amla/components/app-header";
+import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
+import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
+import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { WalletStack } from "@/features/wallets/components/wallet-stack";
 
-export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
-  const { derived, actions } = squadApp;
+export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
+  const { derived, actions } = mou3amlaApp;
   const account = derived.account;
   const footer = renderAppFooter("home", actions);
   const header = (
@@ -42,13 +42,13 @@ export function HomeScreen({ squadApp }: { squadApp: UseSquadApp }) {
         />
       </div>
 
-      <div className="mt-5 rounded-[24px] p-4" style={{ background: squad.hero }}>
-        <Quote className="size-5" style={{ color: squad.accent }} />
+      <div className="mt-5 rounded-[24px] p-4" style={{ background: mou3amla.hero }}>
+        <Quote className="size-5" style={{ color: mou3amla.accent }} />
         <p className="mt-2 text-[14px] leading-snug font-black text-white">
           Sending money should feel like sending a text.
         </p>
         <p className="mt-1.5 text-[11.5px] leading-relaxed text-white/60">
-          SQUAD turns your @username into a TUNPAY routing address - no IBAN, no branch visit, no waiting. Pick a
+          Mou3amla turns your @username into a TUNPAY routing address - no IBAN, no branch visit, no waiting. Pick a
           contact, confirm the amount, and your bank or wallet app finishes the transfer on the spot.
         </p>
       </div>
@@ -73,8 +73,8 @@ function ActionCard({
     tone === "accent"
       ? { background: "linear-gradient(135deg, #FF0083, #FF5C9E)", color: "#FFFFFF", borderColor: "transparent" }
       : tone === "dark"
-        ? { background: squad.hero, color: "#FFFFFF", borderColor: "transparent" }
-        : { background: squad.card, color: squad.text, borderColor: squad.border };
+        ? { background: mou3amla.hero, color: "#FFFFFF", borderColor: "transparent" }
+        : { background: mou3amla.card, color: mou3amla.text, borderColor: mou3amla.border };
 
   return (
     <button
@@ -86,14 +86,14 @@ function ActionCard({
       <div
         className="mb-4 flex size-10 items-center justify-center rounded-[15px]"
         style={{
-          background: tone === "light" ? alpha(squad.accent, 0.1) : "rgba(255,255,255,0.14)",
-          color: tone === "light" ? squad.accent : "#FFFFFF",
+          background: tone === "light" ? alpha(mou3amla.accent, 0.1) : "rgba(255,255,255,0.14)",
+          color: tone === "light" ? mou3amla.accent : "#FFFFFF",
         }}
       >
         {icon}
       </div>
       <div className="text-[13px] font-black">{label}</div>
-      <div className="mt-1 text-[11px]" style={{ color: tone === "light" ? squad.textMuted : "rgba(255,255,255,0.76)" }}>
+      <div className="mt-1 text-[11px]" style={{ color: tone === "light" ? mou3amla.textMuted : "rgba(255,255,255,0.76)" }}>
         {body}
       </div>
     </button>

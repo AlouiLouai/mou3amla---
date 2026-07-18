@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { HomeScreen } from "@/features/squad/components/home-screen";
-import { squad } from "@/features/squad/constants";
-import { useSquadApp } from "@/features/squad/hooks/use-squad-app";
-import type { InitialSquadUser } from "@/features/squad/types";
+import { HomeScreen } from "@/features/mou3amla/components/home-screen";
+import { mou3amla } from "@/features/mou3amla/constants";
+import { useMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import type { InitialMou3amlaUser } from "@/features/mou3amla/types";
 import { WalletRegistrySheet } from "@/features/wallets/components/wallet-registry-sheet";
 
 function ScreenLoading() {
@@ -55,20 +55,20 @@ const AccountsScreen = dynamic(() => import("@/features/wallets/components/accou
   loading: () => <ScreenLoading />,
 });
 
-export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
-  const squadApp = useSquadApp(initialUser);
-  const { screen } = squadApp.state;
+export function Mou3amlaApp({ initialUser }: { initialUser: InitialMou3amlaUser }) {
+  const mou3amlaApp = useMou3amlaApp(initialUser);
+  const { screen } = mou3amlaApp.state;
 
   return (
     <div
-      className="squad-viewport-h w-full overflow-hidden font-sans antialiased"
-      style={{ background: squad.bg, color: squad.text }}
+      className="mou3amla-viewport-h w-full overflow-hidden font-sans antialiased"
+      style={{ background: mou3amla.bg, color: mou3amla.text }}
     >
-      <div className="squad-viewport-h mx-auto flex w-full max-w-md overflow-hidden px-0 sm:min-h-0 sm:py-3">
+      <div className="mou3amla-viewport-h mx-auto flex w-full max-w-md overflow-hidden px-0 sm:min-h-0 sm:py-3">
         <div
-          className="squad-viewport-h relative flex flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
+          className="mou3amla-viewport-h relative flex flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
           style={{
-            background: squad.surface,
+            background: mou3amla.surface,
             boxShadow: "0 16px 42px rgba(255,0,131,0.08), 0 8px 18px rgba(0,0,0,0.06)",
           }}
         >
@@ -83,23 +83,23 @@ export function SquadApp({ initialUser }: { initialUser: InitialSquadUser }) {
 
           <div
             key={screen}
-            className="relative z-10 flex flex-1 flex-col overflow-hidden animate-[squad-screen-in_0.28s_ease_both]"
+            className="relative z-10 flex flex-1 flex-col overflow-hidden animate-[mou3amla-screen-in_0.28s_ease_both]"
             style={{ contain: "layout paint style" }}
           >
-            {screen === "home" && <HomeScreen squadApp={squadApp} />}
-            {screen === "generate-intent" && <GenerateIntentScreen squadApp={squadApp} />}
-            {screen === "receive-qr" && <ReceiveQrScreen squadApp={squadApp} />}
-            {screen === "scan-qr" && <ScanQrScreen squadApp={squadApp} />}
-            {screen === "intent-result" && <IntentResultScreen squadApp={squadApp} />}
-            {screen === "activity" && <ActivityScreen squadApp={squadApp} />}
-            {screen === "invoices" && <InvoicesScreen squadApp={squadApp} />}
-            {screen === "profile" && <ProfileScreen squadApp={squadApp} />}
-            {screen === "notifications" && <NotificationsScreen squadApp={squadApp} />}
-            {screen === "accounts" && <AccountsScreen squadApp={squadApp} />}
+            {screen === "home" && <HomeScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "generate-intent" && <GenerateIntentScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "receive-qr" && <ReceiveQrScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "scan-qr" && <ScanQrScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "intent-result" && <IntentResultScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "activity" && <ActivityScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "invoices" && <InvoicesScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "profile" && <ProfileScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "notifications" && <NotificationsScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "accounts" && <AccountsScreen mou3amlaApp={mou3amlaApp} />}
           </div>
         </div>
       </div>
-      <WalletRegistrySheet squadApp={squadApp} />
+      <WalletRegistrySheet mou3amlaApp={mou3amlaApp} />
     </div>
   );
 }

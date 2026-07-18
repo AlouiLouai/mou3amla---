@@ -26,20 +26,20 @@ Installed via the current (`shadcn@latest`) CLI, **not** the legacy
 
 ## Theming
 
-The product (SQUAD) now uses an intentionally **fixed-light fintech** visual
+The product (Mou3amla) now uses an intentionally **fixed-light fintech** visual
 system built around a compact mobile layout. Pink/orange are reserved for
 CTAs, highlights, and active states - surfaces stay neutral (white/soft grey/
 dark grey), not pink-tinted or pure black:
 
-- `squad.surface` / `squad.card`: white surfaces
-- `squad.bg`: neutral off-white page wash
-- `squad.cardAlt`: neutral light-grey alt surface
-- `squad.hero`: dark neutral surface (wallet pocket, dark action cards) - not pure black
-- `squad.accent`: hot pink `#FF0083` for primary actions
-- `squad.subtle`: orange `#FF8D28` for secondary emphasis
-- `squad.destructive`: reserved for destructive and error states
+- `mou3amla.surface` / `mou3amla.card`: white surfaces
+- `mou3amla.bg`: neutral off-white page wash
+- `mou3amla.cardAlt`: neutral light-grey alt surface
+- `mou3amla.hero`: dark neutral surface (wallet pocket, dark action cards) - not pure black
+- `mou3amla.accent`: hot pink `#FF0083` for primary actions
+- `mou3amla.subtle`: orange `#FF8D28` for secondary emphasis
+- `mou3amla.destructive`: reserved for destructive and error states
 
-These screen-level colors come from `src/features/squad/constants.ts`, not from
+These screen-level colors come from `src/features/mou3amla/constants.ts`, not from
 the full shadcn semantic color scale. Wallet/provider brand colors in
 `src/features/wallets/constants.ts` remain the one deliberate exception.
 
@@ -48,26 +48,26 @@ the full shadcn semantic color scale. Wallet/provider brand colors in
 - The `<html>` tag keeps `suppressHydrationWarning`, which is still required by
   `next-themes`.
 - If you add a screen that should use the normal shadcn theme variables rather
-  than the SQUAD palette, use `--background`, `--foreground`, etc. instead of
+  than the Mou3amla palette, use `--background`, `--foreground`, etc. instead of
   inventing a parallel token system.
 
-## SQUAD Elevation & Motion
+## Mou3amla Elevation & Motion
 
-Beyond raw colors, `src/features/squad/constants.ts` exports shared
+Beyond raw colors, `src/features/mou3amla/constants.ts` exports shared
 `cardShadow` and `raisedShadow` strings. Use those instead of inventing a new
 shadow per screen so elevation stays consistent.
 
-The shell transition lives in `src/features/squad/components/squad-app.tsx`.
+The shell transition lives in `src/features/mou3amla/components/mou3amla-app.tsx`.
 Do not add a different page-enter animation on every individual screen unless
 there is a strong product reason.
 
 The mobile shell also uses a shared frame primitive in
-`src/features/squad/components/screen-frame.tsx`. Keep headers and bottom nav
+`src/features/mou3amla/components/screen-frame.tsx`. Keep headers and bottom nav
 outside the scrollable pane; only the body content should use the shell
 scroller.
 
 Recent performance tuning intentionally softened shell and card shadows in
-`src/features/squad/constants.ts`. If you want more depth, add it carefully;
+`src/features/mou3amla/constants.ts`. If you want more depth, add it carefully;
 heavy blur and oversized shadow stacks make low-end mobile devices feel slow.
 
 ## Toasts
@@ -82,10 +82,10 @@ App events use `sonner` through the shadcn wrapper in
   [03-pwa.md](./03-pwa.md#mobile-shell-behavior)), so a bottom-anchored toast
   would visually collide with it. Don't move toasts back to the bottom
   without also accounting for that.
-- Keep toast visuals aligned with the SQUAD palette.
+- Keep toast visuals aligned with the Mou3amla palette.
 - Prefer concise operational copy: linked, routed, verified, failed.
-- Use success/error/loading states for payment, link, OTP, and notification
-  events instead of custom ad hoc banners.
+- Use success/error/loading states for payment, link, passkey, and
+  notification events instead of custom ad hoc banners.
 
 ## Fonts
 

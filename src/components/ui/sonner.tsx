@@ -10,6 +10,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme="light"
       className="toaster group"
       position="top-center"
+      closeButton
       offset={{ top: "max(1rem, env(safe-area-inset-top))" }}
       mobileOffset={{ top: "max(1rem, env(safe-area-inset-top))" }}
       icons={{
@@ -42,7 +43,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "cn-toast border shadow-[0_18px_44px_rgba(255,0,131,0.12),0_8px_20px_rgba(0,0,0,0.08)]",
+            "cn-toast relative overflow-hidden border shadow-[0_18px_44px_rgba(255,0,131,0.12),0_8px_20px_rgba(0,0,0,0.08)]",
           title: "font-semibold",
           description: "text-[0.8rem] text-black/65",
           actionButton:

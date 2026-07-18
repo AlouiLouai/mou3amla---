@@ -1,7 +1,7 @@
-import { squad } from "@/features/squad/constants";
+import { mou3amla } from "@/features/mou3amla/constants";
 
 /**
- * The SQUAD brand mark (white rounded square + rotated outline square),
+ * The Mou3amla brand mark (white rounded square + rotated outline square),
  * matching the logo drawn inline on the auth screen. Shared by the
  * next/og-generated icon routes under src/app/ so the app icon, apple-icon,
  * and manifest icons stay pixel-consistent with the in-app logo.
@@ -11,7 +11,7 @@ import { squad } from "@/features/squad/constants";
  * launchers - including plain circular masks - crop anything outside it;
  * the default 0.74 badge's corners sit outside that circle).
  */
-export function SquadMark({ size, maskable = false }: { size: number; maskable?: boolean }) {
+export function Mou3amlaMark({ size, maskable = false }: { size: number; maskable?: boolean }) {
   const badgeScale = maskable ? 0.52 : 0.74;
   const badgeSize = size * badgeScale;
   const innerSize = badgeSize * 0.55;
@@ -25,7 +25,7 @@ export function SquadMark({ size, maskable = false }: { size: number; maskable?:
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: squad.bg,
+        background: mou3amla.bg,
       }}
     >
       <div
@@ -33,7 +33,7 @@ export function SquadMark({ size, maskable = false }: { size: number; maskable?:
           width: badgeSize,
           height: badgeSize,
           borderRadius: badgeSize * 0.26,
-          background: squad.accent,
+          background: mou3amla.accent,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -45,7 +45,7 @@ export function SquadMark({ size, maskable = false }: { size: number; maskable?:
             height: innerSize,
             transform: "rotate(45deg)",
             borderRadius: size * 0.03,
-            border: `${borderWidth}px solid ${squad.bg}`,
+            border: `${borderWidth}px solid ${mou3amla.bg}`,
           }}
         />
       </div>

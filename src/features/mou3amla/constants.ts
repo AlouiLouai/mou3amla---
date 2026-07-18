@@ -1,7 +1,7 @@
 // Toned-down fintech palette: pink/orange stay the brand accent hues, but
 // reserved for CTAs, highlights, and active states - surfaces are neutral
 // (white/soft grey/dark grey) instead of pink-tinted or pure black.
-export const squad = {
+export const mou3amla = {
   bg: "#FAFAFA",
   surface: "#FFFFFF",
   card: "#FFFFFF",

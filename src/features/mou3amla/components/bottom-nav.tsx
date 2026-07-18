@@ -1,7 +1,7 @@
 import { Activity, CircleUserRound, Home, Send } from "lucide-react";
-import { alpha, cardShadow, squad } from "@/features/squad/constants";
-import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
-import type { Screen } from "@/features/squad/types";
+import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import type { Screen } from "@/features/mou3amla/types";
 
 interface BottomNavProps {
   active: Screen;
@@ -9,8 +9,6 @@ interface BottomNavProps {
   onSend: () => void;
   onActivity: () => void;
   onProfile: () => void;
-  /** Compacts to a smaller centered pill (icons only) while the caller is mid-scroll, expanding back to full width at rest - mirrors the Instagram-style tab bar that never fully disappears. */
-  compact?: boolean;
 }
 
 const NAV_ITEMS = [
@@ -20,7 +18,7 @@ const NAV_ITEMS = [
   { key: "profile" as const, label: "Profile", icon: CircleUserRound },
 ] as const;
 
-export function BottomNav({ active, onHome, onSend, onActivity, onProfile, compact = false }: BottomNavProps) {
+export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: BottomNavProps) {
   const handlers = {
     home: onHome,
     "generate-intent": onSend,
@@ -29,10 +27,10 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile, compa
   } as const;
 
   return (
-    <div className="flex justify-center px-3 pt-2 pb-[max(0.95rem,env(safe-area-inset-bottom))]" style={{ background: squad.surface }}>
+    <div className="flex justify-center px-3 pt-2 pb-[max(0.95rem,env(safe-area-inset-bottom))]" style={{ background: mou3amla.surface }}>
       <div
-        className="w-full overflow-hidden rounded-[28px] border bg-white/96 p-2 transition-[max-width] duration-300 ease-out"
-        style={{ borderColor: squad.border, boxShadow: cardShadow, maxWidth: compact ? "208px" : "480px" }}
+        className="w-full overflow-hidden rounded-[28px] border bg-white/96 p-2"
+        style={{ borderColor: mou3amla.border, boxShadow: cardShadow, maxWidth: "480px" }}
       >
         <div className="flex min-w-max gap-1">
           {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
@@ -47,18 +45,13 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile, compa
                 aria-label={label}
                 className="flex flex-1 flex-col items-center gap-1 rounded-[20px] px-3 py-2 transition-[background-color,transform] duration-200 active:scale-[0.97]"
                 style={{
-                  minWidth: compact ? "40px" : "76px",
-                  background: isActive ? alpha(squad.accent, 0.11) : "transparent",
-                  color: isActive ? squad.accent : squad.textFaint,
+                  minWidth: "76px",
+                  background: isActive ? alpha(mou3amla.accent, 0.11) : "transparent",
+                  color: isActive ? mou3amla.accent : mou3amla.textFaint,
                 }}
               >
                 <Icon className="size-[18px] shrink-0" strokeWidth={isActive ? 2.5 : 2} />
-                <span
-                  className="overflow-hidden text-[10px] font-black whitespace-nowrap transition-[max-height,opacity] duration-200"
-                  style={{ maxHeight: compact ? "0px" : "14px", opacity: compact ? 0 : 1 }}
-                >
-                  {label}
-                </span>
+                <span className="text-[10px] font-black whitespace-nowrap">{label}</span>
               </button>
             );
           })}
@@ -68,24 +61,20 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile, compa
   );
 }
 
-type FooterActions = Pick<UseSquadApp["actions"], "goHome" | "goGenerateIntent" | "goActivity" | "goProfile">;
+type FooterActions = Pick<UseMou3amlaApp["actions"], "goHome" | "goGenerateIntent" | "goActivity" | "goProfile">;
 
 // Every full-page screen in the authenticated shell shows the same bottom
 // nav, not just the four screens it can directly navigate to - this builds
-// the ScreenFrame `footer` render-prop once instead of repeating the same
-// five-prop wiring per screen.
+// the ScreenFrame `footer` node once instead of repeating the same
+// four-prop wiring per screen.
 export function renderAppFooter(active: Screen, actions: FooterActions) {
-  // Render-prop consumed by ScreenFrame's footer, not a reusable named
-  // component - a displayName would never be read anywhere.
-  // eslint-disable-next-line react/display-name
-  return (compact: boolean) => (
+  return (
     <BottomNav
       active={active}
       onHome={actions.goHome}
       onSend={actions.goGenerateIntent}
       onActivity={actions.goActivity}
       onProfile={actions.goProfile}
-      compact={compact}
     />
   );
 }

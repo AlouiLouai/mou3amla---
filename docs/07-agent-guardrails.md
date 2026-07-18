@@ -25,7 +25,7 @@ rules most likely to be broken by stale training data or over-eager refactors.
     The web platform cannot do that from a browser/PWA.
 12. **Never invent Tunisian tax/regulatory values.** Placeholder values stay
     placeholders until the user confirms them.
-13. **SQUAD is zero-liability by design.** Do not add balances, stored bank
+13. **Mou3amla is zero-liability by design.** Do not add balances, stored bank
     credentials, or balance-fetching behavior.
 14. **Do not split auth into separate sign-in/sign-up screens unless the user
     explicitly changes the product requirement.** The current architecture is a
@@ -34,8 +34,13 @@ rules most likely to be broken by stale training data or over-eager refactors.
     there before use.
 16. **Supabase schema changes must land in migrations.** Do not leave durable
     database changes implied only in app code.
-17. **Identity verification is post-auth.** Do not gate the initial OTP login
-    on CIN/selfie completion; KYC unlocks higher-trust features afterward.
+17. **Identity verification is post-auth.** Do not gate the initial passkey
+    login on CIN/selfie completion; KYC unlocks higher-trust features
+    afterward.
+18. **`server-only` throws in any test** unless `vitest.setup.ts` mocks it
+    (see [08-testing.md](./08-testing.md)). If a test suddenly can't import a
+    server module, fix the mock - don't reach for a `@vitest-environment`
+    pragma or `resolve.conditions`, neither actually fixes it.
 
 ## Before you finish a change
 
@@ -45,6 +50,7 @@ Run, in this order, and do not report done until all pass:
 pnpm typecheck
 pnpm lint
 pnpm build
+pnpm test
 ```
 
 For service-worker or manifest work, also confirm the build still emits the

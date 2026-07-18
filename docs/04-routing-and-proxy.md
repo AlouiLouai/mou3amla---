@@ -9,9 +9,13 @@ as `manifest.ts`.
 Important app routes in this project:
 
 - `/` -> Stage 1 landing screen for `+216` phone + `@username`
-- `/verify` -> Stage 2 6-digit OTP gate
+- `/verify` -> Stage 2 passkey (WebAuthn) gate
 - `/home` -> authenticated dashboard shell
-- `/verify-identity` -> local mock identity verification flow
+- `/verify-identity` -> identity verification entry screen (launches Didit)
+- `/verify-identity/return` -> Didit hosted-flow return callback, re-syncs status
+- `/api/didit/session` -> creates a Didit verification session and redirects to Didit's hosted UI
+- `/api/didit/webhook` -> HMAC-signed Didit status callback (source of truth)
+- `/api/didit/status` -> polled by the dashboard shell while a Didit session is `pending`
 - `/api/qr/mint` -> mints a signed rotating QR payload for the authenticated recipient
 - `/api/qr/resolve` -> verifies a signed QR payload and resolves recipient routing preview
 - `/api/nearby/publish` -> publishes/refreshes the current recipient's short nearby code

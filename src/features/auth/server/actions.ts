@@ -1,15 +1,14 @@
 "use server";
 
-import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { DEMO_OTP_ASSIST_ENABLED, DUMMY_PHONE_OTP_ENABLED } from "@/config/auth";
-import { env } from "@/config/env";
-import { buildDisplayName, landingInputSchema, normalizePhoneForAuth, otpInputSchema } from "@/features/auth/lib/identity";
-import { clearDemoOtpCookie, setDemoOtpCookie } from "@/features/auth/server/demo-otp";
-import type { AuthFormState, VerificationStatus } from "@/features/auth/types";
+import { buildDisplayName, landingInputSchema, normalizePhoneForAuth } from "@/features/auth/lib/identity";
+import { clearPasskeyBridgeCookie, readPasskeyBridgeCookie, setPasskeyBridgeCookie } from "@/features/auth/server/passkey-bridge";
+import type { AuthFormState, PasskeyBridgeResult, VerificationStatus } from "@/features/auth/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/request-ip";
 
 type ProfileLookup = {
   id: string;
@@ -27,40 +26,17 @@ type AuthUserSummary = {
   } | null;
 };
 
-function buildDemoOtp(phone: string, username: string) {
-  const digest = createHash("sha256").update(`${phone}:${username}:squad-demo-otp`).digest("hex");
-  const digits = String(parseInt(digest.slice(0, 12), 16) % 1_000_000);
-  return digits.padStart(6, "0");
-}
+type AdminClient = ReturnType<typeof createAdminClient>;
 
-function buildDemoBridgePassword(phone: string, username: string) {
-  const digest = createHash("sha256")
-    .update(`${env.SUPABASE_SERVICE_ROLE_KEY}:${phone}:${username}:squad-demo-password`)
-    .digest("hex");
-  return `Sqd!${digest.slice(0, 42)}9a`;
-}
-
-function buildDemoBridgeEmail(phone: string, username: string) {
+function buildBridgeEmail(phone: string, username: string) {
   const digits = phone.replace(/\D/g, "");
   const handle = username.replace(/^@+/, "").toLowerCase();
-  return `demo-${digits}-${handle}@mou3amla.local`;
+  return `bridge-${digits}-${handle}@mou3amla.local`;
 }
 
-function encodeVerificationSearch(phone: string, username: string) {
-  return new URLSearchParams({
-    phone,
-    username,
-  }).toString();
-}
-
-async function findAuthUser(phone: string, email: string) {
-  const admin = createAdminClient();
-
+async function findAuthUser(admin: AdminClient, phone: string, email: string) {
   for (let page = 1; page <= 5; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    });
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
 
     if (error) {
       return { user: null, error };
@@ -84,6 +60,59 @@ async function findAuthUser(phone: string, email: string) {
   return { user: null, error: null };
 }
 
+/** Creates the auth user + profile row for a phone/username never seen before. Recovers cleanly if a prior attempt already created the auth user but failed before the profile row landed. */
+async function createIdentity(
+  admin: AdminClient,
+  phone: string,
+  username: string,
+): Promise<{ ok: true; profileId: string } | { ok: false; message: string }> {
+  const bridgeEmail = buildBridgeEmail(phone, username);
+  const { data: createdUser, error: createUserError } = await admin.auth.admin.createUser({
+    email: bridgeEmail,
+    email_confirm: true,
+    user_metadata: { preferred_username: username, phone },
+  });
+
+  let profileId: string;
+
+  if (createUserError?.code === "phone_exists" || createUserError?.code === "email_exists") {
+    const recovered = await findAuthUser(admin, phone, bridgeEmail);
+
+    if (recovered.error || !recovered.user) {
+      return { ok: false, message: "That phone already exists in auth, but we couldn't recover it safely yet. Please retry once." };
+    }
+
+    const existingPreferredUsername = recovered.user.user_metadata?.preferred_username?.replace(/^@+/, "").toLowerCase();
+    if (existingPreferredUsername && existingPreferredUsername !== username) {
+      return { ok: false, message: "That phone number is already attached to a different Mou3amla handle." };
+    }
+
+    profileId = recovered.user.id;
+  } else if (createUserError || !createdUser.user) {
+    return { ok: false, message: "We couldn't create your account yet. Please try again." };
+  } else {
+    profileId = createdUser.user.id;
+  }
+
+  const { error: insertProfileError } = await admin.from("profiles").insert({
+    id: profileId,
+    phone,
+    username,
+    display_name: buildDisplayName(username),
+    verification_status: "unverified",
+  });
+
+  if (insertProfileError) {
+    if (insertProfileError.code === "23505") {
+      return { ok: false, message: "That Mou3amla handle is already taken. Try another username." };
+    }
+
+    return { ok: false, message: "We created your auth record, but couldn't finish profile setup. Please retry." };
+  }
+
+  return { ok: true, profileId };
+}
+
 export async function startPhoneAuth(
   _prevState: AuthFormState | undefined,
   formData: FormData,
@@ -94,9 +123,16 @@ export async function startPhoneAuth(
   });
 
   if (!parsed.success) {
-    return {
-      errors: parsed.error.flatten().fieldErrors,
-    };
+    return { errors: parsed.error.flatten().fieldErrors };
+  }
+
+  // Pre-auth, so this is the one place in the flow an attacker could script
+  // against without ever holding a session - cap attempts per IP before
+  // touching the database at all.
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`start-phone-auth:${clientIp}`, { max: 10, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { message: "Too many attempts. Please wait a few minutes and try again." };
   }
 
   const phone = normalizePhoneForAuth(parsed.data.phone);
@@ -108,178 +144,101 @@ export async function startPhoneAuth(
     .select("id, phone, username, verification_status")
     .or(`phone.eq.${phone},username.eq.${username}`);
 
-  const profiles = (lookup.data ?? null) as ProfileLookup[] | null;
-  const lookupError = lookup.error;
-
-  if (lookupError) {
-    return {
-      message: "We couldn't check your account right now. Please try again.",
-    };
+  if (lookup.error) {
+    return { message: "We couldn't check your account right now. Please try again." };
   }
 
-  const phoneMatch = profiles?.find((profile) => profile.phone === phone) ?? null;
-  const usernameMatch = profiles?.find((profile) => profile.username === username) ?? null;
+  const profiles = (lookup.data ?? []) as ProfileLookup[];
+  const phoneMatch = profiles.find((profile) => profile.phone === phone) ?? null;
+  const usernameMatch = profiles.find((profile) => profile.username === username) ?? null;
 
   if ((phoneMatch && usernameMatch && phoneMatch.id !== usernameMatch.id) || (phoneMatch && !usernameMatch) || (!phoneMatch && usernameMatch)) {
-    return {
-      message: "That phone number and username don't belong to the same SQUAD identity.",
-    };
+    return { message: "That phone number and username don't belong to the same Mou3amla identity." };
   }
 
   let profileId = phoneMatch?.id ?? usernameMatch?.id ?? null;
-  const demoOtp = DUMMY_PHONE_OTP_ENABLED ? buildDemoOtp(phone, username) : null;
-  const demoBridgePassword = DUMMY_PHONE_OTP_ENABLED ? buildDemoBridgePassword(phone, username) : null;
-  const demoBridgeEmail = DUMMY_PHONE_OTP_ENABLED ? buildDemoBridgeEmail(phone, username) : null;
-
-  if (demoOtp) {
-    await setDemoOtpCookie({ phone, username, otp: demoOtp });
-  } else {
-    await clearDemoOtpCookie();
-  }
 
   if (!profileId) {
-    const { data: createdUser, error: createUserError } = await admin.auth.admin.createUser({
-      ...(demoBridgeEmail ? { email: demoBridgeEmail, email_confirm: true } : {}),
-      ...(demoBridgePassword ? { password: demoBridgePassword } : {}),
-      user_metadata: {
-        preferred_username: username,
-        phone,
-      },
-      app_metadata: {
-        onboarding_state: "otp_pending",
-        auth_mode: "dummy_phone_otp",
-      },
-    });
-
-    if (createUserError?.code === "phone_exists" || createUserError?.code === "email_exists") {
-      const recovered = await findAuthUser(phone, demoBridgeEmail ?? "");
-
-      if (recovered.error || !recovered.user) {
-        return {
-          message: "That phone already exists in auth, but we couldn't recover it safely yet. Please retry once.",
-        };
-      }
-
-      const existingPreferredUsername = recovered.user.user_metadata?.preferred_username?.replace(/^@+/, "").toLowerCase();
-      if (existingPreferredUsername && existingPreferredUsername !== username) {
-        return {
-          message: "That phone number is already attached to a different SQUAD handle.",
-        };
-      }
-
-      profileId = recovered.user.id;
-    } else if (createUserError || !createdUser.user) {
-      return {
-        message: "We couldn't create your account yet. Please try again.",
-      };
-    } else {
-      profileId = createdUser.user.id;
+    const created = await createIdentity(admin, phone, username);
+    if (!created.ok) {
+      return { message: created.message };
     }
-
-    const { error: insertProfileError } = await admin.from("profiles").insert({
-      id: profileId,
-      phone,
-      username,
-      display_name: buildDisplayName(username),
-      verification_status: "unverified",
-    });
-
-    if (insertProfileError) {
-      if (insertProfileError.code === "23505") {
-        return {
-          message: "That SQUAD handle is already taken. Try another username.",
-        };
-      }
-
-      return {
-        message: "We created your auth record, but couldn't finish profile setup. Please retry.",
-      };
-    }
+    profileId = created.profileId;
   }
 
-  if (profileId && demoBridgePassword && demoBridgeEmail) {
-    const { error: demoBridgeError } = await admin.auth.admin.updateUserById(profileId, {
-      email: demoBridgeEmail,
-      email_confirm: true,
-      password: demoBridgePassword,
-      user_metadata: {
-        preferred_username: username,
-        phone,
-      },
-    });
+  // The real precondition for signInWithPasskey() is "this profile has a
+  // registered passkey" - not "a profile row exists." Deciding on row
+  // existence alone would strand anyone who abandoned the biometric prompt
+  // mid-registration: they'd get routed to sign-in with no passkey to sign
+  // in with. Checking the actual precondition fixes that for free.
+  const { data: passkeys } = await admin.auth.admin.passkey.listPasskeys({ userId: profileId });
 
-    if (demoBridgeError) {
-      return {
-        message: "We couldn't prepare the demo sign-in bridge. Please retry once.",
-      };
-    }
+  if (passkeys && passkeys.length > 0) {
+    await setPasskeyBridgeCookie({ phone, username, mode: "authenticate" });
+    redirect(`/verify?${new URLSearchParams({ phone, username })}`);
   }
 
-  redirect(`/verify?${encodeVerificationSearch(phone, username)}`);
-}
-
-export async function verifyPhoneOtp(
-  phone: string,
-  username: string,
-  expectedDemoOtp: string | null,
-  _prevState: AuthFormState | undefined,
-  formData: FormData,
-): Promise<AuthFormState | undefined> {
-  const parsed = otpInputSchema.safeParse({
-    otp: formData.get("otp"),
+  const bridgeEmail = buildBridgeEmail(phone, username);
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: bridgeEmail,
   });
 
-  if (!parsed.success) {
-    return {
-      errors: parsed.error.flatten().fieldErrors,
-    };
+  if (linkError || !linkData?.properties?.hashed_token) {
+    return { message: "We couldn't prepare your passkey setup. Please retry once." };
   }
 
-  const isDemoMatch = DEMO_OTP_ASSIST_ENABLED && expectedDemoOtp && parsed.data.otp === expectedDemoOtp;
-  if (!DUMMY_PHONE_OTP_ENABLED) {
-    return {
-      message: "Dummy OTP is disabled in this environment. Configure a real SMS OTP rail or re-enable the demo bridge.",
-    };
-  }
+  await setPasskeyBridgeCookie({
+    phone,
+    username,
+    mode: "register",
+    tokenHash: linkData.properties.hashed_token,
+  });
 
-  if (!isDemoMatch) {
-    return {
-      message: "That code didn't match. Please try the latest 6-digit code.",
-    };
+  redirect(`/verify?${new URLSearchParams({ phone, username })}`);
+}
+
+export async function establishBridgeSession(phone: string, username: string): Promise<PasskeyBridgeResult> {
+  const bridge = await readPasskeyBridgeCookie(phone, username);
+
+  if (!bridge || bridge.mode !== "register" || !bridge.tokenHash) {
+    return { ok: false, message: "Your setup link expired. Please start again." };
   }
 
   const supabase = await createClient();
-  const authResult = await supabase.auth.signInWithPassword({
-    email: buildDemoBridgeEmail(phone, username),
-    password: buildDemoBridgePassword(phone, username),
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: bridge.tokenHash,
+    type: "magiclink",
   });
 
-  const data = authResult.data;
-  const error = authResult.error;
+  if (error) {
+    return { ok: false, message: "We couldn't open a secure session for passkey setup. Please retry once." };
+  }
 
-  if (error || !data.user) {
-    return {
-      message: "The code matched, but we couldn't open your secure session. Please retry once.",
-    };
+  return { ok: true };
+}
+
+export async function finalizeAuth(phone: string, username: string): Promise<PasskeyBridgeResult> {
+  const supabase = await createClient();
+  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
+
+  if (claimsError || !claims?.claims?.sub) {
+    return { ok: false, message: "Your passkey session didn't come through. Please retry." };
   }
 
   const admin = createAdminClient();
-  const { error: updateError } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .update({
-      display_name: buildDisplayName(username),
-    })
-    .eq("id", data.user.id)
-    .eq("phone", phone)
-    .eq("username", username);
+    .select("id, phone, username")
+    .eq("id", claims.claims.sub)
+    .maybeSingle<{ id: string; phone: string; username: string }>();
 
-  if (updateError) {
-    return {
-      message: "Your session is valid, but we couldn't sync your profile. Please retry once.",
-    };
+  if (profileError || !profile || profile.phone !== phone || profile.username.toLowerCase() !== username.toLowerCase()) {
+    await supabase.auth.signOut();
+    return { ok: false, message: "That passkey belongs to a different Mou3amla identity." };
   }
 
-  await clearDemoOtpCookie();
+  await clearPasskeyBridgeCookie();
   revalidatePath("/home");
   redirect("/home");
 }

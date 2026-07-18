@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { OtpScreen } from "@/features/auth/components/otp-screen";
-import { readDemoOtpCookie } from "@/features/auth/server/demo-otp";
+import { PasskeyScreen } from "@/features/auth/components/passkey-screen";
+import { readPasskeyBridgeCookie } from "@/features/auth/server/passkey-bridge";
 import { getCurrentAppUser } from "@/features/auth/server/dal";
 
 type VerifyPageProps = {
@@ -21,7 +21,11 @@ export default async function VerifyPage(props: VerifyPageProps) {
     redirect("/");
   }
 
-  const demoOtp = await readDemoOtpCookie(phone, username);
+  const bridge = await readPasskeyBridgeCookie(phone, username);
 
-  return <OtpScreen phone={phone} username={username} demoOtp={demoOtp} />;
+  if (!bridge) {
+    redirect("/");
+  }
+
+  return <PasskeyScreen phone={phone} username={username} mode={bridge.mode} />;
 }

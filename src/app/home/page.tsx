@@ -1,16 +1,18 @@
 import { requireCurrentAppUser } from "@/features/auth/server/dal";
-import { SquadApp } from "@/features/squad/components/squad-app";
+import { Mou3amlaApp } from "@/features/mou3amla/components/mou3amla-app";
 
 export default async function HomePage() {
   const user = await requireCurrentAppUser();
 
   return (
-    <SquadApp
+    <Mou3amlaApp
       initialUser={{
         phone: user.phone,
         username: user.username,
         displayName: user.displayName,
         verificationStatus: user.verificationStatus,
+        diditLatestStatus: user.diditLatestStatus,
+        diditSessionId: user.diditSessionId,
         wallets: user.wallets,
         sourceWalletId: user.sourceWalletId,
         activityLog: user.activityLog,

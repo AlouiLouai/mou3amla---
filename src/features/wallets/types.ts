@@ -1,5 +1,5 @@
 /**
- * How a provider is addressed for routing purposes. SQUAD only ever stores
+ * How a provider is addressed for routing purposes. Mou3amla only ever stores
  * the destination-only public identifier, never a balance or credential.
  */
 export type RoutingType = "wallet_tag" | "merchant_id" | "rib";
@@ -14,7 +14,7 @@ export interface Provider {
   acceptedRoutingTypes: RoutingType[];
 }
 
-/** A linked destination — SQUAD never sees or stores a balance for this. */
+/** A linked destination — Mou3amla never sees or stores a balance for this. */
 export interface LinkedWallet {
   id: string;
   providerId: string;

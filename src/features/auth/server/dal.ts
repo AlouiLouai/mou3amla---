@@ -15,6 +15,8 @@ type ProfileRow = {
   username: string;
   display_name: string;
   verification_status: VerificationStatus;
+  didit_latest_status: string | null;
+  didit_session_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -74,6 +76,8 @@ function toAppProfile(profile: ProfileRow): AppProfileRecord {
     username: profile.username,
     displayName: profile.display_name,
     verificationStatus: profile.verification_status,
+    diditLatestStatus: profile.didit_latest_status,
+    diditSessionId: profile.didit_session_id,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
   };
@@ -137,7 +141,7 @@ function buildActivityItem(
     ? `@${row.recipient_username}`
     : row.metadata?.sender_username
       ? `@${row.metadata.sender_username}`
-      : "@squad";
+      : "@mou3amla";
 
   return {
     id: row.id,
@@ -145,9 +149,9 @@ function buildActivityItem(
     type: isSend ? "send" : "receive",
     counterparty:
       counterparty?.display_name ??
-      (isSend ? row.recipient_display_name ?? fallbackHandle : row.metadata?.sender_display_name ?? "SQUAD user"),
+      (isSend ? row.recipient_display_name ?? fallbackHandle : row.metadata?.sender_display_name ?? "Mou3amla user"),
     counterpartyHandle: counterparty ? `@${counterparty.username}` : fallbackHandle,
-    wallet: isSend ? row.metadata?.sender_wallet_name ?? "Route SQUAD" : row.metadata?.recipient_wallet_name ?? "Route SQUAD",
+    wallet: isSend ? row.metadata?.sender_wallet_name ?? "Route Mou3amla" : row.metadata?.recipient_wallet_name ?? "Route Mou3amla",
     amount: normalizeAmount(row.amount),
     date: formatActivityDate(row.created_at),
     status: row.status,
@@ -180,7 +184,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("id, phone, username, display_name, verification_status, created_at, updated_at")
+    .select("id, phone, username, display_name, verification_status, didit_latest_status, didit_session_id, created_at, updated_at")
     .eq("id", identity.userId)
     .maybeSingle<ProfileRow>();
 
@@ -243,6 +247,8 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
     username: profile.username,
     displayName: profile.displayName,
     verificationStatus: profile.verificationStatus,
+    diditLatestStatus: profile.diditLatestStatus,
+    diditSessionId: profile.diditSessionId,
     wallets,
     sourceWalletId,
     activityLog,

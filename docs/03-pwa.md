@@ -30,7 +30,7 @@ All icons are generated, not static assets, using `next/og`'s
 To change the icon look, edit these route files directly. Do not add PNG files
 to `public/` for this purpose because nothing references them.
 
-All four rely on the shared `SquadMark` (`src/features/squad/mark.tsx`), which
+All four rely on the shared `Mou3amlaMark` (`src/features/mou3amla/mark.tsx`), which
 takes a `maskable` prop. Pass it **only** from the `-maskable` route: it
 shrinks the badge so its corners stay inside Android's ~40%-radius
 adaptive-icon safe zone. Some Android launchers (and plain circular masks)
@@ -39,15 +39,15 @@ scale) badge for `purpose: "maskable"` icons.
 
 ## Cross-device viewport height
 
-Six top-level screen shells (`squad-app.tsx`, `auth-screen.tsx`,
-`otp-screen.tsx`, `verification-flow-screen.tsx`) size themselves with the
-`.squad-viewport-h` CSS class (`src/app/globals.css`) instead of Tailwind's
+Six top-level screen shells (`mou3amla-app.tsx`, `auth-screen.tsx`,
+`passkey-screen.tsx`, `verification-flow-screen.tsx`) size themselves with the
+`.mou3amla-viewport-h` CSS class (`src/app/globals.css`) instead of Tailwind's
 `min-h-[100dvh]` arbitrary value. That class declares `min-height: 100vh`
 *then* `min-height: 100dvh` as two separate rules: browsers that don't
 recognize the `dvh` unit (older Android WebViews, older Samsung Internet)
 silently drop only the second, unrecognized declaration and keep the `100vh`
 fallback, instead of dropping the whole rule and collapsing the shell to
-`auto` height. Use `squad-viewport-h` for any new full-height screen shell
+`auto` height. Use `mou3amla-viewport-h` for any new full-height screen shell
 instead of reaching for `min-h-[100dvh]` directly.
 
 ## Service worker (Serwist, Turbopack-native)
@@ -118,19 +118,17 @@ something useful instead of a browser error.
 
 The in-app shell intentionally behaves like a compact native container:
 
-- the header zone is fixed per screen
-- the bottom navigation rail floats over the content pane and auto-hides,
-  Instagram-style: it slides out of view (`translateY`, no layout reflow) on
-  scroll-down past a small threshold, and slides back in on scroll-up or once
-  the pane is back near the top
+- the header zone is fixed per screen - it never scrolls, hides, or resizes
+- the bottom navigation rail is fixed over the content pane at all times - no
+  auto-hide, no compacting on scroll, no `translateY` animation
 - only the central content pane scrolls
 
-That show/hide behavior is owned entirely by
-`src/features/squad/components/screen-frame.tsx`, not by individual screens:
-it tracks scroll direction on its own scroll container (rAF-throttled, passive
-listener) and measures the footer's real height via `ResizeObserver` into a
-`--squad-bottomnav-h` CSS variable so the scrollable content always reserves
-enough bottom space. Do not reimplement scroll/sticky handling per screen —
-extend `screen-frame.tsx` instead. Supporting CSS lives in
-`src/app/globals.css`. If a screen starts scrolling edge-to-edge again, or the
-nav stops floating over content, treat that as a regression.
+That layout is owned entirely by
+`src/features/mou3amla/components/screen-frame.tsx`, not by individual screens:
+it measures the footer's real height via `ResizeObserver` into a
+`--mou3amla-bottomnav-h` CSS variable so the scrollable content always reserves
+enough bottom space, independent of `env(safe-area-inset-bottom)` differences
+across devices. Do not reimplement scroll/sticky handling per screen — extend
+`screen-frame.tsx` instead. Supporting CSS lives in `src/app/globals.css`. If
+a screen starts scrolling edge-to-edge again, or the header/nav stop staying
+fixed on any mobile browser, treat that as a regression.

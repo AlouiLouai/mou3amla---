@@ -6,6 +6,7 @@ import { siteConfig } from "@/config/site";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { NetworkStatusToast } from "@/components/pwa/network-status-toast";
+import { SplashScreen } from "@/components/pwa/splash-screen";
 import { Toaster } from "@/components/ui/sonner";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -37,6 +38,7 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: siteConfig.name,
+    startupImage: "/splash_screen.jpg",
   },
   formatDetection: {
     telephone: false,
@@ -70,6 +72,7 @@ export default function RootLayout({
             <InstallPrompt />
             <NetworkStatusToast />
             <Toaster />
+            <SplashScreen />
           </ThemeProvider>
         </SerwistProvider>
       </body>

@@ -29,7 +29,7 @@ export default function ErrorPage({
     <div className="bg-background text-foreground flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
       <div className="text-lg font-black">Something went wrong.</div>
       <p className="text-muted-foreground max-w-xs text-sm">
-        SQUAD hit an unexpected error. Nothing was lost - try again, or head back home.
+        Mou3amla hit an unexpected error. Nothing was lost - try again, or head back home.
       </p>
       <div className="flex gap-2">
         <button

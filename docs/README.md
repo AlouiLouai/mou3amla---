@@ -1,9 +1,9 @@
 # Mou3amla — Project Specs
 
 `mou3amla` is the repo/company name (Tunisian Arabic for "transaction"); the
-product built inside it is **SQUAD**, a **zero-liability payment routing
+product built inside it is **Mou3amla**, a **zero-liability payment routing
 layer** for Tunisia built on top of TUNPAY (BCT/SMT's interoperability rail).
-SQUAD never holds a balance, moves funds itself, or stores banking
+Mou3amla never holds a balance, moves funds itself, or stores banking
 credentials — it maps a public `@username` to a destination-only routing
 identifier (wallet tag / merchant id / RIB) for a real provider (Flouci, D17,
 walletii, BIAT, Amen Pay, etc.), and hands off the actual payment to the
@@ -13,20 +13,22 @@ indicator (real BLE peripheral advertising isn't possible from a browser —
 see [07-agent-guardrails.md](./07-agent-guardrails.md)).
 Authentication now uses a single Supabase-backed entry flow: one landing
 screen collects a Tunisian `+216` phone number plus a unique `@username`,
-then routes every user through the same 6-digit OTP gate before sending them
-to the home dashboard. Digital identity verification is a separate
-SQUAD-branded mock KYC flow launched from the dashboard banner or profile.
-The current MVP keeps the phone-first OTP UX and a local mock verification
-rail so the team can demo trusted-route states without an external identity
-provider. The same Supabase `verification_status` still controls which
-high-trust features unlock. The current MVP also uses a local dummy OTP plus a
-hidden Supabase bridge identity, so no SMS provider is required during
-prototyping.
+then routes every user through a passkey (WebAuthn) gate before sending them
+to the home dashboard — new identities register a device passkey, returning
+identities sign in with it, both via Supabase Auth's native passkey support
+(`auth.experimental.passkey`). No SMS provider, OTP, or password is stored or
+transmitted. Digital identity verification is a separate flow launched from
+the dashboard banner or profile that hands off to Didit's hosted eKYC
+(document capture, liveness, face-match) — Mou3amla itself never captures or
+stores identity documents or biometric data. The same Supabase
+`verification_status` controls which high-trust features unlock, including
+linking any wallet or bank destination, and every status change is recorded
+in `verification_events` for audit.
 Linked destinations, routed payment records, and in-app notifications now
 persist in Supabase instead of living only in the client shell.
 Mode Professionnel accounts get a lightweight El Fatoora micro-invoicing
 view. The app is split into domain feature folders (`auth`, `onboarding`,
-`wallets`, `payments`, `activity`, `notifications`, `invoices`, `profile`) plus a `squad`
+`wallets`, `payments`, `activity`, `notifications`, `invoices`, `profile`) plus a `mou3amla`
 shell that owns the shared state/routing — see
 [02-architecture.md](./02-architecture.md) for where things live.
 
@@ -50,6 +52,7 @@ path to not breaking things.
 | [05-styling-ui.md](./05-styling-ui.md) | Tailwind v4, shadcn/ui conventions, theming |
 | [06-conventions.md](./06-conventions.md) | Naming, `"use client"` boundaries, Server Actions, env/config |
 | [07-agent-guardrails.md](./07-agent-guardrails.md) | Explicit do/don't list, known hallucination traps for this stack |
+| [08-testing.md](./08-testing.md) | Vitest setup, the `server-only` mock gotcha, how to mock Supabase in a test |
 
 ## Keeping this up to date
 

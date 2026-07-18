@@ -1,9 +1,9 @@
 import { Plus } from "lucide-react";
-import { AppHeader } from "@/features/squad/components/app-header";
-import { renderAppFooter } from "@/features/squad/components/bottom-nav";
-import { ScreenFrame } from "@/features/squad/components/screen-frame";
-import { alpha, cardShadow, squad } from "@/features/squad/constants";
-import type { UseSquadApp } from "@/features/squad/hooks/use-squad-app";
+import { AppHeader } from "@/features/mou3amla/components/app-header";
+import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
+import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
+import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
 
@@ -11,8 +11,8 @@ import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing
 // wallet stack is a glanceable, physical-wallet-style preview; this screen is
 // where a user sees every linked account with its full routing detail and
 // picks which one is the default send/receive source.
-export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
-  const { derived, actions } = squadApp;
+export function AccountsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
+  const { derived, actions } = mou3amlaApp;
   const account = derived.account;
   const header = (
     <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
@@ -24,7 +24,7 @@ export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-[15px] font-black tracking-tight">Linked accounts</div>
-          <p className="text-[11px] font-semibold" style={{ color: squad.textMuted }}>
+          <p className="text-[11px] font-semibold" style={{ color: mou3amla.textMuted }}>
             {account.wallets.length} destination{account.wallets.length === 1 ? "" : "s"} · tap to set as default
           </p>
         </div>
@@ -32,7 +32,7 @@ export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
           type="button"
           onClick={actions.openLink}
           className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-black text-white"
-          style={{ background: squad.accent }}
+          style={{ background: mou3amla.accent }}
         >
           <Plus className="size-3.5" />
           Add
@@ -42,10 +42,10 @@ export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
       {account.wallets.length === 0 ? (
         <div
           className="rounded-[24px] border px-4 py-6 text-center"
-          style={{ background: squad.card, borderColor: squad.border, boxShadow: cardShadow }}
+          style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
         >
           <div className="text-[14px] font-black">No linked destination yet.</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
+          <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
             Start with a wallet tag or merchant id. After verification approval, you can also attach a 20-digit RIB.
           </p>
         </div>
@@ -61,8 +61,8 @@ export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
                 onClick={() => actions.selectSource(wallet.id)}
                 className="rounded-[22px] border p-3.5 text-left transition-transform active:scale-[0.98]"
                 style={{
-                  background: isDefault ? "#FFF3F9" : squad.card,
-                  borderColor: isDefault ? alpha(squad.accent, 0.32) : squad.border,
+                  background: isDefault ? "#FFF3F9" : mou3amla.card,
+                  borderColor: isDefault ? alpha(mou3amla.accent, 0.32) : mou3amla.border,
                   boxShadow: cardShadow,
                 }}
               >
@@ -76,7 +76,7 @@ export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
                     </div>
                     <div>
                       <div className="text-[13px] font-black">{wallet.name}</div>
-                      <div className="mt-0.5 text-[11px]" style={{ color: squad.textMuted }}>
+                      <div className="mt-0.5 text-[11px]" style={{ color: mou3amla.textMuted }}>
                         {ROUTING_LABELS[wallet.routingType]} {maskRoutingValue(wallet.routingValue)}
                       </div>
                     </div>
@@ -85,7 +85,7 @@ export function AccountsScreen({ squadApp }: { squadApp: UseSquadApp }) {
                   {isDefault ? (
                     <span
                       className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em]"
-                      style={{ background: squad.accent, color: "#FFFFFF" }}
+                      style={{ background: mou3amla.accent, color: "#FFFFFF" }}
                     >
                       Default
                     </span>

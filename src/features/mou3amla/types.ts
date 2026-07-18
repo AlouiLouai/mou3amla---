@@ -26,14 +26,18 @@ export interface UserProfile {
   fullName: string;
   isProfessional: boolean;
   verificationStatus: VerificationStatus;
+  diditLatestStatus?: string | null;
+  diditSessionId?: string | null;
   matriculeFiscal?: string;
 }
 
-export interface InitialSquadUser {
+export interface InitialMou3amlaUser {
   phone: string;
   username: string;
   displayName: string;
   verificationStatus: VerificationStatus;
+  diditLatestStatus: string | null;
+  diditSessionId: string | null;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];
@@ -43,7 +47,7 @@ export interface InitialSquadUser {
 
 export type HandoffMode = "qr" | "nearby";
 
-export interface SquadState {
+export interface Mou3amlaState {
   screen: Screen;
   initialHandoffMode: HandoffMode;
   linkOpen: boolean;

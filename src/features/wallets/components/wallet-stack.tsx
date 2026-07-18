@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { List, Plus } from "lucide-react";
-import { alpha, raisedShadow, squad } from "@/features/squad/constants";
+import { alpha, raisedShadow, mou3amla } from "@/features/mou3amla/constants";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
 import type { LinkedWallet } from "@/features/wallets/types";
@@ -71,7 +71,7 @@ function BankCard({ wallet }: { wallet: LinkedWallet }) {
 // An Apple-Wallet-style card carousel for linked destinations: one full,
 // realistic bank/wallet card at a time (gradient sheen, chip, masked routing
 // value), swiped or tapped between via native scroll-snap. Deliberately never
-// shows a balance or aggregated total: SQUAD is zero-liability by design and
+// shows a balance or aggregated total: Mou3amla is zero-liability by design and
 // never fetches or stores account balances (see docs/07-agent-guardrails.md),
 // so each card only ever surfaces the provider's name and its masked public
 // routing tag/RIB.
@@ -128,7 +128,7 @@ export function WalletStack({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
-        <div className="text-[13px] font-black" style={{ color: squad.text }}>
+        <div className="text-[13px] font-black" style={{ color: mou3amla.text }}>
           Linked accounts
         </div>
         <div className="flex items-center gap-2">
@@ -137,7 +137,7 @@ export function WalletStack({
             onClick={onViewAccounts}
             aria-label="View all accounts"
             className="flex size-8 items-center justify-center rounded-full transition-colors"
-            style={{ background: alpha(squad.text, 0.06), color: squad.text }}
+            style={{ background: alpha(mou3amla.text, 0.06), color: mou3amla.text }}
           >
             <List className="size-4" />
           </button>
@@ -146,7 +146,7 @@ export function WalletStack({
             onClick={onAddMore}
             aria-label="Add an account"
             className="flex size-8 items-center justify-center rounded-full text-white transition-colors"
-            style={{ background: squad.accent }}
+            style={{ background: mou3amla.accent }}
           >
             <Plus className="size-4" />
           </button>
@@ -154,16 +154,16 @@ export function WalletStack({
       </div>
 
       {wallets.length === 0 ? (
-        <div className="rounded-[22px] border border-dashed px-4 py-6 text-center" style={{ borderColor: squad.borderStrong }}>
+        <div className="rounded-[22px] border border-dashed px-4 py-6 text-center" style={{ borderColor: mou3amla.borderStrong }}>
           <div className="text-[13px] font-black">No linked destination yet</div>
-          <p className="mx-auto mt-1.5 max-w-[240px] text-[11.5px] leading-relaxed" style={{ color: squad.textMuted }}>
+          <p className="mx-auto mt-1.5 max-w-[240px] text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
             Add a wallet tag, merchant id, or RIB to start sending and receiving.
           </p>
           <button
             type="button"
             onClick={onAddMore}
             className="mt-3 rounded-full px-4 py-2 text-[11.5px] font-black text-white"
-            style={{ background: squad.accent }}
+            style={{ background: mou3amla.accent }}
           >
             Link an account
           </button>
@@ -172,7 +172,7 @@ export function WalletStack({
         <>
           <div
             ref={scrollRef}
-            className="squad-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
+            className="mou3amla-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
             style={{ scrollPaddingInline: "6%" }}
           >
             {wallets.map((wallet) => (
@@ -191,7 +191,7 @@ export function WalletStack({
                   className="h-1.5 rounded-full transition-all"
                   style={{
                     width: index === activeIndex ? 16 : 6,
-                    background: index === activeIndex ? squad.accent : alpha(squad.text, 0.16),
+                    background: index === activeIndex ? mou3amla.accent : alpha(mou3amla.text, 0.16),
                   }}
                 />
               ))}
