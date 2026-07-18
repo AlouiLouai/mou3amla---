@@ -8,6 +8,7 @@ import type { NotificationItem } from "@/features/notifications/types";
 import type { PaymentIntent } from "@/features/payments/types";
 import { generateRefId } from "@/features/payments/lib/tunpay";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
 type SenderProfileRow = {
@@ -94,6 +95,11 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   const identity = await getSessionIdentity();
   if (!identity) {
     return { ok: false, message: "Your session expired. Sign in again." };
+  }
+
+  const withinLimit = await checkRateLimit(`create-payment-intent:${identity.userId}`, { max: 20, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many payment attempts. Please wait a few minutes and try again." };
   }
 
   const admin = createAdminClient();

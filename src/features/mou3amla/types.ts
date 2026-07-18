@@ -21,6 +21,7 @@ export type Screen =
   | "notifications";
 
 export interface UserProfile {
+  id: string;
   phone?: string;
   username: string;
   fullName: string;
@@ -31,6 +32,7 @@ export interface UserProfile {
 }
 
 export interface InitialMou3amlaUser {
+  id: string;
   phone: string;
   username: string;
   displayName: string;

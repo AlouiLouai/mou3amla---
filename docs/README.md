@@ -15,9 +15,13 @@ Authentication now uses a single Supabase-backed entry flow: one landing
 screen collects a Tunisian `+216` phone number plus a unique `@username`,
 then routes every user through a passkey (WebAuthn) gate before sending them
 to the home dashboard — new identities register a device passkey, returning
-identities sign in with it, both via Supabase Auth's native passkey support
-(`auth.experimental.passkey`). No SMS provider, OTP, or password is stored or
-transmitted. Digital identity verification is a separate flow launched from
+identities sign in with it, both via a self-hosted WebAuthn implementation
+(`@simplewebauthn/server`/`@simplewebauthn/browser`, storing credentials in
+`public.passkeys`) rather than Supabase Auth's native passkey support, whose
+experimental verify endpoint proved unreliable — see
+[06-conventions.md](./06-conventions.md#auth-conventions). No SMS provider,
+OTP, or password is stored or transmitted. Digital identity verification is
+a separate flow launched from
 the dashboard banner or profile. It currently runs as a visibly-labeled
 simulated demo (no real eKYC provider is wired up yet — Mou3amla itself
 never captures or stores identity documents or biometric data, and won't

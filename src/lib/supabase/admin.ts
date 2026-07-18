@@ -8,9 +8,6 @@ export function createAdminClient() {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-      experimental: {
-        passkey: true,
-      },
     },
   });
 }

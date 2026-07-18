@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { PasskeyScreen } from "@/features/auth/components/passkey-screen";
-import { readPasskeyBridgeCookie } from "@/features/auth/server/passkey-bridge";
+import { readPasskeyModeCookie } from "@/features/auth/server/passkey-bridge";
 import { getCurrentAppUser } from "@/features/auth/server/dal";
 
 type VerifyPageProps = {
@@ -21,11 +21,11 @@ export default async function VerifyPage(props: VerifyPageProps) {
     redirect("/");
   }
 
-  const bridge = await readPasskeyBridgeCookie(phone, username);
+  const mode = await readPasskeyModeCookie(phone, username);
 
-  if (!bridge) {
+  if (!mode) {
     redirect("/");
   }
 
-  return <PasskeyScreen phone={phone} username={username} mode={bridge.mode} />;
+  return <PasskeyScreen phone={phone} username={username} mode={mode} />;
 }

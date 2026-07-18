@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { Fingerprint, Globe, ShieldCheck } from "lucide-react";
 import { useState, useTransition } from "react";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { formatPhoneForDisplay, formatUsernameHandle } from "@/features/auth/lib/identity";
-import { establishBridgeSession, finalizeAuth } from "@/features/auth/server/actions";
-import { createClient } from "@/lib/supabase/client";
+import {
+  getPasskeyAuthenticationOptions,
+  getPasskeyRegistrationOptions,
+  logPasskeyCeremonyFailure,
+  verifyPasskeyAuthentication,
+  verifyPasskeyRegistration,
+} from "@/features/auth/server/actions";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 
 export function PasskeyScreen({ phone, username, mode }: { phone: string; username: string; mode: "register" | "authenticate" }) {
@@ -15,30 +21,47 @@ export function PasskeyScreen({ phone, username, mode }: { phone: string; userna
   const runCeremony = () => {
     setMessage(null);
     startCeremony(async () => {
-      const supabase = createClient();
-
       if (mode === "register") {
-        const bridge = await establishBridgeSession(phone, username);
-        if (!bridge.ok) {
-          setMessage(bridge.message ?? "We couldn't start passkey setup. Please retry.");
+        const optionsResult = await getPasskeyRegistrationOptions(phone, username);
+        if (!optionsResult.ok) {
+          setMessage(optionsResult.message);
           return;
         }
 
-        const { error } = await supabase.auth.registerPasskey();
-        if (error) {
+        let response;
+        try {
+          response = await startRegistration({ optionsJSON: optionsResult.options });
+        } catch (error) {
+          void logPasskeyCeremonyFailure("register", error instanceof Error ? `${error.name}: ${error.message}` : String(error));
           setMessage("We couldn't create your passkey. Please try again on a device that supports Face ID, Touch ID, or Windows Hello.");
           return;
         }
+
+        const result = await verifyPasskeyRegistration(phone, username, response);
+        if (result) {
+          setMessage(result.message);
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPasskey();
-        if (error) {
+        const optionsResult = await getPasskeyAuthenticationOptions(phone, username);
+        if (!optionsResult.ok) {
+          setMessage(optionsResult.message);
+          return;
+        }
+
+        let response;
+        try {
+          response = await startAuthentication({ optionsJSON: optionsResult.options });
+        } catch (error) {
+          void logPasskeyCeremonyFailure("authenticate", error instanceof Error ? `${error.name}: ${error.message}` : String(error));
           setMessage("We couldn't verify your passkey. Please try again.");
           return;
         }
-      }
 
-      const result = await finalizeAuth(phone, username);
-      setMessage(result.message ?? "Something went wrong finishing sign-in. Please retry.");
+        const result = await verifyPasskeyAuthentication(phone, username, response);
+        if (result) {
+          setMessage(result.message);
+        }
+      }
     });
   };
 

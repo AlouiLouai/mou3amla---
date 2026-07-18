@@ -7,6 +7,7 @@ export default async function HomePage() {
   return (
     <Mou3amlaApp
       initialUser={{
+        id: user.id,
         phone: user.phone,
         username: user.username,
         displayName: user.displayName,

@@ -5,9 +5,17 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: vi.fn() }));
 vi.mock("@/lib/request-ip", () => ({ getClientIp: vi.fn() }));
 vi.mock("@/features/auth/server/passkey-bridge", () => ({
-  setPasskeyBridgeCookie: vi.fn(),
-  readPasskeyBridgeCookie: vi.fn(),
-  clearPasskeyBridgeCookie: vi.fn(),
+  setPasskeyModeCookie: vi.fn(),
+  setChallengeCookie: vi.fn(),
+  readChallengeCookie: vi.fn(),
+  clearChallengeCookie: vi.fn(),
+}));
+vi.mock("@/features/auth/server/webauthn", () => ({
+  hasPasskey: vi.fn(),
+  buildRegistrationOptions: vi.fn(),
+  verifyRegistration: vi.fn(),
+  buildAuthenticationOptions: vi.fn(),
+  verifyAuthentication: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -20,9 +28,18 @@ const { createAdminClient } = await import("@/lib/supabase/admin");
 const { createClient } = await import("@/lib/supabase/server");
 const { checkRateLimit } = await import("@/lib/rate-limit");
 const { getClientIp } = await import("@/lib/request-ip");
-const { setPasskeyBridgeCookie } = await import("@/features/auth/server/passkey-bridge");
+const { setPasskeyModeCookie, setChallengeCookie, readChallengeCookie, clearChallengeCookie } = await import("@/features/auth/server/passkey-bridge");
+const { hasPasskey, buildRegistrationOptions, verifyRegistration, buildAuthenticationOptions, verifyAuthentication } = await import(
+  "@/features/auth/server/webauthn"
+);
 const { revalidatePath } = await import("next/cache");
-const { startPhoneAuth, finalizeAuth } = await import("@/features/auth/server/actions");
+const {
+  startPhoneAuth,
+  getPasskeyRegistrationOptions,
+  verifyPasskeyRegistration,
+  getPasskeyAuthenticationOptions,
+  verifyPasskeyAuthentication,
+} = await import("@/features/auth/server/actions");
 
 const PHONE_DIGITS = "20123456";
 const NORMALIZED_PHONE = "+21620123456";
@@ -58,7 +75,6 @@ function makeFakeAdmin(options: {
   fromQueue?: unknown[];
   createUser?: unknown;
   listUsers?: unknown;
-  listPasskeys?: unknown;
   generateLink?: unknown;
 } = {}) {
   return {
@@ -68,20 +84,15 @@ function makeFakeAdmin(options: {
         createUser: vi.fn().mockResolvedValue(options.createUser ?? { data: { user: { id: USER_ID } }, error: null }),
         listUsers: vi.fn().mockResolvedValue(options.listUsers ?? { data: { users: [] }, error: null }),
         generateLink: vi.fn().mockResolvedValue(options.generateLink ?? { data: { properties: { hashed_token: "token-hash-abc" } }, error: null }),
-        passkey: {
-          listPasskeys: vi.fn().mockResolvedValue(options.listPasskeys ?? { data: [], error: null }),
-        },
       },
     },
   };
 }
 
-function makeFakeServerClient(options: { getClaims?: unknown; verifyOtp?: unknown; signOut?: unknown } = {}) {
+function makeFakeServerClient(options: { verifyOtp?: unknown } = {}) {
   return {
     auth: {
-      getClaims: vi.fn().mockResolvedValue(options.getClaims ?? { data: null, error: new Error("no session") }),
       verifyOtp: vi.fn().mockResolvedValue(options.verifyOtp ?? { error: null }),
-      signOut: vi.fn().mockResolvedValue(options.signOut ?? { error: null }),
     },
   };
 }
@@ -94,15 +105,23 @@ function landingFormData(phone = PHONE_DIGITS, username = USERNAME) {
 }
 
 beforeEach(() => {
-  vi.mocked(checkRateLimit).mockResolvedValue(true);
-  vi.mocked(getClientIp).mockResolvedValue("203.0.113.1");
-  vi.mocked(setPasskeyBridgeCookie).mockResolvedValue(undefined);
+  vi.mocked(checkRateLimit).mockReset().mockResolvedValue(true);
+  vi.mocked(getClientIp).mockReset().mockResolvedValue("203.0.113.1");
+  vi.mocked(setPasskeyModeCookie).mockReset().mockResolvedValue(undefined);
+  vi.mocked(setChallengeCookie).mockReset().mockResolvedValue(undefined);
+  vi.mocked(readChallengeCookie).mockReset();
+  vi.mocked(clearChallengeCookie).mockReset().mockResolvedValue(undefined);
+  vi.mocked(hasPasskey).mockReset();
+  vi.mocked(buildRegistrationOptions).mockReset();
+  vi.mocked(verifyRegistration).mockReset();
+  vi.mocked(buildAuthenticationOptions).mockReset();
+  vi.mocked(verifyAuthentication).mockReset();
+  vi.mocked(createAdminClient).mockReset();
+  vi.mocked(createClient).mockReset();
 });
 
 describe("startPhoneAuth", () => {
   it("returns field errors for an invalid phone/username without touching the database", async () => {
-    vi.mocked(createAdminClient).mockClear();
-
     const result = await startPhoneAuth(undefined, landingFormData("123", "ab"));
 
     expect(result?.errors?.phone).toBeDefined();
@@ -112,7 +131,6 @@ describe("startPhoneAuth", () => {
 
   it("rejects with a friendly message when rate-limited, before any database call", async () => {
     vi.mocked(checkRateLimit).mockResolvedValue(false);
-    vi.mocked(createAdminClient).mockClear();
 
     const result = await startPhoneAuth(undefined, landingFormData());
 
@@ -120,56 +138,54 @@ describe("startPhoneAuth", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("creates a new identity and registers a passkey-setup bridge for a phone/username never seen before", async () => {
+  it("creates a new identity and offers registration for a phone/username never seen before", async () => {
     const admin = makeFakeAdmin({
       fromQueue: [
         { data: [], error: null }, // initial lookup: no existing profile
         { error: null }, // profile insert succeeds
       ],
-      listPasskeys: { data: [], error: null }, // brand new user, no passkey yet
     });
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(hasPasskey).mockResolvedValue(false);
 
     await expect(startPhoneAuth(undefined, landingFormData())).rejects.toThrow(
       `REDIRECT:/verify?${new URLSearchParams({ phone: NORMALIZED_PHONE, username: USERNAME })}`,
     );
 
     expect(admin.auth.admin.createUser).toHaveBeenCalledOnce();
-    expect(admin.auth.admin.generateLink).toHaveBeenCalledWith(expect.objectContaining({ type: "magiclink" }));
-    expect(setPasskeyBridgeCookie).toHaveBeenCalledWith(
-      expect.objectContaining({ phone: NORMALIZED_PHONE, username: USERNAME, mode: "register", tokenHash: "token-hash-abc" }),
+    expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
+    expect(setPasskeyModeCookie).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: NORMALIZED_PHONE, username: USERNAME, mode: "register" }),
     );
   });
 
   it("signs an existing identity straight in when it already has a registered passkey", async () => {
     const admin = makeFakeAdmin({
       fromQueue: [{ data: [{ id: USER_ID, phone: NORMALIZED_PHONE, username: USERNAME, verification_status: "unverified" }], error: null }],
-      listPasskeys: { data: [{ id: "pk-1" }], error: null },
     });
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(hasPasskey).mockResolvedValue(true);
 
     await expect(startPhoneAuth(undefined, landingFormData())).rejects.toThrow("REDIRECT:/verify?");
 
     expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
-    expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
-    expect(setPasskeyBridgeCookie).toHaveBeenCalledWith(expect.objectContaining({ mode: "authenticate" }));
+    expect(setPasskeyModeCookie).toHaveBeenCalledWith(expect.objectContaining({ mode: "authenticate" }));
   });
 
   it("re-offers registration for an existing identity that never finished setting up a passkey", async () => {
     // The bug this fixed: deciding register-vs-authenticate from "does a
     // profile row exist" instead of "does a passkey exist" stranded anyone
-    // who abandoned the biometric prompt mid-registration.
+    // who abandoned the ceremony mid-registration.
     const admin = makeFakeAdmin({
       fromQueue: [{ data: [{ id: USER_ID, phone: NORMALIZED_PHONE, username: USERNAME, verification_status: "unverified" }], error: null }],
-      listPasskeys: { data: [], error: null },
     });
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(hasPasskey).mockResolvedValue(false);
 
     await expect(startPhoneAuth(undefined, landingFormData())).rejects.toThrow("REDIRECT:/verify?");
 
     expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
-    expect(admin.auth.admin.generateLink).toHaveBeenCalledOnce();
-    expect(setPasskeyBridgeCookie).toHaveBeenCalledWith(expect.objectContaining({ mode: "register" }));
+    expect(setPasskeyModeCookie).toHaveBeenCalledWith(expect.objectContaining({ mode: "register" }));
   });
 
   it("returns a friendly message instead of throwing when the database call errors unexpectedly", async () => {
@@ -229,54 +245,116 @@ describe("startPhoneAuth", () => {
   });
 });
 
-describe("finalizeAuth", () => {
-  it("returns a friendly error when no session came through", async () => {
-    vi.mocked(createClient).mockResolvedValue(makeFakeServerClient() as never);
-
-    const result = await finalizeAuth(NORMALIZED_PHONE, USERNAME);
-
-    expect(result).toEqual({ ok: false, message: expect.stringMatching(/didn't come through/i) });
-  });
-
-  it("signs out and rejects when the session belongs to a different identity", async () => {
-    const server = makeFakeServerClient({ getClaims: { data: { claims: { sub: USER_ID } }, error: null } });
-    vi.mocked(createClient).mockResolvedValue(server as never);
-
-    const admin = makeFakeAdmin({
-      fromQueue: [{ data: { id: USER_ID, phone: "+21699999999", username: "someoneelse" }, error: null }],
-    });
+describe("getPasskeyRegistrationOptions", () => {
+  it("requires a resolvable identity", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: null, error: null }] });
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
 
-    const result = await finalizeAuth(NORMALIZED_PHONE, USERNAME);
-
-    expect(server.auth.signOut).toHaveBeenCalledOnce();
-    expect(result).toEqual({ ok: false, message: expect.stringMatching(/different .* identity/i) });
-  });
-
-  it("returns a friendly message instead of throwing when the database call errors unexpectedly", async () => {
-    const server = makeFakeServerClient({ getClaims: { data: { claims: { sub: USER_ID } }, error: null } });
-    vi.mocked(createClient).mockResolvedValue(server as never);
-    vi.mocked(createAdminClient).mockImplementation(() => {
-      throw new Error("connection reset");
-    });
-
-    const result = await finalizeAuth(NORMALIZED_PHONE, USERNAME);
+    const result = await getPasskeyRegistrationOptions(NORMALIZED_PHONE, USERNAME);
 
     expect(result).toEqual({ ok: false, message: expect.any(String) });
+    expect(buildRegistrationOptions).not.toHaveBeenCalled();
   });
 
-  it("clears the bridge and redirects home when the session matches the typed identity", async () => {
-    const server = makeFakeServerClient({ getClaims: { data: { claims: { sub: USER_ID } }, error: null } });
-    vi.mocked(createClient).mockResolvedValue(server as never);
-
-    const admin = makeFakeAdmin({
-      fromQueue: [{ data: { id: USER_ID, phone: NORMALIZED_PHONE, username: USERNAME }, error: null }],
-    });
+  it("builds options and stores the challenge", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(buildRegistrationOptions).mockResolvedValue({ challenge: "chal-1" } as never);
 
-    await expect(finalizeAuth(NORMALIZED_PHONE, USERNAME)).rejects.toThrow("REDIRECT:/home");
+    const result = await getPasskeyRegistrationOptions(NORMALIZED_PHONE, USERNAME);
 
+    expect(result).toEqual({ ok: true, options: { challenge: "chal-1" } });
+    expect(setChallengeCookie).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: NORMALIZED_PHONE, username: USERNAME, challenge: "chal-1" }),
+    );
+  });
+});
+
+describe("verifyPasskeyRegistration", () => {
+  it("rejects when the challenge cookie is missing", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(readChallengeCookie).mockResolvedValue(null);
+
+    const result = await verifyPasskeyRegistration(NORMALIZED_PHONE, USERNAME, {} as never);
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/expired/i) });
+    expect(verifyRegistration).not.toHaveBeenCalled();
+  });
+
+  it("returns the verification failure message without minting a session", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(readChallengeCookie).mockResolvedValue("chal-1");
+    vi.mocked(verifyRegistration).mockResolvedValue({ ok: false, message: "nope" });
+
+    const result = await verifyPasskeyRegistration(NORMALIZED_PHONE, USERNAME, {} as never);
+
+    expect(result).toEqual({ ok: false, message: "nope" });
+    expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
+  });
+
+  it("mints a session and redirects home on success", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(createClient).mockResolvedValue(makeFakeServerClient() as never);
+    vi.mocked(readChallengeCookie).mockResolvedValue("chal-1");
+    vi.mocked(verifyRegistration).mockResolvedValue({ ok: true });
+
+    await expect(verifyPasskeyRegistration(NORMALIZED_PHONE, USERNAME, {} as never)).rejects.toThrow("REDIRECT:/home");
+
+    expect(admin.auth.admin.generateLink).toHaveBeenCalledWith(expect.objectContaining({ type: "magiclink" }));
+    expect(clearChallengeCookie).toHaveBeenCalledOnce();
     expect(revalidatePath).toHaveBeenCalledWith("/home");
-    expect(server.auth.signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe("getPasskeyAuthenticationOptions", () => {
+  it("rejects when no passkey exists for this identity", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(buildAuthenticationOptions).mockResolvedValue(null);
+
+    const result = await getPasskeyAuthenticationOptions(NORMALIZED_PHONE, USERNAME);
+
+    expect(result).toEqual({ ok: false, message: expect.any(String) });
+    expect(setChallengeCookie).not.toHaveBeenCalled();
+  });
+
+  it("builds options and stores the challenge", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(buildAuthenticationOptions).mockResolvedValue({ challenge: "chal-2" } as never);
+
+    const result = await getPasskeyAuthenticationOptions(NORMALIZED_PHONE, USERNAME);
+
+    expect(result).toEqual({ ok: true, options: { challenge: "chal-2" } });
+    expect(setChallengeCookie).toHaveBeenCalledWith(expect.objectContaining({ challenge: "chal-2" }));
+  });
+});
+
+describe("verifyPasskeyAuthentication", () => {
+  it("mints a session and redirects home on success", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(createClient).mockResolvedValue(makeFakeServerClient() as never);
+    vi.mocked(readChallengeCookie).mockResolvedValue("chal-2");
+    vi.mocked(verifyAuthentication).mockResolvedValue({ ok: true });
+
+    await expect(verifyPasskeyAuthentication(NORMALIZED_PHONE, USERNAME, {} as never)).rejects.toThrow("REDIRECT:/home");
+
+    expect(clearChallengeCookie).toHaveBeenCalledOnce();
+  });
+
+  it("returns the verification failure message without minting a session", async () => {
+    const admin = makeFakeAdmin({ fromQueue: [{ data: { id: USER_ID }, error: null }] });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(readChallengeCookie).mockResolvedValue("chal-2");
+    vi.mocked(verifyAuthentication).mockResolvedValue({ ok: false, message: "nope" });
+
+    const result = await verifyPasskeyAuthentication(NORMALIZED_PHONE, USERNAME, {} as never);
+
+    expect(result).toEqual({ ok: false, message: "nope" });
+    expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
   });
 });

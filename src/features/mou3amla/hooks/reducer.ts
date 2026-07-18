@@ -30,6 +30,7 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
     confetti: makeConfetti(),
     isSendingPayment: false,
     profile: {
+      id: initialUser?.id ?? "",
       phone: initialUser?.phone,
       username: initialUser?.username ?? "",
       fullName: initialUser?.displayName || initialUser?.username || "",

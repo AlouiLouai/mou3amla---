@@ -2,9 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 import { buildDisplayName, landingInputSchema, normalizePhoneForAuth } from "@/features/auth/lib/identity";
-import { clearPasskeyBridgeCookie, readPasskeyBridgeCookie, setPasskeyBridgeCookie } from "@/features/auth/server/passkey-bridge";
-import type { AuthFormState, PasskeyBridgeResult, VerificationStatus } from "@/features/auth/types";
+import {
+  clearChallengeCookie,
+  readChallengeCookie,
+  setChallengeCookie,
+  setPasskeyModeCookie,
+} from "@/features/auth/server/passkey-bridge";
+import { buildAuthenticationOptions, buildRegistrationOptions, hasPasskey, verifyAuthentication, verifyRegistration } from "@/features/auth/server/webauthn";
+import type { AuthFormState, VerificationStatus } from "@/features/auth/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -114,6 +121,24 @@ async function createIdentity(
   return { ok: true, profileId };
 }
 
+/** Re-resolves the exact (phone, username) pair to a profile id on every
+ * passkey-related action - never trust a client-supplied id alone, and never
+ * confirm a partial match (see the mismatch messages in startPhoneAuthUnsafe). */
+async function resolveExactProfile(admin: AdminClient, phone: string, username: string): Promise<{ id: string } | null> {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("phone", phone)
+    .eq("username", username)
+    .maybeSingle<{ id: string }>();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return { id: data.id };
+}
+
 type StartPhoneAuthOutcome = AuthFormState | { redirectTo: string };
 
 // `redirect()` throws internally, so - per Next.js's own docs - it must be
@@ -182,34 +207,14 @@ async function startPhoneAuthUnsafe(formData: FormData): Promise<StartPhoneAuthO
     profileId = created.profileId;
   }
 
-  // The real precondition for signInWithPasskey() is "this profile has a
-  // registered passkey" - not "a profile row exists." Deciding on row
-  // existence alone would strand anyone who abandoned the biometric prompt
-  // mid-registration: they'd get routed to sign-in with no passkey to sign
-  // in with. Checking the actual precondition fixes that for free.
-  const { data: passkeys } = await admin.auth.admin.passkey.listPasskeys({ userId: profileId });
-
-  if (passkeys && passkeys.length > 0) {
-    await setPasskeyBridgeCookie({ phone, username, mode: "authenticate" });
-    return { redirectTo: `/verify?${new URLSearchParams({ phone, username })}` };
-  }
-
-  const bridgeEmail = buildBridgeEmail(phone, username);
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email: bridgeEmail,
-  });
-
-  if (linkError || !linkData?.properties?.hashed_token) {
-    return { message: "We couldn't prepare your passkey setup. Please retry once." };
-  }
-
-  await setPasskeyBridgeCookie({
-    phone,
-    username,
-    mode: "register",
-    tokenHash: linkData.properties.hashed_token,
-  });
+  // The real precondition for signing in with a passkey is "this profile has
+  // a registered credential in our own passkeys table" - not "a profile row
+  // exists." Deciding on row existence alone would strand anyone who
+  // abandoned the ceremony mid-registration: they'd get routed to sign-in
+  // with no passkey to sign in with. Checking the actual precondition fixes
+  // that for free.
+  const mode: "register" | "authenticate" = (await hasPasskey(profileId)) ? "authenticate" : "register";
+  await setPasskeyModeCookie({ phone, username, mode });
 
   return { redirectTo: `/verify?${new URLSearchParams({ phone, username })}` };
 }
@@ -231,70 +236,101 @@ export async function startPhoneAuth(_prevState: AuthFormState | undefined, form
   return outcome;
 }
 
-async function establishBridgeSessionUnsafe(phone: string, username: string): Promise<PasskeyBridgeResult> {
-  const bridge = await readPasskeyBridgeCookie(phone, username);
+/** Mints the real Supabase session for a resolved identity via the same
+ * synthetic-email magic-link handshake used since the bridge design - this
+ * part was never the problem (only Supabase's own experimental native-passkey
+ * verify endpoint was), so it's reused as-is, now called *after* our own
+ * self-hosted WebAuthn verification succeeds rather than before it. */
+async function mintSessionForIdentity(phone: string, username: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const admin = createAdminClient();
+  const bridgeEmail = buildBridgeEmail(phone, username);
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email: bridgeEmail });
 
-  if (!bridge || bridge.mode !== "register" || !bridge.tokenHash) {
-    return { ok: false, message: "Your setup link expired. Please start again." };
+  if (linkError || !linkData?.properties?.hashed_token) {
+    return { ok: false, message: "We couldn't open a secure session. Please retry." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp({
-    token_hash: bridge.tokenHash,
-    type: "magiclink",
-  });
+  const { error } = await supabase.auth.verifyOtp({ token_hash: linkData.properties.hashed_token, type: "magiclink" });
 
   if (error) {
-    return { ok: false, message: "We couldn't open a secure session for passkey setup. Please retry once." };
+    return { ok: false, message: "We couldn't open a secure session. Please retry." };
   }
 
   return { ok: true };
 }
 
-export async function establishBridgeSession(phone: string, username: string): Promise<PasskeyBridgeResult> {
+type PasskeyOptionsResult<T> = { ok: true; options: T } | { ok: false; message: string };
+
+async function getPasskeyRegistrationOptionsUnsafe(phone: string, username: string): Promise<PasskeyOptionsResult<Awaited<ReturnType<typeof buildRegistrationOptions>>>> {
+  const admin = createAdminClient();
+  const profile = await resolveExactProfile(admin, phone, username);
+
+  if (!profile) {
+    return { ok: false, message: "We couldn't find that identity. Please start again." };
+  }
+
+  const options = await buildRegistrationOptions(profile.id, username);
+  await setChallengeCookie({ phone, username, challenge: options.challenge });
+
+  return { ok: true, options };
+}
+
+export async function getPasskeyRegistrationOptions(
+  phone: string,
+  username: string,
+): ReturnType<typeof getPasskeyRegistrationOptionsUnsafe> {
   try {
-    return await establishBridgeSessionUnsafe(phone, username);
+    return await getPasskeyRegistrationOptionsUnsafe(phone, username);
   } catch (error) {
-    logger.error("Unhandled error in establishBridgeSession", error);
-    return { ok: false, message: "We couldn't start passkey setup right now. Please retry." };
+    logger.error("Unhandled error in getPasskeyRegistrationOptions", error);
+    return { ok: false, message: "We couldn't start passkey setup. Please retry." };
   }
 }
 
-type FinalizeAuthOutcome = PasskeyBridgeResult | { redirectTo: string };
+type VerifyPasskeyOutcome = { ok: false; message: string } | { redirectTo: string };
 
-async function finalizeAuthUnsafe(phone: string, username: string): Promise<FinalizeAuthOutcome> {
-  const supabase = await createClient();
-  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
-
-  if (claimsError || !claims?.claims?.sub) {
-    return { ok: false, message: "Your passkey session didn't come through. Please retry." };
-  }
-
+async function verifyPasskeyRegistrationUnsafe(phone: string, username: string, response: RegistrationResponseJSON): Promise<VerifyPasskeyOutcome> {
   const admin = createAdminClient();
-  const { data: profile, error: profileError } = await admin
-    .from("profiles")
-    .select("id, phone, username")
-    .eq("id", claims.claims.sub)
-    .maybeSingle<{ id: string; phone: string; username: string }>();
+  const profile = await resolveExactProfile(admin, phone, username);
 
-  if (profileError || !profile || profile.phone !== phone || profile.username.toLowerCase() !== username.toLowerCase()) {
-    await supabase.auth.signOut();
-    return { ok: false, message: "That passkey belongs to a different Mou3amla identity." };
+  if (!profile) {
+    return { ok: false, message: "We couldn't find that identity. Please start again." };
   }
 
-  await clearPasskeyBridgeCookie();
+  const challenge = await readChallengeCookie(phone, username);
+  if (!challenge) {
+    return { ok: false, message: "Your passkey setup expired. Please start again." };
+  }
+
+  const result = await verifyRegistration(profile.id, challenge, response);
+  await clearChallengeCookie();
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const session = await mintSessionForIdentity(phone, username);
+  if (!session.ok) {
+    return session;
+  }
+
   revalidatePath("/home");
   return { redirectTo: "/home" };
 }
 
-export async function finalizeAuth(phone: string, username: string): Promise<PasskeyBridgeResult> {
-  let outcome: FinalizeAuthOutcome;
+export async function verifyPasskeyRegistration(
+  phone: string,
+  username: string,
+  response: RegistrationResponseJSON,
+): Promise<{ ok: false; message: string } | undefined> {
+  let outcome: VerifyPasskeyOutcome;
 
   try {
-    outcome = await finalizeAuthUnsafe(phone, username);
+    outcome = await verifyPasskeyRegistrationUnsafe(phone, username, response);
   } catch (error) {
-    logger.error("Unhandled error in finalizeAuth", error);
-    return { ok: false, message: "We couldn't finish signing you in right now. Please retry." };
+    logger.error("Unhandled error in verifyPasskeyRegistration", error);
+    return { ok: false, message: "We couldn't finish setting up your passkey. Please retry." };
   }
 
   if ("redirectTo" in outcome) {
@@ -302,4 +338,94 @@ export async function finalizeAuth(phone: string, username: string): Promise<Pas
   }
 
   return outcome;
+}
+
+async function getPasskeyAuthenticationOptionsUnsafe(
+  phone: string,
+  username: string,
+): Promise<PasskeyOptionsResult<NonNullable<Awaited<ReturnType<typeof buildAuthenticationOptions>>>>> {
+  const admin = createAdminClient();
+  const profile = await resolveExactProfile(admin, phone, username);
+
+  if (!profile) {
+    return { ok: false, message: "We couldn't find that identity. Please start again." };
+  }
+
+  const options = await buildAuthenticationOptions(profile.id);
+  if (!options) {
+    return { ok: false, message: "No passkey is registered for this identity yet." };
+  }
+
+  await setChallengeCookie({ phone, username, challenge: options.challenge });
+
+  return { ok: true, options };
+}
+
+export async function getPasskeyAuthenticationOptions(
+  phone: string,
+  username: string,
+): ReturnType<typeof getPasskeyAuthenticationOptionsUnsafe> {
+  try {
+    return await getPasskeyAuthenticationOptionsUnsafe(phone, username);
+  } catch (error) {
+    logger.error("Unhandled error in getPasskeyAuthenticationOptions", error);
+    return { ok: false, message: "We couldn't prepare passkey sign-in. Please retry." };
+  }
+}
+
+async function verifyPasskeyAuthenticationUnsafe(phone: string, username: string, response: AuthenticationResponseJSON): Promise<VerifyPasskeyOutcome> {
+  const admin = createAdminClient();
+  const profile = await resolveExactProfile(admin, phone, username);
+
+  if (!profile) {
+    return { ok: false, message: "We couldn't find that identity. Please start again." };
+  }
+
+  const challenge = await readChallengeCookie(phone, username);
+  if (!challenge) {
+    return { ok: false, message: "Your sign-in attempt expired. Please start again." };
+  }
+
+  const result = await verifyAuthentication(profile.id, challenge, response);
+  await clearChallengeCookie();
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const session = await mintSessionForIdentity(phone, username);
+  if (!session.ok) {
+    return session;
+  }
+
+  revalidatePath("/home");
+  return { redirectTo: "/home" };
+}
+
+export async function verifyPasskeyAuthentication(
+  phone: string,
+  username: string,
+  response: AuthenticationResponseJSON,
+): Promise<{ ok: false; message: string } | undefined> {
+  let outcome: VerifyPasskeyOutcome;
+
+  try {
+    outcome = await verifyPasskeyAuthenticationUnsafe(phone, username, response);
+  } catch (error) {
+    logger.error("Unhandled error in verifyPasskeyAuthentication", error);
+    return { ok: false, message: "We couldn't verify your passkey. Please retry." };
+  }
+
+  if ("redirectTo" in outcome) {
+    redirect(outcome.redirectTo);
+  }
+
+  return outcome;
+}
+
+/** The WebAuthn ceremony itself (navigator.credentials.create()/.get()) runs
+ * entirely client-side and never otherwise reaches our own logs. Call this
+ * from the client on failure so a real diagnosis is possible. */
+export async function logPasskeyCeremonyFailure(mode: "register" | "authenticate", detail: string): Promise<void> {
+  logger.warn(`Passkey ceremony failed (${mode})`, { detail });
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { type CoarseLocation, getCoarseLocation } from "@/features/payments/lib/geolocation";
 import type { HandoffMode, InitialMou3amlaUser } from "@/features/mou3amla/types";
 import { PROVIDERS } from "@/features/wallets/constants";
+import { useRealtimeNotifications } from "@/features/notifications/hooks/use-realtime-notifications";
 import { initialState, reducer } from "@/features/mou3amla/hooks/reducer";
 import { useNotificationActions } from "@/features/mou3amla/hooks/use-notification-actions";
 import { usePaymentActions } from "@/features/mou3amla/hooks/use-payment-actions";
@@ -41,6 +42,28 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       }
     };
   }, []);
+
+  // Delivers "payment received" (and any other) notification the instant it's
+  // inserted, instead of only on the next full page load - see
+  // use-realtime-notifications.ts.
+  useRealtimeNotifications(
+    state.profile.id,
+    useCallback(
+      (notification) => {
+        dispatch((s) => {
+          if (s.notifications.some((item) => item.id === notification.id)) {
+            return null;
+          }
+          return { notifications: [notification, ...s.notifications] };
+        });
+
+        if (notification.type === "payment_received") {
+          toast.success(notification.title, { description: notification.body });
+        }
+      },
+      [dispatch],
+    ),
+  );
 
   const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false, payerMatch: null }), []);
   const goAccounts = useCallback(() => dispatch({ screen: "accounts" }), []);

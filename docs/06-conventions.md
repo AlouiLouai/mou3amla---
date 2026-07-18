@@ -121,26 +121,57 @@ external API) follows the same `xUnsafe` + wrapper split - see
 - Stage 1 collects `phone` and `username` together.
 - Stage 2 registers or verifies a **passkey (WebAuthn)** and establishes the
   real session — no OTP, no SMS provider, no stored password.
-- New identities: `startPhoneAuth` creates the auth user + profile row, then
-  bridges into a session via `admin.auth.admin.generateLink({ type:
-  "magiclink" })` + server-side `verifyOtp({ token_hash, type: "magiclink" })`
-  (see `establishBridgeSession` in `actions.ts`) purely so `registerPasskey()`
-  has an active session to attach the new credential to. The bridge email is
-  a synthetic `bridge-<phone>-<handle>@mou3amla.local` address, never shown
-  to the user and never used for anything but this handshake.
-- Returning identities skip the bridge entirely: `signInWithPasskey()` on the
-  browser client performs the full WebAuthn ceremony and creates the session
-  directly.
-- Passkey support requires `auth: { experimental: { passkey: true } }` on
-  both the browser and server Supabase clients
-  (`src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`), **and**
-  passkeys enabled on the Supabase project itself (Dashboard → Authentication)
-  with an RP ID/origin matching `NEXT_PUBLIC_APP_URL`. That project-level
-  toggle cannot be set from application code.
-- After either ceremony succeeds, `finalizeAuth()` cross-checks the
-  authenticated session's user against the `phone`/`username` typed on the
-  landing screen before redirecting to `/home` — this guards against a
-  browser passkey picker resolving to the wrong saved identity.
+- **Passkeys are self-hosted, not Supabase's native passkey feature.**
+  Supabase's experimental `registerPasskey()`/`signInWithPasskey()` API
+  reliably returned `AuthApiError: Credential verification failed` even
+  with a correctly configured Relying Party (verified against the Dashboard
+  settings) - a bug/limitation in that experimental feature, not fixable
+  from application code. Registration and authentication are implemented
+  with `@simplewebauthn/server` (`src/features/auth/server/webauthn.ts`)
+  and `@simplewebauthn/browser` (`startRegistration`/`startAuthentication`
+  in `passkey-screen.tsx`), with credentials stored in `public.passkeys`
+  (our own table) rather than `auth.webauthn_credentials`. Do not switch
+  back to Supabase's native passkey API without first confirming Supabase
+  has actually fixed the underlying verification bug.
+- The Relying Party ID/origin are derived from `NEXT_PUBLIC_APP_URL`
+  (`getRpConfig()` in `webauthn.ts`), not a Supabase Dashboard toggle - one
+  less moving part outside this codebase's control. Note RP ID is a single
+  bare domain and origins must be that domain or a subdomain of it, so
+  `localhost` (dev) and a real deployed domain (prod) can never both work
+  under the same RP config - `NEXT_PUBLIC_APP_URL` must match wherever
+  you're actually testing.
+- The registration/authentication ceremony is two round trips around one
+  browser-side `navigator.credentials.create()`/`.get()` call: `get*Options`
+  (`getPasskeyRegistrationOptions`/`getPasskeyAuthenticationOptions` in
+  `actions.ts`) generates a challenge and stores it in a short-lived httpOnly
+  cookie (`setChallengeCookie`, `passkey-bridge.ts`), then
+  `verifyPasskeyRegistration`/`verifyPasskeyAuthentication` reads that same
+  cookie back to verify the browser's response.
+- Every passkey action **re-resolves the profile from the exact
+  (phone, username) pair** (`resolveExactProfile` in `actions.ts`) rather
+  than trusting a client-supplied id - this is also what scopes
+  `allowCredentials`/`excludeCredentials` to only that profile's own rows,
+  so there's no discoverable-credential ambiguity to guard against
+  separately (the old Supabase-native flow needed a post-hoc identity
+  cross-check for exactly this reason; this design doesn't).
+- Once our own WebAuthn verification succeeds (register or authenticate),
+  `mintSessionForIdentity()` opens the real Supabase session via
+  `admin.auth.admin.generateLink({ type: "magiclink" })` + server-side
+  `verifyOtp({ token_hash, type: "magiclink" })` against the synthetic
+  `bridge-<phone>-<handle>@mou3amla.local` address created at registration
+  time. This part of the old design was never the problem - only Supabase's
+  native passkey verify endpoint was - so it's reused as-is, now called
+  *after* verification instead of before it (the old design opened this
+  session first so `registerPasskey()` would have something to attach a
+  credential to; self-hosting the credential storage means we no longer need
+  a session before verifying, which also closes a real gap the old design
+  had: a session opened before verification stayed valid even if the
+  passkey step then failed).
+- WebAuthn ceremony failures happen entirely client-side and never otherwise
+  reach server logs - `logPasskeyCeremonyFailure(mode, detail)` in
+  `actions.ts` exists purely so a real error ends up somewhere greppable.
+  Call it from the client on every `startRegistration`/`startAuthentication`
+  catch.
 - `startPhoneAuth` never confirms *which* identity a phone or handle belongs
   to beyond "an account already exists" - only that a partial match exists,
   never the other party's actual phone/handle. Revealing more would let an
@@ -228,6 +259,47 @@ external API) follows the same `xUnsafe` + wrapper split - see
   rather than deleting the demo path outright - it's a useful fallback if
   the provider is ever unreachable during a live demo.
 
+## Payments conventions
+
+- `createPaymentIntent` (`src/features/payments/server/actions.ts`) is
+  rate-limited per user (`create-payment-intent:<userId>`, 20/5min) and
+  follows the `xUnsafe` + try/catch-logging pattern - see "Exception
+  handling..." above.
+- `generateRefId()` (`src/features/payments/lib/tunpay.ts`) uses
+  `crypto.randomUUID()` (the global Web Crypto API, not `node:crypto` -
+  this file is imported from both client components and the server action,
+  so it must stay isomorphic). It used to use `Math.random()`, which was
+  both weak and a real collision risk against `payment_transactions.ref_id`'s
+  unique constraint - don't reintroduce a non-cryptographic ID generator for
+  anything that ends up as a unique, user-facing payment reference.
+- No idempotency key exists yet for payment-intent creation - a duplicated
+  network request could create two transaction rows with two different
+  `ref_id`s. Acceptable for now because Mou3amla is explicitly zero-liability
+  (no real settlement happens here, see "Mocked vs. real boundaries" below),
+  but this becomes a real requirement the moment a real TUNPAY handoff can
+  actually move money - don't forget it when that integration happens.
+- `payment_transactions`/`notifications` inserts are unit-tested in
+  `src/features/payments/server/actions.test.ts` - covering validation,
+  session/rate-limit checks, self-transfer and unverified-recipient
+  rejection, missing-destination rejection, the success path, and that a
+  failed notification insert doesn't fail the whole payment (the transaction
+  already committed by that point).
+- **Payment notifications are delivered over Supabase Realtime, not just on
+  next page load.** `useRealtimeNotifications`
+  (`src/features/notifications/hooks/use-realtime-notifications.ts`)
+  subscribes to `postgres_changes` INSERT events on `public.notifications`
+  filtered to the current user - enabled via `alter publication
+  supabase_realtime add table public.notifications;` (migration
+  `20260718170000_enable_realtime_notifications.sql`). This relies on the
+  existing `notifications_select_own` RLS policy for scoping - Realtime
+  enforces the same RLS as the REST API, so a client can't construct a
+  filter to see anyone else's notifications. Wired into
+  `use-mou3amla-app.ts`; a `payment_received` notification also triggers a
+  toast. Requires `Mou3amlaState.profile.id` (threaded through from
+  `requireCurrentAppUser()` via `InitialMou3amlaUser`/`UserProfile`) - if you
+  see the subscription silently not firing, check that `id` actually made it
+  into `initialUser` in `src/app/home/page.tsx`.
+
 ## Nearby AirDrop-style handoff (mutual accept)
 
 - This is a **choice presented alongside QR code**, not a replacement for it:
@@ -241,10 +313,14 @@ external API) follows the same `xUnsafe` + wrapper split - see
   become `confirmed` and `/api/nearby/status` starts returning the recipient.
   Do not shortcut this back to a one-sided reveal.
 - Both sides poll `/api/nearby/status` (via `startNearbyMatchPolling` in
-  `use-mou3amla-app.ts`) rather than using a push channel - this repo has no
-  websocket/realtime infra, and polling matches the existing QR-rotation
-  convention. If you need lower latency, reduce `NEARBY_POLL_INTERVAL_MS`
-  before reaching for new infra.
+  `use-mou3amla-app.ts`) rather than using Realtime - this handshake's state
+  lives across two different users' requests to a stateless API route, not a
+  single table row a client can subscribe to the way notifications does, so
+  polling still matches this flow's shape better. (Supabase Realtime *is*
+  available in this repo now - see "Payments conventions" above - so "no
+  realtime infra" is no longer the reason to default to polling; judge each
+  new case on its own shape.) If you need lower latency here, reduce
+  `NEARBY_POLL_INTERVAL_MS` before reaching for new infra.
 - Proximity itself is still simulated via the shared code, not real
   Bluetooth (guardrail #11). The one added sensory cue is
   `navigator.vibrate(...)` on state transitions (matched, then confirmed),
