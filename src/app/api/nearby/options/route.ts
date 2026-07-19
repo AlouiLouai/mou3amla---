@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { NEARBY_GEO_MATCH_RADIUS_DEG } from "@/features/payments/constants";
+import { generateNearbyCode } from "@/features/payments/lib/nearby-code";
 import { withRouteErrorHandling } from "@/lib/api-handler";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,14 +11,10 @@ type NearbyRow = {
 };
 
 function generateDecoy(excluded: Set<string>): string {
-  let code = Math.floor(Math.random() * 1000)
-    .toString()
-    .padStart(3, "0");
+  let code = generateNearbyCode();
 
   while (excluded.has(code)) {
-    code = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
+    code = generateNearbyCode();
   }
 
   return code;
@@ -44,8 +42,16 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const admin = createAdminClient();
   const userId = authData.claims.sub;
+
+  // Polled every NEARBY_OPTIONS_REFRESH_MS (4s) while idle - max here needs
+  // headroom above the ~15 legitimate calls/min that implies.
+  const withinLimit = await checkRateLimit(`nearby-options:${userId}`, { max: 40, windowSeconds: 60 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many requests. Please wait a moment and try again." }, { status: 429 });
+  }
+
+  const admin = createAdminClient();
   const nowIso = new Date().toISOString();
 
   let query = admin

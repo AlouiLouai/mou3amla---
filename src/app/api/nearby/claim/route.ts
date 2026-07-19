@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { NEARBY_GEO_MATCH_RADIUS_DEG, NEARBY_HANDSHAKE_TTL_MS } from "@/features/payments/constants";
 import { roundCoord } from "@/features/payments/lib/geolocation";
+import { NEARBY_CODE_REGEX } from "@/features/payments/lib/nearby-code";
 import { withRouteErrorHandling } from "@/lib/api-handler";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const claimSchema = z.object({
-  code: z.string().regex(/^\d{3}$/),
+  code: z.string().regex(NEARBY_CODE_REGEX),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
 });
@@ -28,10 +30,20 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
+  // The challenge code space is only 100,000 wide (see NEARBY_CODE_DIGITS) -
+  // without a tight per-user cap, a script could still exhaust a meaningful
+  // slice of it inside the code's own short TTL. This caps brute-forcing a
+  // stranger's code to a handful of tries a minute, not a scan of the whole
+  // keyspace.
+  const withinLimit = await checkRateLimit(`nearby-claim:${authData.claims.sub}`, { max: 8, windowSeconds: 30 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many attempts. Please wait a moment and try again." }, { status: 429 });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = claimSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ message: "Enter a valid 3-digit nearby code." }, { status: 400 });
+    return NextResponse.json({ message: "Enter a valid nearby code." }, { status: 400 });
   }
 
   const admin = createAdminClient();

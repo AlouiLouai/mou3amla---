@@ -42,7 +42,7 @@ function NearbyCountdown({ expiresAt }: { expiresAt: number }) {
 
 export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { state, derived, actions } = mou3amlaApp;
-  const { startQrRotation, startNearbyMatchPolling, acceptOwnerMatch, cancelOwnerMatch } = actions;
+  const { startQrRotation, startNearbyPublishRotation, startNearbyRealtime, acceptOwnerMatch, cancelOwnerMatch } = actions;
   const [mode, setMode] = useState<HandoffMode>(state.initialHandoffMode);
   const qrToken = state.qrToken;
   const nearbyHandoff = state.nearbyHandoff;
@@ -52,10 +52,11 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
   const footer = renderAppFooter("receive-qr", actions);
 
   useEffect(() => startQrRotation(), [startQrRotation]);
+  useEffect(() => startNearbyPublishRotation(), [startNearbyPublishRotation]);
   useEffect(() => {
     if (mode !== "nearby") return;
-    return startNearbyMatchPolling("owner");
-  }, [mode, startNearbyMatchPolling]);
+    return startNearbyRealtime("owner");
+  }, [mode, startNearbyRealtime]);
 
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-6 pb-8">
@@ -127,8 +128,8 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
             </div>
 
             <div className="mt-3 flex items-end justify-between gap-3">
-              <div className="font-mono text-[2.3rem] font-black tracking-[0.26em]" style={{ color: mou3amla.hero }}>
-                {nearbyHandoff?.code ?? "---"}
+              <div className="font-mono text-[1.85rem] font-black tracking-[0.16em]" style={{ color: mou3amla.hero }}>
+                {nearbyHandoff?.code ?? "-----"}
               </div>
               <div className="text-right">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: mou3amla.textFaint }}>

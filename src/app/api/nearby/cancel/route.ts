@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withRouteErrorHandling } from "@/lib/api-handler";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,8 +16,14 @@ export const POST = withRouteErrorHandling(async () => {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const admin = createAdminClient();
   const userId = authData.claims.sub;
+
+  const withinLimit = await checkRateLimit(`nearby-cancel:${userId}`, { max: 10, windowSeconds: 30 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many attempts. Please wait a moment and try again." }, { status: 429 });
+  }
+
+  const admin = createAdminClient();
 
   await admin.from("nearby_handoffs").delete().eq("owner_user_id", userId);
 

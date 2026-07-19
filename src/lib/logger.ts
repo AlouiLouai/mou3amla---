@@ -9,12 +9,41 @@ function serializeError(error: unknown) {
   return { value: error };
 }
 
+// Key-based, not value-based: this is a payments/KYC app, so a caller could
+// easily pass a phone number, a RIB/wallet routing value, or a WebAuthn
+// credential straight into a log's context object without thinking twice -
+// there was previously no redaction at all, so any such value would print in
+// the clear to stdout/Vercel logs. Matching on the key name (rather than
+// trying to pattern-match values) is cheap and catches the field regardless
+// of which log call introduces it, current or future.
+const REDACTED_KEY_PATTERN = /phone|routing_value|routingvalue|\brib\b|credential|public_key|publickey|challenge|token|secret|password/i;
+const REDACTED_PLACEHOLDER = "[redacted]";
+const MAX_REDACTION_DEPTH = 6;
+
+function redactContext(value: unknown, depth = 0): unknown {
+  if (depth > MAX_REDACTION_DEPTH) return "[redacted:max-depth]";
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactContext(item, depth + 1));
+  }
+
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = REDACTED_KEY_PATTERN.test(key) ? REDACTED_PLACEHOLDER : redactContext(val, depth + 1);
+    }
+    return out;
+  }
+
+  return value;
+}
+
 function emit(level: "info" | "warn" | "error", message: string, context?: LogContext) {
   const line = {
     level,
     message,
     time: new Date().toISOString(),
-    ...context,
+    ...(context ? (redactContext(context) as LogContext) : {}),
   };
 
   // Structured JSON so Vercel's log viewer (and any downstream log drain)

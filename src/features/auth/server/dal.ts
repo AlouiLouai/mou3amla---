@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityItem } from "@/features/activity/types";
 import type { AppProfileRecord, AuthenticatedAppUser, VerificationStatus } from "@/features/auth/types";
+import { computeStampDuty } from "@/features/invoices/lib/el-fatoora";
+import type { Invoice } from "@/features/invoices/types";
 import type { NotificationItem } from "@/features/notifications/types";
 import type { LinkedWallet } from "@/features/wallets/types";
 
@@ -126,6 +128,27 @@ function normalizeAmount(value: number | string): number {
   return typeof value === "number" ? value : Number.parseFloat(value);
 }
 
+// Invoices are a Mode Professionnel view of the sender's own sent
+// transactions, not a separately-persisted record - so they survive a
+// refresh for free instead of only existing in that session's client state
+// (the previous behavior: `invoices` was hardcoded to `[]` here and only
+// ever populated client-side after a live send, disappearing on reload).
+function buildInvoiceFromTransaction(row: TransactionRow, counterparties: Map<string, CounterpartyProfileRow>): Invoice {
+  const amount = normalizeAmount(row.amount);
+  const stampDuty = computeStampDuty();
+  const counterparty = row.recipient_user_id ? counterparties.get(row.recipient_user_id) : undefined;
+
+  return {
+    id: row.id,
+    refId: row.ref_id,
+    amount,
+    stampDuty,
+    total: amount + stampDuty,
+    date: new Date(row.created_at).toLocaleDateString(),
+    counterparty: counterparty?.display_name ?? row.recipient_display_name ?? `@${row.recipient_username}`,
+  };
+}
+
 function buildActivityItem(
   row: TransactionRow,
   currentUserId: string,
@@ -237,6 +260,9 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
   }
 
   const activityLog = transactions.map((transaction) => buildActivityItem(transaction, identity.userId, counterpartyMap));
+  const invoices = transactions
+    .filter((transaction) => transaction.sender_user_id === identity.userId)
+    .map((transaction) => buildInvoiceFromTransaction(transaction, counterpartyMap));
   const sourceWalletId = wallets.find((wallet) => wallet.isDefault)?.id ?? wallets[0]?.id ?? "";
 
   return {
@@ -250,7 +276,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
     sourceWalletId,
     activityLog,
     notifications,
-    invoices: [],
+    invoices,
   };
 }
 

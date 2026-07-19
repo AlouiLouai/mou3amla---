@@ -80,7 +80,8 @@ export function usePaymentActions({
       dispatch({
         isSendingPayment: false,
         currentIntent: result.intent,
-        screen: "intent-result",
+        screen: "activity",
+        highlightedActivityId: result.activity.id,
         confetti: makeConfetti(),
         amount: "",
         recipientInput: "",
@@ -92,7 +93,16 @@ export function usePaymentActions({
           : stateRef.current.invoices,
       });
 
-      toast.success("Payment intent saved and handed off to the bank rail.");
+      // Both sides of this transfer are guaranteed identity-verified by
+      // construction - the recipient check already ran server-side in
+      // createPaymentIntent, and sending itself was only reachable because
+      // linking a source destination requires the sender's own
+      // verification_status === "verified" (see wallets/server/actions.ts).
+      // Surfacing that here is reporting a real, enforced guarantee, not a
+      // trust claim invented for the toast.
+      toast.success("Payment intent saved and handed off to the bank rail.", {
+        description: "Routed between two identity-verified Mou3amla accounts.",
+      });
       attemptNativeHandoff(buildTunpayUri(result.intent));
     })();
   }, [dispatch, stateRef]);

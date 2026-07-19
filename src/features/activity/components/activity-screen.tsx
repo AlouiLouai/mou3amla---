@@ -1,9 +1,14 @@
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+"use client";
+
+import { useEffect } from "react";
+import { ArrowDownLeft, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+
+const ACTIVITY_HIGHLIGHT_DURATION_MS = 3000;
 
 function statusTone(status: string) {
   if (status === "confirmed") return { bg: alpha("#1DAA62", 0.12), color: "#17834C", label: "Confirmed" };
@@ -12,8 +17,9 @@ function statusTone(status: string) {
 }
 
 export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
-  const { derived, actions } = mou3amlaApp;
+  const { state, derived, actions } = mou3amlaApp;
   const account = derived.account;
+  const highlightedActivityId = state.highlightedActivityId;
   const header = (
     <AppHeader
       profile={account.profile}
@@ -23,6 +29,15 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
     />
   );
   const footer = renderAppFooter("activity", actions);
+
+  // Landing here right after a send (or a live payment_received event)
+  // briefly colorizes that row so it's obvious which one just changed - see
+  // the mou3amla-activity-highlight keyframes in globals.css.
+  useEffect(() => {
+    if (!highlightedActivityId) return;
+    const timeout = setTimeout(() => actions.clearActivityHighlight(), ACTIVITY_HIGHLIGHT_DURATION_MS);
+    return () => clearTimeout(timeout);
+  }, [highlightedActivityId, actions]);
 
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-4">
@@ -48,10 +63,12 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
               const tone = isSend ? mou3amla.accent : mou3amla.subtle;
               const status = statusTone(item.status);
 
+              const isHighlighted = item.id === highlightedActivityId;
+
               return (
                 <div
                   key={item.id}
-                  className="rounded-[22px] border p-4"
+                  className={`rounded-[22px] border p-4 ${isHighlighted ? "mou3amla-activity-highlight" : ""}`}
                   style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
                 >
                   <div className="flex items-start gap-3">
@@ -82,8 +99,20 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
                         </span>
                       </div>
 
-                      <div className="mt-2 font-mono text-[10px]" style={{ color: mou3amla.textFaint }}>
-                        {item.refId}
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <div className="font-mono text-[10px]" style={{ color: mou3amla.textFaint }}>
+                          {item.refId}
+                        </div>
+                        {/* Mou3amla only ever lets this transaction exist between two
+                            identity-verified accounts: linking a destination to send
+                            from requires the sender's own verification_status ===
+                            "verified" (see linkDestination), and createPaymentIntent
+                            separately rejects an unverified recipient - so this badge
+                            reflects a real, server-enforced guarantee, not a claim. */}
+                        <div className="flex items-center gap-1 text-[9.5px] font-bold" style={{ color: "#17834C" }}>
+                          <ShieldCheck className="size-3" />
+                          Verified parties
+                        </div>
                       </div>
                     </div>
                   </div>

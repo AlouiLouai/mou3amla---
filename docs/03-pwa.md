@@ -90,6 +90,26 @@ pnpm start
 curl -I http://localhost:3000/serwist/sw.js   # should be 200
 ```
 
+## Launch splash screen
+
+`src/components/pwa/splash-screen.tsx` is a server-rendered, no-client-JS
+overlay (`/splash_screen.jpg` plus a "Welcome to Mou3amla" tagline) that
+covers Android, which - unlike iOS's `apple-touch-startup-image` - has no
+manifest field for a custom launch image. A pure-CSS animation
+(`mou3amla-splash-out` in `globals.css`) fades it out ~1.1s after paint with
+no hydration-timing dependency.
+
+It must only flash once per real app launch, not once per screen. The auth
+handoff (`/` -> `/verify` -> `/home`) uses server-side `redirect()`, and each
+redirect is a brand-new document load that remounts `RootLayout` - without
+gating, the splash would replay on every one of those steps. `RootLayout`
+reads a `mou3amla-splash-seen` cookie (via `next/headers` `cookies()`) and
+skips rendering `<SplashScreen />` once it's set; the splash component itself
+sets that cookie via an inline `<script>` the instant it mounts. It's a
+session cookie (no `Max-Age`) rather than `localStorage`, on purpose: closing
+and reopening the installed PWA ends that browser session, which is exactly
+when the launch splash should be allowed to reappear.
+
 ## Install prompt
 
 `src/components/pwa/install-prompt.tsx` handles the `beforeinstallprompt`

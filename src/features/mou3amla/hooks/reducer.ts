@@ -43,5 +43,6 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
     activityLog: initialUser?.activityLog ?? [],
     notifications: initialUser?.notifications ?? [],
     invoices: initialUser?.invoices ?? [],
+    highlightedActivityId: null,
   };
 }

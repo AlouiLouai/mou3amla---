@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
+import { NEARBY_CODE_TTL_MS } from "@/features/payments/constants";
 import { roundCoord } from "@/features/payments/lib/geolocation";
-import { getQrTokenSecret, mintQrToken } from "@/features/payments/lib/qr-token";
+import { generateNearbyCode } from "@/features/payments/lib/nearby-code";
 import { withRouteErrorHandling } from "@/lib/api-handler";
+import { logger } from "@/lib/logger";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,18 +28,17 @@ type ExistingHandoffRow = {
   expires_at: string;
 };
 
-function generateChallengeCode(): string {
-  return Math.floor(Math.random() * 1000)
-    .toString()
-    .padStart(3, "0");
-}
-
 export const POST = withRouteErrorHandling(async (request: Request) => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
 
   if (authError || !authData?.claims?.sub) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const withinLimit = await checkRateLimit(`nearby-publish:${authData.claims.sub}`, { max: 20, windowSeconds: 60 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many requests. Please wait a moment and try again." }, { status: 429 });
   }
 
   const body = await request.json().catch(() => null);
@@ -87,49 +88,72 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     });
   }
 
-  await admin.from("nearby_handoffs").delete().eq("owner_user_id", userId);
-  await admin.from("nearby_handoffs").delete().lt("expires_at", nowIso);
+  // No longer sweeping *other* owners' globally-expired rows here (it used
+  // to: `delete().lt("expires_at", nowIso)` with no owner filter). That sweep
+  // wasn't actually needed for this owner's own row - the upsert below
+  // replaces it in place via onConflict regardless of whether it was
+  // expired - but deleting a *different* owner's expired row fired a
+  // Realtime DELETE event on *their* subscription, which their client
+  // correctly-but-wrongly treated as "my match was cancelled" and blanked
+  // their screen back to "---" well before their own rotation was due
+  // (whenever anyone else happened to call publish). A stray challenge_code
+  // collision with an old, expired-but-undeleted row from another owner is
+  // still handled below by retrying with a fresh code.
+  //
+  // `owner_user_id` carries a unique index (one row per owner) - the old
+  // delete-then-insert here raced two concurrent publish calls for the same
+  // owner (React Strict Mode's double-effect-invocation in dev reproduced it
+  // on every single mount): both would delete, then both try to insert, and
+  // whichever inserted second hit a unique-constraint violation and 500'd.
+  // A single atomic upsert keyed on that same unique index removes the race
+  // window entirely - Postgres serializes concurrent upserts on a conflict
+  // target instead of one of them erroring.
+  let insertedRow: { challenge_code: string; expires_at: string } | null = null;
+  let lastError: { code?: string } | null = null;
 
-  let challengeCode = generateChallengeCode();
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const { data: collision } = await admin
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const challengeCode = generateNearbyCode();
+    const { data, error } = await admin
       .from("nearby_handoffs")
-      .select("id")
-      .eq("challenge_code", challengeCode)
-      .gt("expires_at", nowIso)
-      .limit(1)
-      .maybeSingle();
+      .upsert(
+        {
+          owner_user_id: profile.id,
+          challenge_code: challengeCode,
+          status: "published",
+          payer_user_id: null,
+          owner_accepted_at: null,
+          payer_accepted_at: null,
+          expires_at: new Date(Date.now() + NEARBY_CODE_TTL_MS).toISOString(),
+          ...geo,
+        },
+        { onConflict: "owner_user_id" },
+      )
+      .select("challenge_code, expires_at")
+      .single<{ challenge_code: string; expires_at: string }>();
 
-    if (!collision) {
+    if (!error && data) {
+      insertedRow = data;
       break;
     }
 
-    challengeCode = generateChallengeCode();
+    lastError = error;
+    // Only a challenge_code collision (a different owner already holds that
+    // exact code) is worth retrying with a fresh random code - any other
+    // error means retrying blindly would just fail the same way again.
+    if (error?.code !== "23505") {
+      break;
+    }
   }
 
-  const qrToken = mintQrToken({
-    recipientUserId: profile.id,
-    recipientUsername: profile.username,
-    secret: getQrTokenSecret(),
-  });
-
-  const { error: insertError } = await admin.from("nearby_handoffs").insert({
-    owner_user_id: profile.id,
-    signed_token: qrToken.token,
-    challenge_code: challengeCode,
-    status: "published",
-    expires_at: new Date(Date.now() + QR_TOKEN_TTL_MS).toISOString(),
-    ...geo,
-  });
-
-  if (insertError) {
+  if (!insertedRow) {
+    logger.error("Failed to publish nearby handoff", lastError, { userId });
     return NextResponse.json({ message: "We couldn't publish a nearby code right now." }, { status: 500 });
   }
 
   return NextResponse.json({
     handoff: {
-      code: challengeCode,
-      expiresAt: Date.now() + QR_TOKEN_TTL_MS,
+      code: insertedRow.challenge_code,
+      expiresAt: new Date(insertedRow.expires_at).getTime(),
       status: "published",
       ownerAccepted: false,
       payerAccepted: false,

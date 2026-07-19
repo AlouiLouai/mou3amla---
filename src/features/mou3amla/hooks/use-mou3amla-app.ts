@@ -45,11 +45,14 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
 
   // Delivers "payment received" (and any other) notification the instant it's
   // inserted, instead of only on the next full page load - see
-  // use-realtime-notifications.ts.
+  // use-realtime-notifications.ts. A payment_received event also carries the
+  // recipient's own Activity row (embedded in the notification's metadata at
+  // write time), so the recipient can jump straight to Activity and see it
+  // highlighted, the same moment the sender does.
   useRealtimeNotifications(
     state.profile.id,
     useCallback(
-      (notification) => {
+      ({ notification, activity }) => {
         dispatch((s) => {
           if (s.notifications.some((item) => item.id === notification.id)) {
             return null;
@@ -58,13 +61,30 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
         });
 
         if (notification.type === "payment_received") {
-          toast.success(notification.title, { description: notification.body });
+          // The sender could only reach this point because both accounts are
+          // identity-verified: linking a source destination requires the
+          // sender's own verification_status === "verified", and this
+          // recipient's own verified status is what let createPaymentIntent
+          // accept them in the first place. A real enforced guarantee, not a
+          // trust claim invented for the toast.
+          toast.success(notification.title, {
+            description: `${notification.body} Routed between two identity-verified Mou3amla accounts.`,
+          });
+
+          if (activity) {
+            dispatch((s) => ({
+              activityLog: s.activityLog.some((item) => item.id === activity.id) ? s.activityLog : [activity, ...s.activityLog],
+              screen: "activity",
+              highlightedActivityId: activity.id,
+            }));
+          }
         }
       },
       [dispatch],
     ),
   );
 
+  const clearActivityHighlight = useCallback(() => dispatch({ highlightedActivityId: null }), []);
   const goHome = useCallback(() => dispatch({ screen: "home", linkOpen: false, payerMatch: null }), []);
   const goAccounts = useCallback(() => dispatch({ screen: "accounts" }), []);
   const goActivity = useCallback(() => dispatch({ screen: "activity" }), []);
@@ -128,6 +148,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       linkProvider: PROVIDERS.find((provider) => provider.id === state.linkProviderId) ?? null,
     },
     actions: {
+      clearActivityHighlight,
       goHome,
       goAccounts,
       goActivity,

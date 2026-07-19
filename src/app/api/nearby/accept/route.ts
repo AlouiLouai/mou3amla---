@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildNearbyMatchPayload, loadNearbyMatchByCode, type NearbyHandoffRow } from "@/features/payments/server/nearby-match";
+import { NEARBY_CODE_REGEX } from "@/features/payments/lib/nearby-code";
+import { withRouteErrorHandling } from "@/lib/api-handler";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 const acceptSchema = z.object({
-  code: z.string().regex(/^\d{3}$/),
+  code: z.string().regex(NEARBY_CODE_REGEX),
 });
 
-export async function POST(request: Request) {
+export const POST = withRouteErrorHandling(async (request: Request) => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
 
@@ -17,13 +20,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = authData.claims.sub;
+
+  const withinLimit = await checkRateLimit(`nearby-accept:${userId}`, { max: 20, windowSeconds: 60 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many attempts. Please wait a moment and try again." }, { status: 429 });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = acceptSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ message: "Enter a valid 3-digit nearby code." }, { status: 400 });
+    return NextResponse.json({ message: "Enter a valid nearby code." }, { status: 400 });
   }
 
-  const userId = authData.claims.sub;
   const lookup = await loadNearbyMatchByCode(parsed.data.code, userId);
   if ("error" in lookup) {
     const status = lookup.error === "forbidden" ? 403 : 404;
@@ -51,4 +60,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ match: await buildNearbyMatchPayload(updated, lookup.role) });
-}
+});

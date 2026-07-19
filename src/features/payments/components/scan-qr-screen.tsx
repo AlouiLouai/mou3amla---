@@ -8,11 +8,24 @@ import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { NEARBY_OPTIONS_REFRESH_MS } from "@/features/payments/constants";
 import { useQrCameraScanner } from "@/features/payments/hooks/use-qr-camera-scanner";
+import { useNow } from "@/hooks/use-now";
+
+function NearbyCountdown({ expiresAt }: { expiresAt: number }) {
+  const now = useNow(1000);
+  const secondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+
+  return (
+    <div className="font-mono text-[13px] font-bold" style={{ color: mou3amla.accent }}>
+      {secondsLeft}s
+    </div>
+  );
+}
 
 export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { state, derived, actions } = mou3amlaApp;
-  const { loadNearbyOptions, submitNearbyOption, acceptPayerMatch, cancelPayerMatch, startNearbyMatchPolling, submitScannedToken } = actions;
+  const { loadNearbyOptions, submitNearbyOption, acceptPayerMatch, cancelPayerMatch, expirePayerMatch, startNearbyRealtime, submitScannedToken } = actions;
   const [mode, setMode] = useState<HandoffMode>(state.initialHandoffMode);
   const payerMatch = state.payerMatch;
   const header = (
@@ -20,14 +33,36 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   );
   const footer = renderAppFooter("scan-qr", actions);
 
+  // The owner's code rotates every QR_TOKEN_TTL_MS (60s) on its own timer,
+  // unsynced with when the payer happened to load this screen - a one-shot
+  // fetch here would silently go stale (showing a code that already
+  // rotated away) until the payer noticed and tapped "Refresh" manually.
+  // Re-polling well inside that 60s window keeps it current on its own.
   useEffect(() => {
-    if (mode === "nearby") loadNearbyOptions();
-  }, [mode, loadNearbyOptions]);
+    if (mode !== "nearby" || payerMatch) return;
+
+    loadNearbyOptions();
+    const interval = setInterval(loadNearbyOptions, NEARBY_OPTIONS_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [mode, payerMatch, loadNearbyOptions]);
 
   useEffect(() => {
     if (mode !== "nearby") return;
-    return startNearbyMatchPolling("payer");
-  }, [mode, startNearbyMatchPolling]);
+    return startNearbyRealtime("payer");
+  }, [mode, startNearbyRealtime]);
+
+  // Realtime only reacts to a write (claim/accept/cancel) - a match nobody
+  // acts on just goes stale past its own expiresAt with no event to catch.
+  useEffect(() => {
+    if (!payerMatch) return;
+    const remaining = payerMatch.expiresAt - Date.now();
+    if (remaining <= 0) {
+      expirePayerMatch();
+      return;
+    }
+    const timeout = setTimeout(expirePayerMatch, remaining);
+    return () => clearTimeout(timeout);
+  }, [payerMatch, expirePayerMatch]);
 
   const {
     videoRef,
@@ -40,7 +75,7 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
       <div className="mb-3">
         <div className="text-[15px] font-black tracking-tight">Find the recipient</div>
         <div className="text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-          Scan their signed QR, or use the nearby 3-digit code instead, AirDrop-style.
+          Scan their signed QR, or use the nearby code instead, AirDrop-style.
         </div>
       </div>
       <HandoffModeToggle mode={mode} onChange={setMode} />
@@ -114,7 +149,7 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
               <div>
                 <div className="text-[12px] font-black">Nearby match</div>
                 <div className="text-[10.5px] font-medium" style={{ color: mou3amla.textMuted }}>
-                  Ask the recipient which 3 digits they see, then pick it here. Uses your
+                  Ask the recipient which code they see, then pick it here. Uses your
                   approximate location, if allowed, to only show codes nearby.
                 </div>
               </div>
@@ -135,9 +170,17 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
 
           {payerMatch ? (
             <div className="rounded-[20px] border bg-white p-4" style={{ borderColor: mou3amla.border }}>
-              <div className="flex items-center gap-2">
-                <HandCoins className="size-4.5" style={{ color: mou3amla.accent }} />
-                <span className="text-[13px] font-black">Matched code {payerMatch.code}</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <HandCoins className="size-4.5" style={{ color: mou3amla.accent }} />
+                  <span className="text-[13px] font-black">Matched code {payerMatch.code}</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: mou3amla.textFaint }}>
+                    Expires
+                  </div>
+                  <NearbyCountdown expiresAt={payerMatch.expiresAt} />
+                </div>
               </div>
               <p className="mt-1.5 mb-3 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
                 Both phones vibrated - confirm on your side too. The recipient reveals once you both accept.
@@ -167,7 +210,7 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
                   key={code}
                   type="button"
                   onClick={() => submitNearbyOption(code)}
-                  className="rounded-[20px] border bg-white px-4 py-4 text-center font-mono text-[1.4rem] font-black tracking-[0.24em] transition-transform active:scale-[0.98]"
+                  className="rounded-[20px] border bg-white px-2 py-4 text-center font-mono text-[1.15rem] font-black tracking-[0.1em] transition-transform active:scale-[0.98]"
                   style={{ borderColor: mou3amla.borderStrong, color: mou3amla.hero }}
                 >
                   {code}

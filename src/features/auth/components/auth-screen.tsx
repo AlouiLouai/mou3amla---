@@ -136,7 +136,7 @@ export function AuthScreen() {
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[15px] font-black transition-opacity disabled:opacity-60"
               style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
             >
-              <span>{pending ? "Preparing passkey..." : "Continue to passkey"}</span>
+              <span>{pending ? "Preparing passkey..." : "Sign in"}</span>
               <ArrowRight className="size-4" />
             </button>
           </form>

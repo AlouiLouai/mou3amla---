@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getQrTokenSecret, isQrTokenExpired, verifyQrToken } from "@/features/payments/lib/qr-token";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
 import { withRouteErrorHandling } from "@/lib/api-handler";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,6 +27,11 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
   const { data: authData, error: authError } = await supabase.auth.getClaims();
   if (authError || !authData?.claims?.sub) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const withinLimit = await checkRateLimit(`qr-resolve:${authData.claims.sub}`, { max: 20, windowSeconds: 60 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many attempts. Please wait a moment and try again." }, { status: 429 });
   }
 
   if (!rawToken) {

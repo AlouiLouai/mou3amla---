@@ -7,11 +7,27 @@
 // the thing that makes a splash screen actually work on Android, where the
 // Web App Manifest spec has no field for a custom launch image the way iOS's
 // apple-touch-startup-image does.
+//
+// The auth handoff (`/` -> `/verify` -> `/home`) uses server-side redirects,
+// each of which is a brand-new document load - so RootLayout, and this
+// component with it, remounts on every one of those steps too. Gating on a
+// session cookie (set the instant this mounts, read by RootLayout on the
+// next request) keeps it to one real flash per launch instead of once per
+// redirect. It's deliberately a session cookie (no Max-Age) rather than
+// localStorage: closing/reopening the installed PWA ends that browser
+// session, which is exactly when the launch splash should be allowed to
+// reappear.
 export function SplashScreen() {
   return (
     <div aria-hidden className="mou3amla-splash">
       {/* eslint-disable-next-line @next/next/no-img-element -- full-bleed static launch asset, not an optimizable content image */}
       <img src="/splash_screen.jpg" alt="" className="mou3amla-splash-image" />
+      <p className="mou3amla-splash-tagline">Welcome to Mou3amla</p>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.cookie="mou3amla-splash-seen=1;path=/;SameSite=Lax";`,
+        }}
+      />
     </div>
   );
 }

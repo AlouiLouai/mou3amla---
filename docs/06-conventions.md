@@ -272,12 +272,17 @@ external API) follows the same `xUnsafe` + wrapper split - see
   both weak and a real collision risk against `payment_transactions.ref_id`'s
   unique constraint - don't reintroduce a non-cryptographic ID generator for
   anything that ends up as a unique, user-facing payment reference.
-- No idempotency key exists yet for payment-intent creation - a duplicated
-  network request could create two transaction rows with two different
-  `ref_id`s. Acceptable for now because Mou3amla is explicitly zero-liability
-  (no real settlement happens here, see "Mocked vs. real boundaries" below),
-  but this becomes a real requirement the moment a real TUNPAY handoff can
-  actually move money - don't forget it when that integration happens.
+- **Duplicate-submission guard**: before inserting, `createPaymentIntentUnsafe`
+  looks for an existing `payment_transactions` row from the same
+  (sender, destination, recipient, amount) tuple created within the last
+  `DUPLICATE_SUBMIT_WINDOW_MS` (10s) and reuses it instead of writing a
+  second row + a second pair of notifications - a double-tap or a
+  slow-network retry from the send screen is otherwise indistinguishable
+  from two separate intentional sends. This is a same-request dedupe, not a
+  client-supplied idempotency key - fine for Mou3amla's zero-liability model
+  (see "Mocked vs. real boundaries" below), but a real TUNPAY handoff that
+  can actually move money would want a proper client-generated idempotency
+  key instead of a time-window heuristic.
 - `payment_transactions`/`notifications` inserts are unit-tested in
   `src/features/payments/server/actions.test.ts` - covering validation,
   session/rate-limit checks, self-transfer and unverified-recipient
@@ -312,15 +317,36 @@ external API) follows the same `xUnsafe` + wrapper split - see
   `/api/nearby/accept` independently; only once both are accepted does status
   become `confirmed` and `/api/nearby/status` starts returning the recipient.
   Do not shortcut this back to a one-sided reveal.
-- Both sides poll `/api/nearby/status` (via `startNearbyMatchPolling` in
-  `use-mou3amla-app.ts`) rather than using Realtime - this handshake's state
-  lives across two different users' requests to a stateless API route, not a
-  single table row a client can subscribe to the way notifications does, so
-  polling still matches this flow's shape better. (Supabase Realtime *is*
-  available in this repo now - see "Payments conventions" above - so "no
-  realtime infra" is no longer the reason to default to polling; judge each
-  new case on its own shape.) If you need lower latency here, reduce
-  `NEARBY_POLL_INTERVAL_MS` before reaching for new infra.
+- **Both sides get status/accept updates over Supabase Realtime, not a
+  poll.** `startNearbyRealtime` (`use-qr-nearby-actions.ts`) subscribes to
+  `postgres_changes` UPDATE and DELETE events on `public.nearby_handoffs`,
+  filtered separately by `owner_user_id=eq.<me>` and `payer_user_id=eq.<me>`
+  (a participant can be either, and Postgres Changes filters are single-column
+  equality, so it takes two `.on()` registrations on one channel rather than
+  one `OR` filter). Enabled via `alter publication supabase_realtime add
+  table public.nearby_handoffs` plus a `nearby_handoffs_select_participant`
+  RLS policy (migration `20260719130000_profiles_column_grants_and_nearby_realtime.sql`).
+  DELETE events need `replica identity full` on the table (migration
+  `20260719130100_nearby_handoffs_replica_identity_full.sql`) - the default
+  replica identity only includes the primary key in a delete's old-row
+  image, which isn't enough for Realtime to evaluate the
+  owner_user_id/payer_user_id filter, so a cancel would otherwise never
+  reach the other participant.
+  - The raw row carries no recipient identity - `buildNearbyMatchPayload`
+    still resolves and returns the counterparty's profile server-side, only
+    once `status` is `"confirmed"`. Don't add a column to
+    `nearby_handoffs` that would leak identity pre-reveal: this table now
+    ships to a Realtime broadcast, and column-level SELECT grants do **not**
+    protect against that (logical replication ships the whole physical row,
+    independent of PostgREST grants) - `signed_token` used to be exactly
+    this kind of leak (a signed-but-not-encrypted JWT-like token embedding
+    the owner's userId + username, write-only and never actually read by
+    anything) and was removed for that reason.
+  - Realtime only fires on a write. A match nobody acts on just goes stale
+    past its own `expiresAt` with no event at all - the owner side self-heals
+    within `QR_TOKEN_TTL_MS` via its own publish rotation, but the payer has
+    no equivalent, so `expirePayerMatch` + a client-side `setTimeout` in
+    `scan-qr-screen.tsx` is what recovers a payer stuck on a gone-stale match.
 - Proximity itself is still simulated via the shared code, not real
   Bluetooth (guardrail #11). The one added sensory cue is
   `navigator.vibrate(...)` on state transitions (matched, then confirmed),
@@ -347,9 +373,74 @@ Read this before "fixing" something that looks incomplete:
   resolve recipient data.
 - **BLE proximity** is still a visual simulation; web PWAs cannot act as BLE
   advertisers. The current app simulates "nearby" discovery with a short
-  server-backed 3-digit handoff code plus signed recipient payloads.
+  server-backed 3-digit handoff code, with recipient identity resolved and
+  returned server-side only after both sides mutually accept.
 - **`lib/el-fatoora.ts` stamp duty** remains a placeholder until the user
   confirms the current legal amount.
+- **Invoices are derived, not separately persisted.** `getCurrentAppUser`
+  (`src/features/auth/server/dal.ts`) computes the current user's `invoices`
+  from their own sent `payment_transactions` rows (already fetched for
+  `activityLog`) rather than reading from a dedicated table - so they survive
+  a page reload without needing new schema. There is currently no way for an
+  account to actually become "Mode Professionnel" (`UserProfile.isProfessional`
+  is hardcoded `false` in `reducer.ts` and nothing ever flips it) - the
+  Invoices screen is reachable from the bottom nav regardless and will show
+  real, durable invoice data once it has any sent transactions, but the
+  professional-mode gate itself is unwired. Don't build on the assumption
+  that `isProfessional` reflects anything real until that's addressed.
+
+## Security hardening
+
+- **Rate limiting covers every abuse-prone route, not just send-money.**
+  `/api/nearby/claim` (8/30s per user), `/api/nearby/accept` (20/60s per
+  user), and `/api/qr/mint` (15/60s per user) all call `checkRateLimit`
+  (`src/lib/rate-limit.ts`), same as `createPaymentIntent` and
+  `/api/users/search`. `claim` in particular guards a 3-digit (000-999)
+  challenge code - without a tight per-user cap, a script could exhaust the
+  whole keyspace well inside the code's own TTL. New abuse-prone routes
+  (anything that mutates state, resolves identity, or is cheap to call
+  repeatedly) should get a `checkRateLimit` call before doing real work -
+  see guardrail #19 in
+  [07-agent-guardrails.md](./07-agent-guardrails.md).
+- **RLS restricts rows; column-level GRANTs restrict columns - both matter.**
+  `profiles_update_own` (RLS) only checks `auth.uid() = id`, saying nothing
+  about *which* columns a signed-in user could set. Supabase's default
+  project privileges grant table-wide UPDATE to `authenticated`, so without
+  an explicit column grant, any signed-in user could call PostgREST directly
+  (`PATCH /rest/v1/profiles?id=eq.<own-id>` with
+  `{"verification_status":"verified"}`) and self-approve their own KYC -
+  bypassing the entire demo verification flow, using nothing but the public
+  anon key and their own session. Migration
+  `20260719130000_profiles_column_grants_and_nearby_realtime.sql` revokes
+  table-wide UPDATE on `public.profiles` from `authenticated` and grants it
+  back only for `display_name`. The app itself never writes to `profiles`
+  this way (every write goes through the service-role admin client), so this
+  is pure hardening with no behavior change - if you ever add a
+  self-service profile edit that needs a new column writable by the user
+  directly, extend the column grant explicitly rather than reverting to a
+  blanket `grant update on public.profiles`.
+- **`src/lib/logger.ts` redacts by key, not by value.** Any context key
+  matching phone/routing_value/rib/credential/public_key/challenge/token/
+  secret/password (case-insensitive substring) gets replaced with
+  `"[redacted]"` before the line is emitted, recursively through nested
+  objects/arrays. This is deliberately broad (it'll redact things like a
+  WebAuthn `credentialId` that aren't secrets, just to be safe) - the
+  intent is that no future log call can accidentally leak PII/routing data
+  just by including it in a context object, without needing every call site
+  to remember to redact it manually. See `src/lib/logger.test.ts`.
+- **`next.config.ts` sets a Content-Security-Policy** (in addition to the
+  pre-existing `X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy`).
+  It's the non-nonce variant (`script-src`/`style-src` include
+  `'unsafe-inline'`) rather than a `proxy.ts`-issued per-request nonce,
+  because nonce-based CSP requires forcing every page into dynamic
+  rendering - a bigger structural change than this demo-stage app's CSP
+  warrants right now. `connect-src` explicitly allow-lists the Supabase
+  project host (`https://*.supabase.co` and `wss://*.supabase.co`) so the
+  browser client (auth, Realtime websockets) isn't blocked. If a future
+  need for a stricter `script-src` (no `'unsafe-inline'`) comes up, follow
+  Next's own nonce guide
+  (`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`)
+  rather than hand-rolling it.
 
 ## Shell layout conventions
 

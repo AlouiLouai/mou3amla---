@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { IBM_Plex_Mono, Plus_Jakarta_Sans, Syne } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
@@ -54,11 +55,14 @@ export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const splashAlreadySeen = cookieStore.get("mou3amla-splash-seen")?.value === "1";
+
   return (
     <html
       lang={siteConfig.locale}
@@ -72,7 +76,7 @@ export default function RootLayout({
             <InstallPrompt />
             <NetworkStatusToast />
             <Toaster />
-            <SplashScreen />
+            {!splashAlreadySeen && <SplashScreen />}
           </ThemeProvider>
         </SerwistProvider>
       </body>

@@ -38,6 +38,7 @@ export interface NearbyMatchState {
   status: NearbyMatchStatus;
   ownerAccepted: boolean;
   payerAccepted: boolean;
+  expiresAt: number;
 }
 
 export interface ConfettiPiece {

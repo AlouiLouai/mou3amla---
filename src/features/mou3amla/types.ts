@@ -73,4 +73,7 @@ export interface Mou3amlaState {
   activityLog: ActivityItem[];
   notifications: NotificationItem[];
   invoices: Invoice[];
+  /** The Activity row to briefly colorize after landing on that screen from
+   * a just-sent or just-received payment - cleared a few seconds later. */
+  highlightedActivityId: string | null;
 }

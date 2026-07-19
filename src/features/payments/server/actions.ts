@@ -48,6 +48,8 @@ type NotificationInsertRow = {
   created_at: string;
 };
 
+const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
+
 const sendPaymentSchema = z.object({
   sourceWalletId: z.string().uuid(),
   recipientUsername: z
@@ -152,73 +154,129 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     return { ok: false, message: "That recipient hasn't linked a destination yet." };
   }
 
-  const refId = generateRefId();
-  const { data: transaction, error: insertError } = await admin
+  // A double-tap or a slow-network retry from the same screen resubmits the
+  // exact same (sender, destination, recipient, amount) tuple within seconds
+  // - reuse that row instead of writing a second transaction + a second pair
+  // of notifications for what was really one user action.
+  const { data: recentDuplicate } = await admin
     .from("payment_transactions")
-    .insert({
-      ref_id: refId,
-      sender_user_id: senderProfile.id,
-      recipient_user_id: recipient.id,
-      sender_destination_id: sourceWallet.id,
-      recipient_destination_id: recipientDestination.id,
-      amount: parsed.data.amount,
-      recipient_username: recipient.username,
-      recipient_display_name: recipient.display_name,
-      status: "initiated",
-      metadata: {
-        sender_display_name: senderProfile.display_name,
-        sender_username: senderProfile.username,
-        sender_wallet_name: sourceWallet.name,
-        recipient_wallet_name: recipientDestination.name,
-      },
-    })
     .select("id, ref_id, amount, created_at")
-    .single<TransactionInsertRow>();
+    .eq("sender_user_id", senderProfile.id)
+    .eq("recipient_user_id", recipient.id)
+    .eq("sender_destination_id", sourceWallet.id)
+    .eq("amount", parsed.data.amount)
+    .gte("created_at", new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<TransactionInsertRow>();
 
-  if (insertError || !transaction) {
-    return { ok: false, message: "We couldn't save this payment route yet. Please retry." };
+  let transaction: TransactionInsertRow;
+  let notificationRows: NotificationInsertRow[];
+
+  if (recentDuplicate) {
+    transaction = recentDuplicate;
+    const { data: existingNotifications } = await admin
+      .from("notifications")
+      .select("id, user_id, type, title, body, unread, created_at")
+      .eq("transaction_id", transaction.id);
+    notificationRows = (existingNotifications ?? []) as NotificationInsertRow[];
+  } else {
+    const refId = generateRefId();
+    const { data: inserted, error: insertError } = await admin
+      .from("payment_transactions")
+      .insert({
+        ref_id: refId,
+        sender_user_id: senderProfile.id,
+        recipient_user_id: recipient.id,
+        sender_destination_id: sourceWallet.id,
+        recipient_destination_id: recipientDestination.id,
+        amount: parsed.data.amount,
+        recipient_username: recipient.username,
+        recipient_display_name: recipient.display_name,
+        status: "initiated",
+        metadata: {
+          sender_display_name: senderProfile.display_name,
+          sender_username: senderProfile.username,
+          sender_wallet_name: sourceWallet.name,
+          recipient_wallet_name: recipientDestination.name,
+        },
+      })
+      .select("id, ref_id, amount, created_at")
+      .single<TransactionInsertRow>();
+
+    if (insertError || !inserted) {
+      return { ok: false, message: "We couldn't save this payment route yet. Please retry." };
+    }
+    transaction = inserted;
+
+    const senderNotificationDraft = {
+      user_id: senderProfile.id,
+      actor_user_id: recipient.id,
+      transaction_id: transaction.id,
+      type: "payment_sent" as const,
+      title: "Intent TUNPAY cree",
+      body: `Votre paiement vers @${recipient.username} a ete route a TUNPAY.`,
+      unread: true,
+      // Must be present (even if empty) alongside recipientNotificationDraft:
+      // a bulk .insert([a, b]) builds one INSERT from the union of both
+      // objects' keys, and sends an explicit NULL - not "use the column
+      // default" - for whichever row is missing a key present on the other.
+      // `metadata` is NOT NULL, so omitting it here made the *entire*
+      // 2-row insert fail with a not-null violation, silently dropping the
+      // recipient's payment_received row (and with it, their Realtime
+      // notification and Activity redirect) along with this one.
+      metadata: {},
+    };
+
+    const recipientNotificationDraft = {
+      user_id: recipient.id,
+      actor_user_id: senderProfile.id,
+      transaction_id: transaction.id,
+      type: "payment_received" as const,
+      title: "Intent de paiement recu",
+      body: `@${senderProfile.username} a prepare ${parsed.data.amount.toFixed(3)} DT a votre attention.`,
+      unread: true,
+      // Carries enough to build the recipient's own Activity row client-side
+      // the instant this notification arrives over Realtime, without a
+      // second round-trip - see useRealtimeNotifications.
+      metadata: {
+        activity: {
+          id: transaction.id,
+          refId: transaction.ref_id,
+          type: "receive" as const,
+          counterparty: senderProfile.display_name,
+          counterpartyHandle: `@${senderProfile.username}`,
+          wallet: recipientDestination.name,
+          amount: parsed.data.amount,
+          date: formatActivityDate(transaction.created_at),
+          status: "initiated" as const,
+        },
+      },
+    };
+
+    const { data: inserted2, error: notificationError } = await admin
+      .from("notifications")
+      .insert([senderNotificationDraft, recipientNotificationDraft])
+      .select("id, user_id, type, title, body, unread, created_at");
+
+    // The payment route itself already committed above - a notification-insert
+    // failure must not report the whole intent as failed (the client would show
+    // an error and the transaction row would silently exist anyway, inviting a
+    // duplicate retry). Log it and fall back to locally-built notification data
+    // below; the in-app notification is a nice-to-have, not the source of truth.
+    if (notificationError) {
+      logger.error("Failed to insert payment notifications", notificationError, { transactionId: transaction.id });
+    }
+
+    notificationRows = (inserted2 ?? []) as NotificationInsertRow[];
   }
 
-  const senderNotificationDraft = {
-    user_id: senderProfile.id,
-    actor_user_id: recipient.id,
-    transaction_id: transaction.id,
-    type: "payment_sent" as const,
-    title: "Intent TUNPAY cree",
-    body: `Votre paiement vers @${recipient.username} a ete route a TUNPAY.`,
-    unread: true,
-  };
-
-  const recipientNotificationDraft = {
-    user_id: recipient.id,
-    actor_user_id: senderProfile.id,
-    transaction_id: transaction.id,
-    type: "payment_received" as const,
-    title: "Intent de paiement recu",
-    body: `@${senderProfile.username} a prepare ${parsed.data.amount.toFixed(3)} DT a votre attention.`,
-    unread: true,
-  };
-
-  const { data: notificationRows, error: notificationError } = await admin
-    .from("notifications")
-    .insert([senderNotificationDraft, recipientNotificationDraft])
-    .select("id, user_id, type, title, body, unread, created_at");
-
-  // The payment route itself already committed above - a notification-insert
-  // failure must not report the whole intent as failed (the client would show
-  // an error and the transaction row would silently exist anyway, inviting a
-  // duplicate retry). Log it and fall back to locally-built notification data
-  // below; the in-app notification is a nice-to-have, not the source of truth.
-  if (notificationError) {
-    logger.error("Failed to insert payment notifications", notificationError, { transactionId: transaction.id });
-  }
-
-  const senderNotificationRow = ((notificationRows ?? []) as NotificationInsertRow[]).find((row) => row.user_id === senderProfile.id);
+  const senderNotificationRow = notificationRows.find((row) => row.user_id === senderProfile.id);
   const senderNotification: NotificationItem = {
     id: senderNotificationRow?.id ?? transaction.id,
-    type: senderNotificationRow?.type ?? senderNotificationDraft.type,
-    title: senderNotificationRow?.title ?? senderNotificationDraft.title,
-    body: senderNotificationRow?.body ?? senderNotificationDraft.body,
+    type: senderNotificationRow?.type ?? "payment_sent",
+    title: senderNotificationRow?.title ?? "Intent TUNPAY cree",
+    body: senderNotificationRow?.body ?? `Votre paiement vers @${recipient.username} a ete route a TUNPAY.`,
     unread: senderNotificationRow?.unread ?? true,
     createdAt: senderNotificationRow?.created_at ?? transaction.created_at,
   };

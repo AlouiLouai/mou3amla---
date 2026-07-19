@@ -35,6 +35,7 @@ function makeFrom(queue: unknown[]) {
         return builder;
       },
       eq: () => builder,
+      gte: () => builder,
       order: () => builder,
       limit: () => builder,
       maybeSingle: () => Promise.resolve(result),
@@ -147,6 +148,7 @@ describe("createPaymentIntent", () => {
   });
 
   it("creates the transaction and both notifications on success", async () => {
+    const noDuplicate = { data: null, error: null };
     const notificationRows = {
       data: [
         { id: "notif-sender", user_id: SENDER_ID, type: "payment_sent", title: "t1", body: "b1", unread: true, created_at: "2026-07-18T10:00:00.000Z" },
@@ -154,7 +156,15 @@ describe("createPaymentIntent", () => {
       ],
       error: null,
     };
-    const { admin, calls } = makeFakeAdmin([senderRow, sourceWalletRow, recipientRow, recipientDestinationRow, transactionRow, notificationRows]);
+    const { admin, calls } = makeFakeAdmin([
+      senderRow,
+      sourceWalletRow,
+      recipientRow,
+      recipientDestinationRow,
+      noDuplicate,
+      transactionRow,
+      notificationRows,
+    ]);
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
 
     const result = await createPaymentIntent(VALID_INPUT);
@@ -174,6 +184,7 @@ describe("createPaymentIntent", () => {
       sourceWalletRow,
       recipientRow,
       recipientDestinationRow,
+      { data: null, error: null },
       transactionRow,
       { data: null, error: { message: "insert failed" } },
     ]);
@@ -184,6 +195,41 @@ describe("createPaymentIntent", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected ok result");
     expect(result.senderNotification.type).toBe("payment_sent");
+  });
+
+  it("reuses a recent duplicate transaction instead of inserting a second one (double-submit guard)", async () => {
+    const existingNotifications = {
+      data: [
+        {
+          id: "notif-sender",
+          user_id: SENDER_ID,
+          type: "payment_sent",
+          title: "t1",
+          body: "b1",
+          unread: true,
+          created_at: "2026-07-18T10:00:00.000Z",
+        },
+      ],
+      error: null,
+    };
+    const { admin, calls } = makeFakeAdmin([
+      senderRow,
+      sourceWalletRow,
+      recipientRow,
+      recipientDestinationRow,
+      transactionRow,
+      existingNotifications,
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await createPaymentIntent(VALID_INPUT);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok result");
+    expect(result.intent.id).toBe("tx-1");
+
+    const insertCall = calls.find((call) => call.table === "payment_transactions" && call.op === "insert");
+    expect(insertCall).toBeUndefined();
   });
 
   it("never throws - unexpected errors are caught and reported as a friendly message", async () => {
