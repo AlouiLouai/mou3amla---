@@ -208,7 +208,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
   }
 
   const profile = toAppProfile(data);
-  const [walletsResult, transactionsResult, notificationsResult] = await Promise.all([
+  const [walletsResult, transactionsResult, notificationsResult, passkeysResult] = await Promise.all([
     admin
       .from("linked_destinations")
       .select("id, provider_id, name, network, color, initials, routing_type, routing_value, is_default, created_at")
@@ -226,6 +226,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
       .eq("user_id", identity.userId)
       .order("created_at", { ascending: false })
       .limit(40),
+    admin.from("passkeys").select("id", { count: "exact", head: true }).eq("user_id", identity.userId),
   ]);
 
   const wallets = ((walletsResult.data ?? []) as LinkedDestinationRow[]).map(toLinkedWallet);
@@ -271,6 +272,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
     activityLog,
     notifications,
     invoices,
+    passkeyCount: passkeysResult.count ?? 0,
   };
 }
 

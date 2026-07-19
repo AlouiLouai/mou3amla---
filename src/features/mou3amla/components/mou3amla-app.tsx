@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { ContactsScreen } from "@/features/mou3amla/components/contacts-screen";
 import { HomeScreen } from "@/features/mou3amla/components/home-screen";
 import { mou3amla } from "@/features/mou3amla/constants";
 import { useMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
@@ -64,9 +65,9 @@ export function Mou3amlaApp({ initialUser }: { initialUser: InitialMou3amlaUser 
       className="mou3amla-viewport-h w-full overflow-hidden font-sans antialiased"
       style={{ background: mou3amla.bg, color: mou3amla.text }}
     >
-      <div className="mou3amla-viewport-h mx-auto flex w-full max-w-md overflow-hidden px-0 sm:min-h-0 sm:py-3">
+      <div className="mou3amla-viewport-h mx-auto flex w-full max-w-sm overflow-hidden px-0 sm:min-h-0 sm:py-3">
         <div
-          className="mou3amla-viewport-h relative flex flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
+          className="mou3amla-shell-h relative flex flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
           style={{
             background: mou3amla.surface,
             boxShadow: "0 16px 42px rgba(0,0,0,0.5), 0 8px 18px rgba(0,0,0,0.4)",
@@ -87,6 +88,7 @@ export function Mou3amlaApp({ initialUser }: { initialUser: InitialMou3amlaUser 
             style={{ contain: "layout paint style" }}
           >
             {screen === "home" && <HomeScreen mou3amlaApp={mou3amlaApp} />}
+            {screen === "contacts" && <ContactsScreen mou3amlaApp={mou3amlaApp} />}
             {screen === "generate-intent" && <GenerateIntentScreen mou3amlaApp={mou3amlaApp} />}
             {screen === "receive-qr" && <ReceiveQrScreen mou3amlaApp={mou3amlaApp} />}
             {screen === "scan-qr" && <ScanQrScreen mou3amlaApp={mou3amlaApp} />}

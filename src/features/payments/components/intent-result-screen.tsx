@@ -14,7 +14,12 @@ export function IntentResultScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaAp
 
   const sourceWallet = derived.account.wallets.find((w) => w.id === intent.sourceWalletId);
   const header = (
-    <AppHeader profile={derived.account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+    <AppHeader
+      profile={derived.account.profile}
+      unreadNotifications={derived.unreadNotifications}
+      onNotifications={actions.goNotifications}
+      onScan={() => actions.goScanQr()}
+    />
   );
   const footer = renderAppFooter("intent-result", actions);
 

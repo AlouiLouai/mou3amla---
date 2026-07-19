@@ -1,12 +1,21 @@
-// Server-rendered, no client JS involved: the CSS animation (see
-// `mou3amla-splash-out` in globals.css) hides this after a fixed delay on its
-// own. Doing it in pure CSS instead of a mounted-state effect means it paints
-// on the very first frame of every fresh document load (App Router
-// navigations inside the mou3amla shell don't reload the document, so this only
-// ever appears once per real launch) with no hydration-timing dependency -
-// the thing that makes a splash screen actually work on Android, where the
-// Web App Manifest spec has no field for a custom launch image the way iOS's
+import { LogoLockup } from "@/features/mou3amla/components/logo-lockup";
+
+// Server-rendered, no client JS involved beyond the inline cookie-setting
+// script: the CSS animation (see `mou3amla-splash-out` in globals.css) hides
+// this after a fixed delay on its own. Doing it in pure CSS instead of a
+// mounted-state effect means it paints on the very first frame of every
+// fresh document load (App Router navigations inside the mou3amla shell
+// don't reload the document, so this only ever appears once per real
+// launch) with no hydration-timing dependency - the thing that makes a
+// splash screen actually work on Android, where the Web App Manifest spec
+// has no field for a custom launch image the way iOS's
 // apple-touch-startup-image does.
+//
+// Reuses the exact same logo lockup as the auth screen (LogoLockup) instead
+// of the static /splash_screen.jpg asset, so the very first thing a user
+// sees is pixel-consistent with the sign-in screen right after it, rather
+// than a separately-authored image that can drift out of sync with the
+// theme.
 //
 // The auth handoff (`/` -> `/verify` -> `/home`) uses server-side redirects,
 // each of which is a brand-new document load - so RootLayout, and this
@@ -20,9 +29,7 @@
 export function SplashScreen() {
   return (
     <div aria-hidden className="mou3amla-splash">
-      {/* eslint-disable-next-line @next/next/no-img-element -- full-bleed static launch asset, not an optimizable content image */}
-      <img src="/splash_screen.jpg" alt="" className="mou3amla-splash-image" />
-      <p className="mou3amla-splash-tagline">Welcome to Mou3amla</p>
+      <LogoLockup />
       <script
         dangerouslySetInnerHTML={{
           __html: `document.cookie="mou3amla-splash-seen=1;path=/;SameSite=Lax";`,

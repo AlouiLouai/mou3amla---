@@ -127,7 +127,7 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
             type="button"
             onClick={actions.submitManualScanCode}
             disabled={!state.scanManualInput.trim()}
-            className="rounded-2xl py-3.5 text-[15px] font-bold transition-opacity disabled:opacity-40"
+            className="w-full rounded-2xl py-3.5 text-center text-[15px] font-bold transition-opacity disabled:opacity-40"
             style={{ background: mou3amla.accent, color: "#FFFFFF" }}
           >
             Continue

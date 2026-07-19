@@ -41,4 +41,5 @@ export interface AuthenticatedAppUser {
   activityLog: ActivityItem[];
   notifications: NotificationItem[];
   invoices: Invoice[];
+  passkeyCount: number;
 }

@@ -1,4 +1,5 @@
 import { Activity, CircleUserRound, Home, Send } from "lucide-react";
+import { useScrollCompact } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import type { Screen } from "@/features/mou3amla/types";
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
 ] as const;
 
 export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: BottomNavProps) {
+  const compact = useScrollCompact();
   const handlers = {
     home: onHome,
     "generate-intent": onSend,
@@ -28,14 +30,14 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: Bot
 
   return (
     <div
-      className="flex justify-center px-3 pt-2 pb-[max(0.95rem,env(safe-area-inset-bottom))]"
+      className="flex justify-center px-9 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))]"
       style={{ background: "linear-gradient(180deg, transparent, #000000 60%)" }}
     >
       <div
-        className="w-full overflow-hidden rounded-[28px] border p-2 backdrop-blur-xl"
-        style={{ background: "rgba(18,18,18,0.92)", borderColor: mou3amla.border, boxShadow: cardShadow, maxWidth: "480px" }}
+        className="overflow-hidden rounded-[22px] border p-1 backdrop-blur-xl"
+        style={{ background: "rgba(18,18,18,0.66)", borderColor: mou3amla.border, boxShadow: cardShadow }}
       >
-        <div className="flex min-w-max gap-1">
+        <div className="flex gap-1">
           {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
             const onClick = handlers[key];
             const isActive = active === key;
@@ -46,15 +48,18 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: Bot
                 type="button"
                 onClick={onClick}
                 aria-label={label}
-                className="flex flex-1 flex-col items-center gap-1 rounded-[20px] px-3 py-2 transition-[background-color,transform] duration-200 active:scale-[0.97]"
+                className="flex items-center justify-center rounded-[16px] transition-[background-color,padding,transform] duration-300 ease-out active:scale-[0.97]"
                 style={{
-                  minWidth: "76px",
+                  padding: compact ? "0.5rem 0.55rem" : "0.6rem 0.85rem",
                   background: isActive ? alpha(mou3amla.accent, 0.11) : "transparent",
                   color: isActive ? mou3amla.accent : mou3amla.textFaint,
                 }}
               >
-                <Icon className="size-[18px] shrink-0" strokeWidth={isActive ? 2.5 : 2} />
-                <span className="text-[10px] font-black whitespace-nowrap">{label}</span>
+                <Icon
+                  className="shrink-0 transition-[width,height] duration-300 ease-out"
+                  style={{ width: compact ? "16px" : "19px", height: compact ? "16px" : "19px" }}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
               </button>
             );
           })}

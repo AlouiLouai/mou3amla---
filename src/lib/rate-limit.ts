@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 
 /**
  * Atomic fixed-window rate limit backed by `public.check_rate_limit` (see
@@ -22,7 +23,7 @@ export async function checkRateLimit(key: string, options: { max: number; window
   });
 
   if (error) {
-    console.error("[rate-limit] check failed, failing open", error);
+    logger.error("Rate limit check failed, failing open", error, { key });
     return true;
   }
 

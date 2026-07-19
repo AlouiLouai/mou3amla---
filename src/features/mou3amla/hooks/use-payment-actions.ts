@@ -40,7 +40,7 @@ export function usePaymentActions({
   );
 
   const keypadBackspace = useCallback(() => dispatch((s) => ({ amount: s.amount.slice(0, -1) })), [dispatch]);
-  const quickAmount5 = useCallback(() => dispatch({ amount: "5" }), [dispatch]);
+  const setQuickAmount = useCallback((amount: number) => dispatch({ amount: String(amount) }), [dispatch]);
   const clearAmount = useCallback(() => dispatch({ amount: "" }), [dispatch]);
 
   const generateIntent = useCallback(() => {
@@ -171,7 +171,7 @@ export function usePaymentActions({
     selectRecipient,
     keypadPress,
     keypadBackspace,
-    quickAmount5,
+    setQuickAmount,
     clearAmount,
     generateIntent,
     doneIntent,

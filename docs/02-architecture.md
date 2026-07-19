@@ -23,11 +23,15 @@ src/
   features/
     mou3amla/                # Authenticated shell: screen router, shared reducer,
                            # dashboard, bottom nav, shell-level theme tokens
-      components/         # includes shell primitives like screen-frame.tsx
+      components/         # includes shell primitives like screen-frame.tsx,
+                           # plus home-screen.tsx and contacts-screen.tsx (the
+                           # "quick send" full-list screen, derived from the
+                           # activity log - not a real contacts table)
       hooks/
       constants.ts
       types.ts
-      mark.tsx
+      mark.tsx            # OG-image icon generator source, not the in-app logo
+      logo-lockup.tsx      # the actual "m" + wordmark shown on splash/auth
 
     auth/                 # Stage 1 + Stage 2 auth UX and server logic
       components/         # auth-screen.tsx, passkey-screen.tsx
@@ -132,11 +136,25 @@ interaction state, and shared shell chrome such as the bottom nav. Auth,
 wallets, notifications, profile, invoices, and payments still keep their own
 domain code in their feature folders.
 
-The shell now uses a reusable frame pattern: header and footer/tab chrome are
-always fixed - they never move, resize, or hide - while each screen's central
-content pane is the only scrollable region. That shared behavior belongs in
+The shell now uses a reusable frame pattern: header and footer/tab chrome
+stay pinned to the top/bottom of the shell - they never scroll away or get
+covered - while each screen's central content pane is the only scrollable
+region. That shared behavior belongs in
 `src/features/mou3amla/components/screen-frame.tsx` instead of being
-reimplemented ad hoc per screen.
+reimplemented ad hoc per screen. Pinned is not the same as static: the bottom
+nav does visually react to that scroll (see below) without ever leaving its
+fixed position or being scrolled offscreen.
+
+`ScreenFrame` also exposes scroll direction via a small context
+(`useScrollCompact`, exported from `screen-frame.tsx`) so the footer it
+renders can react to it without prop-drilling through every screen's
+`renderAppFooter(...)` call site - the footer node is built by each screen
+before being handed to `ScreenFrame` as a plain prop, so `ScreenFrame` is the
+only place that actually sees the scroll events. `BottomNav`
+(`bottom-nav.tsx`) is the one consumer today: it shrinks its tab icons/
+padding on scroll-down and restores them on scroll-up or near the top,
+Instagram-style. This is a visual response to scrolling, not the frame
+structure moving - the nav's position never changes.
 
 Every full-page screen in the authenticated shell (home, send, receive, scan,
 intent result, activity, invoices, profile, notifications) shares the exact
@@ -148,8 +166,9 @@ their own header; use `src/features/mou3amla/components/app-header.tsx`
 `src/features/mou3amla/components/bottom-nav.tsx` instead. Screen-specific
 context (a title, a subtitle) belongs as the first thing in the *scrollable
 body*, not in the fixed header. `ScreenFrame`'s `footer` prop is a plain
-`ReactNode` rendered `absolute` at the bottom of the shell - it does not hide,
-shrink, or otherwise react to scrolling. Sheets/overlays like
+`ReactNode` rendered `absolute` at the bottom of the shell; it never hides or
+leaves that position, though (per above) `BottomNav` specifically does resize
+its own contents in response to scroll direction. Sheets/overlays like
 `WalletRegistrySheet` are not full-page screens and stay exempt from this
 pattern.
 

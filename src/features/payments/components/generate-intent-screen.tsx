@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Delete, Loader2, Send, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Delete, Loader2, ScanLine, Send, ShieldCheck, TriangleAlert, Users, X } from "lucide-react";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -31,6 +31,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
       profile={account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
+      onScan={() => actions.goScanQr()}
       onBack={actions.goHome}
     />
   );
@@ -71,72 +72,108 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         </div>
       ) : null}
 
-      <div className="mb-3 grid grid-cols-2 gap-2.5">
-        <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
-            FROM
-          </div>
-          <div
-            className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border px-2 py-2"
-            style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
-          >
-            {derived.supportedSendWallets.map((wallet) => {
-              const selected = wallet.id === state.sendSourceWalletId;
-              return (
-                <button
-                  key={wallet.id}
-                  type="button"
-                  onClick={() => actions.selectSendSource(wallet.id)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 transition-colors"
-                  style={{
-                    background: selected ? alpha(wallet.color, 0.16) : "transparent",
-                    borderColor: selected ? wallet.color : mou3amla.border,
-                  }}
+      <div className="mb-3">
+        <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
+          FROM
+        </div>
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border px-2 py-2"
+          style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
+        >
+          {derived.supportedSendWallets.map((wallet) => {
+            const selected = wallet.id === state.sendSourceWalletId;
+            return (
+              <button
+                key={wallet.id}
+                type="button"
+                onClick={() => actions.selectSendSource(wallet.id)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 transition-colors"
+                style={{
+                  background: selected ? alpha(wallet.color, 0.16) : "transparent",
+                  borderColor: selected ? wallet.color : mou3amla.border,
+                }}
+              >
+                <div
+                  className="flex size-4 items-center justify-center rounded-full text-[8px] font-extrabold"
+                  style={{ background: alpha(wallet.color, 0.16), color: wallet.color }}
                 >
-                  <div
-                    className="flex size-4 items-center justify-center rounded-full text-[8px] font-extrabold"
-                    style={{ background: alpha(wallet.color, 0.16), color: wallet.color }}
-                  >
-                    <WalletIcon id={wallet.providerId} initials={wallet.initials} className="size-[9px]" />
-                  </div>
-                  <span className="whitespace-nowrap text-[11px] font-semibold" style={{ color: selected ? mou3amla.text : mou3amla.textMuted }}>
-                    {wallet.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  <WalletIcon id={wallet.providerId} initials={wallet.initials} className="size-[9px]" />
+                </div>
+                <span className="whitespace-nowrap text-[11px] font-semibold" style={{ color: selected ? mou3amla.text : mou3amla.textMuted }}>
+                  {wallet.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
+      </div>
 
-        <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
-            TO
-          </div>
-          <div
-            className="flex items-center gap-1.5 rounded-2xl border px-3 py-2"
-            style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
-          >
-            <span className="font-mono text-[14px]" style={{ color: mou3amla.accent }}>
-              @
-            </span>
-            <input
-              value={state.recipientInput.replace(/^@/, "")}
-              onChange={(e) => actions.onRecipientChange(e.target.value)}
-              placeholder="username"
-              className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13.5px] outline-none"
-              style={{ color: mou3amla.text }}
-            />
-            <button
-              type="button"
-              onClick={() => actions.goScanQr()}
-              aria-label="Scan QR"
-              className="flex size-6 shrink-0 items-center justify-center rounded-full"
-              style={{ background: alpha(mou3amla.accent, 0.1), color: mou3amla.accent }}
-            >
-              <Camera className="size-3.5" />
-            </button>
-          </div>
+      <div className="mb-3">
+        <div className="mb-2 text-[11px] font-semibold tracking-wide" style={{ color: mou3amla.textMuted }}>
+          TO
         </div>
+        <div
+          className="flex items-center gap-1.5 rounded-2xl border px-3 py-2"
+          style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
+        >
+          <span className="font-mono text-[14px]" style={{ color: mou3amla.accent }}>
+            @
+          </span>
+          <input
+            value={state.recipientInput.replace(/^@/, "")}
+            onChange={(e) => actions.onRecipientChange(e.target.value)}
+            placeholder="username"
+            className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13.5px] outline-none"
+            style={{ color: mou3amla.text }}
+          />
+          <button
+            type="button"
+            onClick={() => actions.goScanQr()}
+            aria-label="Scan QR"
+            className="flex size-6 shrink-0 items-center justify-center rounded-full"
+            style={{ background: alpha(mou3amla.accent, 0.1), color: mou3amla.accent }}
+          >
+            <ScanLine className="size-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+        {derived.recentContacts.length > 0 ? (
+          derived.recentContacts.map((contact) => {
+            const selected = state.recipientInput === contact.username;
+            return (
+              <button
+                key={contact.handle}
+                type="button"
+                onClick={() => actions.onRecipientChange(contact.username)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5"
+                style={{
+                  background: selected ? alpha(mou3amla.accent, 0.12) : mou3amla.card,
+                  borderColor: selected ? mou3amla.accent : mou3amla.border,
+                }}
+              >
+                <div
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-black text-white"
+                  style={{ background: contact.color }}
+                >
+                  {contact.initials}
+                </div>
+                <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: mou3amla.text }}>
+                  @{contact.username}
+                </span>
+              </button>
+            );
+          })
+        ) : (
+          <div
+            className="flex w-full items-center gap-2 rounded-2xl border border-dashed px-3 py-2.5 text-[11px] font-semibold"
+            style={{ borderColor: mou3amla.borderStrong, color: mou3amla.textFaint }}
+          >
+            <Users className="size-3.5 shrink-0" />
+            No one yet - send your first payment and they&apos;ll show up here for quick pick.
+          </div>
+        )}
       </div>
 
       {searchEnabled && (isSearching || recipientResults.length > 0) ? (
@@ -230,14 +267,19 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             </button>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={actions.quickAmount5}
-          className="mt-3 rounded-full border px-3.5 py-1.5 text-xs font-bold"
-          style={{ color: mou3amla.accent, background: alpha(mou3amla.accent, 0.1), borderColor: alpha(mou3amla.accent, 0.3) }}
-        >
-          +5 DT quick
-        </button>
+        <div className="mt-3 flex items-center gap-2">
+          {[5, 10, 20].map((quick) => (
+            <button
+              key={quick}
+              type="button"
+              onClick={() => actions.setQuickAmount(quick)}
+              className="rounded-full border px-3.5 py-1.5 text-xs font-bold"
+              style={{ color: mou3amla.accent, background: alpha(mou3amla.accent, 0.1), borderColor: alpha(mou3amla.accent, 0.3) }}
+            >
+              +{quick} DT
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="my-4 grid grid-cols-3 gap-2">
@@ -258,11 +300,11 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         type="button"
         onClick={actions.generateIntent}
         disabled={!canGenerate}
-        aria-label="Send via TUNPAY"
-        className="mx-auto flex size-16 items-center justify-center rounded-full transition-opacity disabled:opacity-40"
+        className="flex w-full items-center justify-center gap-2 rounded-full py-4 text-[14px] font-black transition-opacity disabled:opacity-40"
         style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
       >
-        {state.isSendingPayment ? <Loader2 className="size-6 animate-spin" /> : <Send className="size-6" />}
+        {state.isSendingPayment ? <Loader2 className="size-4.5 animate-spin" /> : <Send className="size-4.5" />}
+        Send via TUNPAY
       </button>
     </ScreenFrame>
   );

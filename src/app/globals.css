@@ -213,13 +213,32 @@
   opacity: 0;
 }
 
-/* min-height: 100dvh with a 100vh fallback for browsers that don't parse the
-   dvh unit (older Android WebViews, older Samsung Internet) - those browsers
-   drop an unrecognized-unit declaration entirely, so without the fallback the
-   shell would collapse to auto height instead of filling the viewport. */
+/* A capped `height` (100dvh, with a 100vh fallback for browsers that don't
+   parse the dvh unit - older Android WebViews, older Samsung Internet, which
+   drop an unrecognized-unit declaration entirely). This must stay `height`,
+   not `min-height`: these wrappers need a fixed box so their overflow-hidden
+   actually clips, leaving only the inner `.mou3amla-scroll` div (see
+   ScreenFrame) free to scroll - a `min-height` here let the box grow with
+   its content instead, which pushed scrolling up to the whole page. */
 .mou3amla-viewport-h {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Same fixed-height behavior on mobile, but on desktop (>=640px, where the
+   app renders as a centered, padded phone frame instead of full-bleed) this
+   needs to shrink to fit inside its padded parent rather than force its own
+   100dvh and get clipped - `sm:min-h-0` on the element pairs with this to
+   make that shrink-to-fit actually work in a flex layout. */
+.mou3amla-shell-h {
+  height: 100vh;
+  height: 100dvh;
+}
+
+@media (min-width: 640px) {
+  .mou3amla-shell-h {
+    height: auto;
+  }
 }
 
 .mou3amla-scroll {
@@ -331,27 +350,6 @@
   animation: mou3amla-splash-out 1.4s ease forwards;
 }
 
-.mou3amla-splash-image {
-  max-height: 42%;
-  max-width: 62%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
-
-.mou3amla-splash-tagline {
-  position: absolute;
-  top: calc(50% + 21%);
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--font-syne);
-  font-weight: 600;
-  font-size: 1rem;
-  letter-spacing: 0.01em;
-  color: #0095f6;
-  white-space: nowrap;
-}
-
 @keyframes mou3amla-fadeup {
   from {
     opacity: 0;
@@ -360,6 +358,28 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Brand mark entrance - a small playful overshoot-and-settle pop, used by
+   LogoLockup (shared verbatim between the splash screen and the auth
+   screen). Kept as pure CSS (not JS-timed) so it plays correctly on the
+   splash screen's server-rendered, no-hydration-dependency first paint. */
+@keyframes mou3amla-mark-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) rotate(2deg);
+  }
+  80% {
+    transform: scale(0.97) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
   }
 }
 

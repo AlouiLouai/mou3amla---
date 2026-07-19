@@ -39,16 +39,39 @@ scale) badge for `purpose: "maskable"` icons.
 
 ## Cross-device viewport height
 
-Six top-level screen shells (`mou3amla-app.tsx`, `auth-screen.tsx`,
-`passkey-screen.tsx`, `verification-flow-screen.tsx`) size themselves with the
-`.mou3amla-viewport-h` CSS class (`src/app/globals.css`) instead of Tailwind's
-`min-h-[100dvh]` arbitrary value. That class declares `min-height: 100vh`
-*then* `min-height: 100dvh` as two separate rules: browsers that don't
-recognize the `dvh` unit (older Android WebViews, older Samsung Internet)
-silently drop only the second, unrecognized declaration and keep the `100vh`
-fallback, instead of dropping the whole rule and collapsing the shell to
-`auto` height. Use `mou3amla-viewport-h` for any new full-height screen shell
-instead of reaching for `min-h-[100dvh]` directly.
+Full-height screen shells size themselves with two CSS classes in
+`src/app/globals.css` instead of Tailwind's `min-h-[100dvh]` arbitrary value -
+both declare `height: 100vh` *then* `height: 100dvh` as two separate rules:
+browsers that don't recognize the `dvh` unit (older Android WebViews, older
+Samsung Internet) silently drop only the second, unrecognized declaration and
+keep the `100vh` fallback, instead of dropping the whole rule and collapsing
+the shell to `auto` height.
+
+- **`.mou3amla-viewport-h`** - a plain, unconditional `height` cap. Used by
+  the two outer wrapper `div`s in `mou3amla-app.tsx` (the body-level
+  full-bleed wrapper and the flex row that centers the phone frame on
+  desktop), and by the standalone pre-authenticated screens
+  (`auth-screen.tsx`, `passkey-screen.tsx`, `verification-flow-screen.tsx`),
+  which don't own an internal scroller and rely on normal page-level scroll
+  if their content ever exceeds one viewport.
+- **`.mou3amla-shell-h`** - the same fixed height on mobile, but at `>=640px`
+  (desktop, where the app renders as a centered, padded phone frame instead
+  of full-bleed) it switches to `height: auto` so the shell can shrink to fit
+  inside its padded parent instead of forcing its own 100dvh and getting
+  clipped. Used only by the innermost phone-frame `div` in `mou3amla-app.tsx`
+  - the one that also carries `overflow-hidden` and `sm:min-h-0`. This is
+  deliberately a *fixed*, not `min-height`, box: `ScreenFrame`'s internal
+  `.mou3amla-scroll` div is what should scroll, and that only works if this
+  shell has a capped height for its own `overflow-hidden` to actually clip
+  against - a `min-height` here let the box grow with its content instead,
+  handing scroll to the whole page and dragging the fixed header/bottom nav
+  along with it. If the mobile shell ever appears to page-scroll instead of
+  keeping header/nav fixed, check this class first.
+
+Use `mou3amla-viewport-h` for any new full-height standalone screen (auth-like
+flows without their own internal scroller); use `mou3amla-shell-h` only for a
+shell that, like the authenticated app frame, owns its own internal
+scrolling region and needs desktop shrink-to-fit behavior.
 
 ## Service worker (Serwist, Turbopack-native)
 
@@ -93,9 +116,8 @@ curl -I http://localhost:3000/serwist/sw.js   # should be 200
 ## Launch splash screen
 
 `src/components/pwa/splash-screen.tsx` is a server-rendered, no-client-JS
-overlay (`/splash_screen.jpg` plus a "Welcome to Mou3amla" tagline) that
-covers Android, which - unlike iOS's `apple-touch-startup-image` - has no
-manifest field for a custom launch image. A pure-CSS animation
+overlay that covers Android, which - unlike iOS's `apple-touch-startup-image`
+- has no manifest field for a custom launch image. A pure-CSS animation
 (`mou3amla-splash-out` in `globals.css`) fades it out ~1.1s after paint with
 no hydration-timing dependency.
 
@@ -110,11 +132,19 @@ session cookie (no `Max-Age`) rather than `localStorage`, on purpose: closing
 and reopening the installed PWA ends that browser session, which is exactly
 when the launch splash should be allowed to reappear.
 
-The overlay background (`.mou3amla-splash` in `globals.css`) and tagline
-color follow the current dark palette (`#000000` / accent blue). The
-`/splash_screen.jpg` file itself is a static binary asset, not something a
-code change can restyle - if it still has a light background baked in from
-the previous theme, it needs a replacement image to actually match.
+The splash content is `src/features/mou3amla/components/logo-lockup.tsx`
+(`LogoLockup`) - the "m" badge + "mou3amla" wordmark, with an optional
+tagline - rendered with no `tagline` prop here. This is the same component
+the auth screen (`auth-screen.tsx`) renders with a tagline, so the very first
+and very last pre-authenticated things a user sees are pixel-identical; there
+is no longer a separate static splash image asset. `LogoLockup`'s entrance
+(mark pops in, then the wordmark, then the tagline if present) is pure CSS
+(`mou3amla-mark-in` / `mou3amla-fadeup` in `globals.css`, driven by inline
+`animation` styles with staggered delays) so it plays correctly on the
+splash's server-rendered first paint - no JS timing dependency - and is
+already covered by the global `prefers-reduced-motion: reduce` override.
+Pass `animate={false}` to render it statically if a future placement needs
+that (none currently do).
 
 ## Install prompt
 
@@ -144,12 +174,13 @@ something useful instead of a browser error.
 
 The in-app shell intentionally behaves like a compact native container:
 
-- the header zone is fixed per screen - it never scrolls, hides, or resizes
-- the bottom navigation rail is fixed over the content pane at all times - no
-  auto-hide, no compacting on scroll, no `translateY` animation
+- the header zone is fixed per screen - it never scrolls or leaves its
+  position
+- the bottom navigation rail is fixed over the content pane at all times - it
+  never scrolls away, hides, or changes position
 - only the central content pane scrolls
 
-That layout is owned entirely by
+That fixed positioning is owned entirely by
 `src/features/mou3amla/components/screen-frame.tsx`, not by individual screens:
 it measures the footer's real height via `ResizeObserver` into a
 `--mou3amla-bottomnav-h` CSS variable so the scrollable content always reserves
@@ -158,3 +189,14 @@ across devices. Do not reimplement scroll/sticky handling per screen — extend
 `screen-frame.tsx` instead. Supporting CSS lives in `src/app/globals.css`. If
 a screen starts scrolling edge-to-edge again, or the header/nav stop staying
 fixed on any mobile browser, treat that as a regression.
+
+**Fixed position is not the same as static appearance.** `BottomNav`
+(`bottom-nav.tsx`) reads scroll direction from `ScreenFrame` via the
+`useScrollCompact` context (`screen-frame.tsx` tracks `scrollTop` on the
+content pane's own scroll handler and exposes a boolean through a Provider
+wrapped around the footer) and shrinks its tab icons/padding on scroll-down,
+restoring them on scroll-up or near the top of the pane - an Instagram-style
+compacting effect, done by resizing the nav's own contents with a CSS
+`transition`, not by moving, hiding, or `translateY`-animating the nav
+itself. The nav's own `position`/placement never changes; only its rendered
+size does.

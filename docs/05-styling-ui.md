@@ -106,7 +106,7 @@ App events use `sonner` through the shadcn wrapper in
 - Toasts render `top-center` with a safe-area-aware offset
   (`max(1rem, env(safe-area-inset-top))`) rather than sonner's default
   `bottom-right`. This is deliberate: the bottom nav in the authenticated
-  shell floats over content and slides in/out on scroll (see
+  shell floats over content at all times (see
   [03-pwa.md](./03-pwa.md#mobile-shell-behavior)), so a bottom-anchored toast
   would visually collide with it. Don't move toasts back to the bottom
   without also accounting for that.

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut } from "lucide-react";
+import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut, Share2, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
-import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { statusToneColor } from "@/features/mou3amla/status-tone";
 
@@ -35,15 +36,22 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
   const verification = verificationTone(account.profile.verificationStatus, account.profile.kycProviderStatus === "Demo Approved");
   const footer = renderAppFooter("profile", actions);
 
+  const copyInviteLink = () => {
+    const link = `mou3amla.app/u/${account.profile.username}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(link);
+    }
+    toast.success("Invite link copied", { description: link });
+  };
+
   return (
     <ScreenFrame footer={footer} contentClassName="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
         <div className="mb-4 rounded-[28px] border px-5 py-5" style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}>
           <div className="mb-4 flex items-center gap-4">
-            <div
-              className="flex size-16 items-center justify-center rounded-full border text-lg font-black"
-              style={{ background: mou3amla.cardAlt, borderColor: alpha(mou3amla.accent, 0.18), color: mou3amla.accent }}
-            >
-              {initials || "SQ"}
+            <div className="flex size-16 shrink-0 items-center justify-center rounded-full p-[2.5px]" style={{ background: igGradient }}>
+              <div className="flex size-full items-center justify-center rounded-full text-lg font-black text-white" style={{ background: mou3amla.hero }}>
+                {initials || "SQ"}
+              </div>
             </div>
 
             <div className="min-w-0 flex-1">
@@ -68,9 +76,10 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2">
+        <div className="mb-4 grid grid-cols-3 gap-2">
           <InfoTile label="Destinations" value={String(account.wallets.length)} />
-          <InfoTile label="Unread alerts" value={String(derived.unreadNotifications)} />
+          <InfoTile label="Payments" value={String(account.activityLog.length)} />
+          <InfoTile label="Unread" value={String(derived.unreadNotifications)} />
         </div>
 
         <div className="mb-4 flex flex-col gap-2">
@@ -79,6 +88,11 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
             icon={<Landmark className="size-4" style={{ color: mou3amla.accent }} />}
             label="Identity verification"
             value={account.profile.verificationStatus}
+          />
+          <InfoRow
+            icon={<ShieldCheck className="size-4" style={{ color: mou3amla.accent }} />}
+            label="Passkeys & security"
+            value={`${account.profile.passkeyCount} device${account.profile.passkeyCount === 1 ? "" : "s"}`}
           />
           <ActionCard
             icon={<Bell className="size-4" style={{ color: mou3amla.accent }} />}
@@ -93,6 +107,28 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
             onClick={actions.goHome}
           />
         </div>
+
+        <button
+          type="button"
+          onClick={copyInviteLink}
+          className="mb-4 w-full rounded-[22px] p-[1.5px] text-left"
+          style={{ background: igGradient }}
+        >
+          <div className="flex items-center justify-between gap-3 rounded-[20.5px] px-4 py-3.5" style={{ background: mou3amla.card }}>
+            <span className="flex items-center gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full" style={{ background: alpha(mou3amla.accent, 0.12) }}>
+                <Share2 className="size-4" style={{ color: mou3amla.accent }} />
+              </span>
+              <span>
+                <span className="block text-[13px] font-black">Invite friends</span>
+                <span className="block text-[10.5px] font-semibold" style={{ color: mou3amla.textMuted }}>
+                  Share your @username, get paid faster
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="size-4 shrink-0" style={{ color: mou3amla.textFaint }} />
+          </div>
+        </button>
 
         <form action="/auth/logout" method="post">
           <button
@@ -164,6 +200,23 @@ function ActionCard({
         {value} <ChevronRight className="size-3.5" />
       </span>
     </button>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div
+      className="flex items-center justify-between rounded-[22px] border px-4 py-3"
+      style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
+    >
+      <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+        {icon}
+        {label}
+      </span>
+      <span className="text-xs font-bold" style={{ color: mou3amla.textFaint }}>
+        {value}
+      </span>
+    </div>
   );
 }
 

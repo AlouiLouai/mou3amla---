@@ -25,6 +25,7 @@ export default async function HomePage(props: HomePageProps) {
         activityLog: user.activityLog,
         notifications: user.notifications,
         invoices: user.invoices,
+        passkeyCount: user.passkeyCount,
         initialScreen: highlightedActivity ? "activity" : "home",
         highlightedActivityId: highlightedActivity?.id ?? null,
       }}

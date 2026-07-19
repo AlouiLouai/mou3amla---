@@ -77,8 +77,11 @@ export function useRealtimeNotifications(userId: string, onNotification: (event:
       .subscribe((status, err) => {
         if (tornDown) return;
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          // Always worth knowing about, even in production - a silent drop
+          // here means "payment received" toasts stop arriving live with no
+          // other signal.
           console.error(`[realtime-notifications] subscription ${status}`, err);
-        } else {
+        } else if (process.env.NODE_ENV !== "production") {
           console.log(`[realtime-notifications] subscription ${status}`);
         }
       });

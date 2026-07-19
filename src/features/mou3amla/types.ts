@@ -11,6 +11,7 @@ export type Screen =
   | "home"
   | "wallet-registry"
   | "accounts"
+  | "contacts"
   | "generate-intent"
   | "receive-qr"
   | "scan-qr"
@@ -29,6 +30,7 @@ export interface UserProfile {
   verificationStatus: VerificationStatus;
   kycProviderStatus?: string | null;
   matriculeFiscal?: string;
+  passkeyCount: number;
 }
 
 export interface InitialMou3amlaUser {
@@ -43,6 +45,7 @@ export interface InitialMou3amlaUser {
   activityLog: ActivityItem[];
   notifications: NotificationItem[];
   invoices: Invoice[];
+  passkeyCount: number;
   initialScreen?: Screen;
   highlightedActivityId?: string | null;
 }

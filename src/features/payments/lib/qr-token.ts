@@ -2,11 +2,27 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { serverEnv } from "@/config/env.server";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import type { QrToken } from "@/features/payments/types";
+import { logger } from "@/lib/logger";
 const QR_TOKEN_VERSION = "sqd1";
+
+// Logged at most once per server process, not once per QR mint/verify call -
+// this can fire on every request in a misconfigured environment, and a
+// warning that spams the log on every payment is one nobody reads.
+let warnedAboutMissingSecret = false;
 
 /** Falls back to the service-role key only because no dedicated secret was configured for this MVP - set QR_TOKEN_SECRET in production so QR-token signing isn't coupled to the DB admin credential. */
 export function getQrTokenSecret(): string {
-  return serverEnv.QR_TOKEN_SECRET ?? serverEnv.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serverEnv.QR_TOKEN_SECRET) {
+    if (!warnedAboutMissingSecret) {
+      warnedAboutMissingSecret = true;
+      logger.warn(
+        "QR_TOKEN_SECRET is not set - falling back to SUPABASE_SERVICE_ROLE_KEY for QR token signing. Set a dedicated QR_TOKEN_SECRET so QR forgery-resistance isn't coupled to the DB admin credential.",
+      );
+    }
+    return serverEnv.SUPABASE_SERVICE_ROLE_KEY;
+  }
+
+  return serverEnv.QR_TOKEN_SECRET;
 }
 
 type SignedQrTokenPayload = {

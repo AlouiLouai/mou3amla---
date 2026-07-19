@@ -1,6 +1,13 @@
-import { Bell, ChevronLeft } from "lucide-react";
+import { Bell, ChevronLeft, ScanLine } from "lucide-react";
 import { alpha, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UserProfile } from "@/features/mou3amla/types";
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 // The one header every authenticated screen shares - avatar, greeting, bell.
 // Screens no longer own a bespoke back-button header; the bottom nav is the
@@ -15,11 +22,13 @@ export function AppHeader({
   profile,
   unreadNotifications,
   onNotifications,
+  onScan,
   onBack,
 }: {
   profile: UserProfile;
   unreadNotifications: number;
   onNotifications: () => void;
+  onScan?: () => void;
   onBack?: () => void;
 }) {
   const initials = profile.fullName
@@ -53,26 +62,44 @@ export function AppHeader({
           </div>
           <div className="min-w-0">
             <div className="truncate text-[13px] font-bold" style={{ color: mou3amla.text }}>
-              Hi @{profile.username}!
+              @{profile.username}
             </div>
-            <div className="truncate text-[11px] font-normal" style={{ color: mou3amla.textMuted }}>
-              Send, receive &amp; manage your routes, all here.
+            {/* Client-only clock read - server and client can legitimately
+                disagree on the hour near a boundary or across timezones, so
+                this text is allowed to differ between SSR and hydration. */}
+            <div className="truncate text-[11px] font-normal" style={{ color: mou3amla.textMuted }} suppressHydrationWarning>
+              {greeting()} — routes ready
             </div>
           </div>
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onNotifications}
-        className="relative flex size-10 shrink-0 items-center justify-center rounded-full"
-        style={{ background: alpha(mou3amla.text, 0.06) }}
-      >
-        <Bell className="size-4" style={{ color: mou3amla.text }} />
-        {unreadNotifications > 0 ? (
-          <span className="absolute top-2 right-2.5 size-1.5 rounded-full" style={{ background: mou3amla.destructive }} />
+      <div className="flex shrink-0 items-center gap-2">
+        {onScan ? (
+          <button
+            type="button"
+            onClick={() => onScan()}
+            aria-label="Scan QR"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full"
+            style={{ background: alpha(mou3amla.text, 0.06) }}
+          >
+            <ScanLine className="size-4" style={{ color: mou3amla.text }} />
+          </button>
         ) : null}
-      </button>
+
+        <button
+          type="button"
+          onClick={onNotifications}
+          aria-label="Notifications"
+          className="relative flex size-10 shrink-0 items-center justify-center rounded-full"
+          style={{ background: alpha(mou3amla.text, 0.06) }}
+        >
+          <Bell className="size-4" style={{ color: mou3amla.text }} />
+          {unreadNotifications > 0 ? (
+            <span className="absolute top-2 right-2.5 size-1.5 rounded-full" style={{ background: mou3amla.destructive }} />
+          ) : null}
+        </button>
+      </div>
     </div>
   );
 }

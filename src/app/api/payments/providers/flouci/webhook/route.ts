@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withRouteErrorHandling } from "@/lib/api-handler";
 import { verifyAndFinalizeProviderReturn } from "@/features/payments/server/provider-returns";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 async function handleWebhook(request: Request) {
   const url = new URL(request.url);
@@ -8,6 +9,16 @@ async function handleWebhook(request: Request) {
 
   if (!refId) {
     return NextResponse.json({ message: "Missing payment reference." }, { status: 400 });
+  }
+
+  // Unauthenticated (the provider's webhook and the browser's return-URL
+  // redirect both hit this with no session) - keyed by refId rather than a
+  // user id, since that's what a naive hammer/enumeration attempt would
+  // actually vary, and it's what bounds the real cost here: repeated
+  // outbound status calls to Flouci/Konnect's own API for one transaction.
+  const withinLimit = await checkRateLimit(`payment-webhook:flouci:${refId}`, { max: 20, windowSeconds: 60 });
+  if (!withinLimit) {
+    return NextResponse.json({ message: "Too many attempts. Please wait a moment and try again." }, { status: 429 });
   }
 
   const result = await verifyAndFinalizeProviderReturn("flouci", refId);

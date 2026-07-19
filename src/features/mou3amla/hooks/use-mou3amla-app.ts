@@ -11,7 +11,7 @@ import { initialState, reducer } from "@/features/mou3amla/hooks/reducer";
 import { useNotificationActions } from "@/features/mou3amla/hooks/use-notification-actions";
 import { usePaymentActions } from "@/features/mou3amla/hooks/use-payment-actions";
 import { useQrNearbyActions } from "@/features/mou3amla/hooks/use-qr-nearby-actions";
-import { getPreferredSendWalletId, getSupportedCheckoutWallets } from "@/features/mou3amla/hooks/utils";
+import { getPreferredSendWalletId, getRecentContacts, getSupportedCheckoutWallets } from "@/features/mou3amla/hooks/utils";
 import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
 
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
@@ -97,6 +97,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const goProfile = useCallback(() => dispatch({ screen: "profile" }), []);
   const goNotifications = useCallback(() => dispatch({ screen: "notifications" }), []);
   const goInvoices = useCallback(() => dispatch({ screen: "invoices" }), []);
+  const goContacts = useCallback(() => dispatch({ screen: "contacts" }), []);
   const goGenerateIntent = useCallback(() => {
     if (!stateRef.current.wallets.length) {
       toast.error("Link at least one destination account before sending money.");
@@ -158,6 +159,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     invoices: state.invoices,
   };
 
+  const allContacts = getRecentContacts(state.activityLog);
+
   return {
     state,
     derived: {
@@ -169,6 +172,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       unreadNotifications: state.notifications.filter((item) => item.unread).length,
       availableProviders: PROVIDERS.filter((provider) => !state.wallets.some((wallet) => wallet.providerId === provider.id)),
       linkProvider: PROVIDERS.find((provider) => provider.id === state.linkProviderId) ?? null,
+      recentContacts: allContacts.slice(0, 8),
+      allContacts,
     },
     actions: {
       clearActivityHighlight,
@@ -178,6 +183,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       goProfile,
       goNotifications,
       goInvoices,
+      goContacts,
       goGenerateIntent,
       goReceiveQr,
       goScanQr,

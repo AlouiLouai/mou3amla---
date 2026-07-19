@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
-import { ArrowDownLeft, ArrowUpRight, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { avatarColorFor, initialsFor } from "@/features/mou3amla/hooks/utils";
 import { statusToneColor } from "@/features/mou3amla/status-tone";
 
 const ACTIVITY_HIGHLIGHT_DURATION_MS = 3000;
+
+type ActivityFilter = "all" | "send" | "receive";
+const FILTERS: { key: ActivityFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "send", label: "Sent" },
+  { key: "receive", label: "Received" },
+];
 
 function statusTone(status: string) {
   if (status === "confirmed") {
@@ -28,11 +35,14 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
   const { state, derived, actions } = mou3amlaApp;
   const account = derived.account;
   const highlightedActivityId = state.highlightedActivityId;
+  const [filter, setFilter] = useState<ActivityFilter>("all");
+  const filteredActivity = account.activityLog.filter((item) => filter === "all" || item.type === filter);
   const header = (
     <AppHeader
       profile={account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
+      onScan={() => actions.goScanQr()}
       onBack={actions.goHome}
     />
   );
@@ -56,72 +66,75 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
           </p>
         </div>
 
-        {account.activityLog.length === 0 ? (
+        <div className="mb-3 flex items-center gap-2">
+          {FILTERS.map(({ key, label }) => {
+            const isActive = filter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFilter(key)}
+                className="rounded-full px-3.5 py-1.5 text-[11.5px] font-black transition-colors"
+                style={{
+                  background: isActive ? mou3amla.accent : mou3amla.card,
+                  color: isActive ? "#FFFFFF" : mou3amla.textMuted,
+                  border: `1px solid ${isActive ? mou3amla.accent : mou3amla.border}`,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredActivity.length === 0 ? (
           <div
             className="rounded-[24px] border p-5 text-center text-[12.5px]"
             style={{ background: mou3amla.card, borderColor: mou3amla.border, color: mou3amla.textMuted, boxShadow: cardShadow }}
           >
-            No activity yet. Your first routed payment will appear here.
+            {account.activityLog.length === 0 ? "No activity yet. Your first routed payment will appear here." : "Nothing here yet."}
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {account.activityLog.map((item) => {
+            {filteredActivity.map((item) => {
               const isSend = item.type === "send";
-              const Icon = isSend ? ArrowUpRight : ArrowDownLeft;
-              const tone = isSend ? mou3amla.accent : mou3amla.subtle;
               const status = statusTone(item.status);
-
+              const avatarColor = avatarColorFor(item.counterpartyHandle);
               const isHighlighted = item.id === highlightedActivityId;
 
               return (
                 <div
                   key={item.id}
-                  className={`rounded-[22px] border p-4 ${isHighlighted ? "mou3amla-activity-highlight" : ""}`}
+                  className={`rounded-[22px] border p-3.5 ${isHighlighted ? "mou3amla-activity-highlight" : ""}`}
                   style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: alpha(tone, 0.12) }}>
-                      <Icon className="size-4.5" style={{ color: tone }} />
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex size-11 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white"
+                      style={{ background: avatarColor }}
+                    >
+                      {initialsFor(item.counterparty)}
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-[13.5px] font-black">{isSend ? item.counterparty : `From ${item.counterparty}`}</div>
-                          <div className="mt-0.5 text-[11px] font-semibold" style={{ color: mou3amla.textMuted }}>
-                            {item.counterpartyHandle}
-                          </div>
-                        </div>
-                        <div className="font-mono text-[13px] font-bold" style={{ color: isSend ? mou3amla.accent : mou3amla.subtle }}>
+                        <div className="truncate text-[13px] font-black">{isSend ? item.counterparty : `From ${item.counterparty}`}</div>
+                        <div className="shrink-0 font-mono text-[13px] font-bold" style={{ color: isSend ? "#FFFFFF" : mou3amla.accent }}>
                           {isSend ? "-" : "+"}
                           {item.amount.toFixed(3)} DT
                         </div>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between gap-3">
-                        <div className="text-[11px]" style={{ color: mou3amla.textMuted }}>
-                          {item.wallet} - {item.date}
-                        </div>
-                        <span className="rounded-full px-2.5 py-1 text-[10px] font-black" style={{ background: status.bg, color: status.color }}>
-                          {status.label}
-                        </span>
+                      <div className="mt-0.5 truncate text-[10.5px] font-semibold" style={{ color: mou3amla.textMuted }}>
+                        {item.counterpartyHandle} · {item.wallet} · {item.date}
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <div className="font-mono text-[10px]" style={{ color: mou3amla.textFaint }}>
-                          {item.refId}
-                        </div>
-                        {/* Mou3amla only ever lets this transaction exist between two
-                            identity-verified accounts: linking a destination to send
-                            from requires the sender's own verification_status ===
-                            "verified" (see linkDestination), and createPaymentIntent
-                            separately rejects an unverified recipient - so this badge
-                            reflects a real, server-enforced guarantee, not a claim. */}
-                        <div className="flex items-center gap-1 text-[9.5px] font-bold" style={{ color: statusToneColor("positive") }}>
-                          <ShieldCheck className="size-3" />
-                          Verified parties
-                        </div>
-                      </div>
+                      <span
+                        className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[9.5px] font-black"
+                        style={{ background: status.bg, color: status.color }}
+                      >
+                        {status.label}
+                      </span>
                     </div>
                   </div>
                 </div>

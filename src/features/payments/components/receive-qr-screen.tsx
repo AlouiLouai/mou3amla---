@@ -48,7 +48,12 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
   const qrToken = state.qrToken;
   const nearbyHandoff = state.nearbyHandoff;
   const header = (
-    <AppHeader profile={derived.account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+    <AppHeader
+      profile={derived.account.profile}
+      unreadNotifications={derived.unreadNotifications}
+      onNotifications={actions.goNotifications}
+      onScan={() => actions.goScanQr()}
+    />
   );
   const footer = renderAppFooter("receive-qr", actions);
 

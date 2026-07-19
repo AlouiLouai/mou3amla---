@@ -20,7 +20,12 @@ export function AccountsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const header = (
-    <AppHeader profile={account.profile} unreadNotifications={derived.unreadNotifications} onNotifications={actions.goNotifications} />
+    <AppHeader
+      profile={account.profile}
+      unreadNotifications={derived.unreadNotifications}
+      onNotifications={actions.goNotifications}
+      onScan={() => actions.goScanQr()}
+    />
   );
   const footer = renderAppFooter("accounts", actions);
 
