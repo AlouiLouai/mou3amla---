@@ -1,21 +1,28 @@
-// Toned-down fintech palette: pink/orange stay the brand accent hues, but
-// reserved for CTAs, highlights, and active states - surfaces are neutral
-// (white/soft grey/dark grey) instead of pink-tinted or pure black.
+// Dark, Instagram-derived palette: pure black surfaces throughout, with a
+// single 3-stop gradient (blue -> purple -> red) supplying every semantic
+// accent color used elsewhere in this object - accent/subtle/destructive are
+// literally that gradient's own stops, so the palette and igGradient can
+// never visually drift apart.
 export const mou3amla = {
-  bg: "#FAFAFA",
-  surface: "#FFFFFF",
-  card: "#FFFFFF",
-  cardAlt: "#F4F4F5",
-  border: "rgba(0,0,0,0.08)",
-  borderStrong: "rgba(0,0,0,0.14)",
-  text: "#050505",
-  textMuted: "rgba(5,5,5,0.62)",
-  textFaint: "rgba(5,5,5,0.36)",
-  accent: "#FF0083",
-  subtle: "#FF8D28",
-  destructive: "#D93072",
-  hero: "#1C1C1E",
+  bg: "#000000",
+  surface: "#000000",
+  card: "#121212",
+  cardAlt: "#1c1c1e",
+  border: "#262626",
+  borderStrong: "#363636",
+  text: "#FFFFFF",
+  textMuted: "#A8A8A8",
+  textFaint: "#555555",
+  accent: "#0095F6",
+  subtle: "#7A3EF0",
+  destructive: "#ED4956",
+  hero: "#0A0A0A",
 } as const;
+
+// The shared "story ring" / highlight gradient - avatar rings, the auth logo
+// badge, and gradient-bordered pitch/invite cards all reuse this exact
+// string rather than each hand-rolling their own stops.
+export const igGradient = "linear-gradient(135deg, #0095F6, #7A3EF0, #ED4956)";
 
 export function alpha(hex: string, opacity: number): string {
   const value = parseInt(hex.slice(1), 16);
@@ -25,5 +32,9 @@ export function alpha(hex: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-export const cardShadow = "0 10px 24px rgba(255,0,131,0.08), 0 4px 12px rgba(0,0,0,0.05)";
-export const raisedShadow = "0 18px 36px rgba(255,0,131,0.10), 0 8px 18px rgba(0,0,0,0.08)";
+// Plain dark elevation instead of a colored glow - a pink-tinted shadow made
+// sense on a white surface; on black it would just look like a color cast,
+// so this now leans on real shadow depth the way the mockup's mostly-flat,
+// border-driven cards do.
+export const cardShadow = "0 8px 20px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)";
+export const raisedShadow = "0 16px 36px rgba(0,0,0,0.5), 0 6px 16px rgba(0,0,0,0.35)";

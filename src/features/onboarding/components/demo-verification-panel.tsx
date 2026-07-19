@@ -3,6 +3,7 @@
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useDemoVerification } from "@/features/onboarding/hooks/use-demo-verification";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import { statusToneColor } from "@/features/mou3amla/status-tone";
 
 export function DemoVerificationPanel() {
   const { steps, stepIndex, running, done, error, start } = useDemoVerification();
@@ -26,7 +27,7 @@ export function DemoVerificationPanel() {
               style={{ color: index <= stepIndex ? mou3amla.text : mou3amla.textFaint }}
             >
               {index < stepIndex ? (
-                <CheckCircle2 className="size-4" style={{ color: "#139A63" }} />
+                <CheckCircle2 className="size-4" style={{ color: statusToneColor("positive") }} />
               ) : index === stepIndex ? (
                 <Loader2 className="size-4 animate-spin" style={{ color: mou3amla.accent }} />
               ) : (

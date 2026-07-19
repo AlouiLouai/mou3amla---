@@ -12,7 +12,7 @@ import {
   verifyPasskeyAuthentication,
   verifyPasskeyRegistration,
 } from "@/features/auth/server/actions";
-import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 
 export function PasskeyScreen({ phone, username, mode }: { phone: string; username: string; mode: "register" | "authenticate" }) {
   const [message, setMessage] = useState<string | null>(null);
@@ -75,10 +75,7 @@ export function PasskeyScreen({ phone, username, mode }: { phone: string; userna
           className="relative mb-4 overflow-hidden rounded-[30px] px-5 pt-5 pb-6 text-white"
           style={{ background: mou3amla.hero, boxShadow: "0 26px 70px rgba(0,0,0,0.18)" }}
         >
-          <div
-            className="pointer-events-none absolute -top-12 right-[-26px] h-36 w-36 rounded-full"
-            style={{ background: "linear-gradient(135deg, rgba(255,0,131,0.95), rgba(255,141,40,0.88))" }}
-          />
+          <div className="pointer-events-none absolute -top-12 right-[-26px] h-36 w-36 rounded-full opacity-80" style={{ background: igGradient }} />
           <div className="relative flex items-center justify-between">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Verification</div>
@@ -92,7 +89,7 @@ export function PasskeyScreen({ phone, username, mode }: { phone: string; userna
             </div>
           </div>
 
-          <div className="relative mt-5 flex items-center gap-3 rounded-[22px] bg-white px-4 py-3 text-black">
+          <div className="relative mt-5 flex items-center gap-3 rounded-[22px] px-4 py-3" style={{ background: mou3amla.card }}>
             <div
               className="flex size-11 items-center justify-center rounded-[16px]"
               style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
@@ -100,7 +97,9 @@ export function PasskeyScreen({ phone, username, mode }: { phone: string; userna
               <ShieldCheck className="size-5" />
             </div>
             <div>
-              <div className="text-[13px] font-black">Passkey gate</div>
+              <div className="text-[13px] font-black" style={{ color: mou3amla.text }}>
+                Passkey gate
+              </div>
               <div className="text-[11px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
                 +216 {formatPhoneForDisplay(phone)} for {formatUsernameHandle(username)}
               </div>

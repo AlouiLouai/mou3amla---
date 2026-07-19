@@ -110,6 +110,12 @@ session cookie (no `Max-Age`) rather than `localStorage`, on purpose: closing
 and reopening the installed PWA ends that browser session, which is exactly
 when the launch splash should be allowed to reappear.
 
+The overlay background (`.mou3amla-splash` in `globals.css`) and tagline
+color follow the current dark palette (`#000000` / accent blue). The
+`/splash_screen.jpg` file itself is a static binary asset, not something a
+code change can restyle - if it still has a light background baked in from
+the previous theme, it needs a replacement image to actually match.
+
 ## Install prompt
 
 `src/components/pwa/install-prompt.tsx` handles the `beforeinstallprompt`

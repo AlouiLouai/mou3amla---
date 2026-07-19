@@ -6,7 +6,7 @@ import { HandoffModeToggle, type HandoffMode } from "@/features/payments/compone
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
-import { mou3amla } from "@/features/mou3amla/constants";
+import { alpha, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { NEARBY_OPTIONS_REFRESH_MS } from "@/features/payments/constants";
 import { useQrCameraScanner } from "@/features/payments/hooks/use-qr-camera-scanner";
@@ -85,14 +85,14 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
           {supportsBarcodeDetector ? (
             <div
               className="relative mb-5 aspect-square w-full overflow-hidden rounded-[28px] border"
-              style={{ background: "#0d0e12", borderColor: mou3amla.border }}
+              style={{ background: mou3amla.hero, borderColor: mou3amla.border }}
             >
               <video ref={videoRef} muted playsInline className="size-full object-cover" />
               <div className="pointer-events-none absolute inset-8 rounded-2xl border-2" style={{ borderColor: mou3amla.accent, opacity: 0.8 }} />
               {cameraError ? (
                 <div
                   className="absolute inset-0 flex items-center justify-center p-6 text-center text-[12.5px]"
-                  style={{ background: "rgba(255,255,255,0.88)", color: mou3amla.textMuted }}
+                  style={{ background: "rgba(0,0,0,0.88)", color: mou3amla.textMuted }}
                 >
                   {cameraError}
                 </div>
@@ -142,7 +142,7 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
             <div className="flex items-center gap-2">
               <div
                 className="flex size-9 items-center justify-center rounded-2xl"
-                style={{ background: "rgba(255,0,131,0.12)", color: mou3amla.accent }}
+                style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
               >
                 <Waves className="size-4.5" />
               </div>
@@ -159,8 +159,8 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
               <button
                 type="button"
                 onClick={loadNearbyOptions}
-                className="flex items-center gap-1 rounded-full bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em]"
-                style={{ color: mou3amla.accent }}
+                className="flex items-center gap-1 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em]"
+                style={{ background: mou3amla.card, color: mou3amla.accent }}
               >
                 <RefreshCw className={`size-3 ${state.isLoadingNearbyOptions ? "animate-spin" : ""}`} />
                 Refresh
@@ -169,7 +169,7 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
           </div>
 
           {payerMatch ? (
-            <div className="rounded-[20px] border bg-white p-4" style={{ borderColor: mou3amla.border }}>
+            <div className="rounded-[20px] border p-4" style={{ background: mou3amla.card, borderColor: mou3amla.border }}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <HandCoins className="size-4.5" style={{ color: mou3amla.accent }} />
@@ -210,8 +210,8 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
                   key={code}
                   type="button"
                   onClick={() => submitNearbyOption(code)}
-                  className="rounded-[20px] border bg-white px-2 py-4 text-center font-mono text-[1.15rem] font-black tracking-[0.1em] transition-transform active:scale-[0.98]"
-                  style={{ borderColor: mou3amla.borderStrong, color: mou3amla.hero }}
+                  className="rounded-[20px] border px-2 py-4 text-center font-mono text-[1.15rem] font-black tracking-[0.1em] transition-transform active:scale-[0.98]"
+                  style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong, color: mou3amla.accent }}
                 >
                   {code}
                 </button>

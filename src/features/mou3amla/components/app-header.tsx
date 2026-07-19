@@ -1,5 +1,5 @@
 import { Bell, ChevronLeft } from "lucide-react";
-import { alpha, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UserProfile } from "@/features/mou3amla/types";
 
 // The one header every authenticated screen shares - avatar, greeting, bell.
@@ -43,12 +43,9 @@ export function AppHeader({
         </button>
       ) : (
         <div className="flex min-w-0 items-center gap-2">
-          <div
-            className="flex size-10 shrink-0 items-center justify-center rounded-full"
-            style={{ background: alpha(mou3amla.accent, 0.12) }}
-          >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full p-[2px]" style={{ background: igGradient }}>
             <div
-              className="flex size-[35px] items-center justify-center rounded-full text-[12px] font-bold text-white"
+              className="flex size-full items-center justify-center rounded-full text-[12px] font-bold text-white"
               style={{ background: mou3amla.hero }}
             >
               {initials || "SQ"}

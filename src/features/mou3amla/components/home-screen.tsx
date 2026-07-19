@@ -3,7 +3,7 @@ import { QrCode, Quote, Send } from "lucide-react";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
-import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { WalletStack } from "@/features/wallets/components/wallet-stack";
 
@@ -42,7 +42,7 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
         />
       </div>
 
-      <div className="mt-5 rounded-[24px] p-4" style={{ background: mou3amla.hero }}>
+      <div className="mt-5 rounded-[24px] p-4" style={{ background: mou3amla.card }}>
         <Quote className="size-5" style={{ color: mou3amla.accent }} />
         <p className="mt-2 text-[14px] leading-snug font-black text-white">
           Sending money should feel like sending a text.
@@ -71,9 +71,9 @@ function ActionCard({
 }) {
   const styles =
     tone === "accent"
-      ? { background: "linear-gradient(135deg, #FF0083, #FF5C9E)", color: "#FFFFFF", borderColor: "transparent" }
+      ? { background: igGradient, color: "#FFFFFF", borderColor: "transparent" }
       : tone === "dark"
-        ? { background: mou3amla.hero, color: "#FFFFFF", borderColor: "transparent" }
+        ? { background: mou3amla.card, color: "#FFFFFF", borderColor: mou3amla.border }
         : { background: mou3amla.card, color: mou3amla.text, borderColor: mou3amla.border };
 
   return (

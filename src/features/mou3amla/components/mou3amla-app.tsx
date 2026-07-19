@@ -10,10 +10,10 @@ import { WalletRegistrySheet } from "@/features/wallets/components/wallet-regist
 function ScreenLoading() {
   return (
     <div className="flex flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
-      <div className="mb-4 h-10 w-32 rounded-full bg-black/5" />
-      <div className="mb-3 h-28 rounded-[28px] bg-black/5" />
-      <div className="mb-3 h-24 rounded-[24px] bg-black/5" />
-      <div className="h-24 rounded-[24px] bg-black/5" />
+      <div className="mb-4 h-10 w-32 rounded-full bg-white/6" />
+      <div className="mb-3 h-28 rounded-[28px] bg-white/6" />
+      <div className="mb-3 h-24 rounded-[24px] bg-white/6" />
+      <div className="h-24 rounded-[24px] bg-white/6" />
     </div>
   );
 }
@@ -69,16 +69,16 @@ export function Mou3amlaApp({ initialUser }: { initialUser: InitialMou3amlaUser 
           className="mou3amla-viewport-h relative flex flex-1 flex-col overflow-hidden sm:min-h-0 sm:rounded-[36px]"
           style={{
             background: mou3amla.surface,
-            boxShadow: "0 16px 42px rgba(255,0,131,0.08), 0 8px 18px rgba(0,0,0,0.06)",
+            boxShadow: "0 16px 42px rgba(0,0,0,0.5), 0 8px 18px rgba(0,0,0,0.4)",
           }}
         >
           <div
             className="pointer-events-none absolute -top-14 right-[-20px] h-44 w-44 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(255,0,131,0.12), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, rgba(0,149,246,0.14), transparent 70%)" }}
           />
           <div
             className="pointer-events-none absolute -bottom-16 left-[-34px] h-44 w-44 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(255,141,40,0.14), transparent 68%)" }}
+            style={{ background: "radial-gradient(circle, rgba(122,62,240,0.14), transparent 68%)" }}
           />
 
           <div

@@ -4,12 +4,23 @@ import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { statusToneColor } from "@/features/mou3amla/status-tone";
 
 function verificationTone(status: string, isDemoApproval: boolean) {
-  if (status === "verified") return { bg: alpha("#15A46B", 0.12), color: "#12885A", label: isDemoApproval ? "Verified profile (demo)" : "Verified profile" };
-  if (status === "pending") return { bg: alpha("#D28B11", 0.14), color: "#B6790E", label: "Verification in review" };
-  if (status === "rejected") return { bg: alpha(mou3amla.destructive, 0.12), color: mou3amla.destructive, label: "Action required" };
-  return { bg: alpha(mou3amla.accent, 0.1), color: mou3amla.accent, label: "Not verified" };
+  if (status === "verified") {
+    const color = statusToneColor("positive");
+    return { bg: alpha(color, 0.12), color, label: isDemoApproval ? "Verified profile (demo)" : "Verified profile" };
+  }
+  if (status === "pending") {
+    const color = statusToneColor("pending");
+    return { bg: alpha(color, 0.14), color, label: "Verification in review" };
+  }
+  if (status === "rejected") {
+    const color = statusToneColor("negative");
+    return { bg: alpha(color, 0.12), color, label: "Action required" };
+  }
+  const color = statusToneColor("neutral");
+  return { bg: alpha(color, 0.1), color, label: "Not verified" };
 }
 
 export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {

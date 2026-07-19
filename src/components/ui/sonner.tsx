@@ -3,11 +3,12 @@
 import type { CSSProperties } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react";
+import { alpha, mou3amla } from "@/features/mou3amla/constants";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme="light"
+      theme="dark"
       className="toaster group"
       position="top-center"
       closeButton
@@ -22,34 +23,31 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "#FFFFFF",
-          "--normal-text": "#050505",
-          "--normal-border": "rgba(255,0,131,0.18)",
-          "--success-bg": "#FFF3F9",
-          "--success-text": "#050505",
-          "--success-border": "rgba(255,0,131,0.22)",
-          "--error-bg": "#FFF3F7",
-          "--error-text": "#8F124C",
-          "--error-border": "rgba(217,48,114,0.24)",
-          "--warning-bg": "#FFF7EE",
-          "--warning-text": "#9C5513",
-          "--warning-border": "rgba(255,141,40,0.24)",
-          "--info-bg": "#FFF8FC",
-          "--info-text": "#050505",
-          "--info-border": "rgba(255,0,131,0.18)",
+          "--normal-bg": mou3amla.card,
+          "--normal-text": mou3amla.text,
+          "--normal-border": mou3amla.border,
+          "--success-bg": mou3amla.card,
+          "--success-text": mou3amla.text,
+          "--success-border": alpha(mou3amla.accent, 0.35),
+          "--error-bg": mou3amla.card,
+          "--error-text": mou3amla.destructive,
+          "--error-border": alpha(mou3amla.destructive, 0.35),
+          "--warning-bg": mou3amla.card,
+          "--warning-text": mou3amla.subtle,
+          "--warning-border": alpha(mou3amla.subtle, 0.35),
+          "--info-bg": mou3amla.card,
+          "--info-text": mou3amla.text,
+          "--info-border": mou3amla.border,
           "--border-radius": "20px",
         } as CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast:
-            "cn-toast relative overflow-hidden border shadow-[0_18px_44px_rgba(255,0,131,0.12),0_8px_20px_rgba(0,0,0,0.08)]",
+          toast: "cn-toast relative overflow-hidden border shadow-[0_18px_44px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.4)]",
           title: "font-semibold",
-          description: "text-[0.8rem] text-black/65",
-          actionButton:
-            "bg-[#FF0083] text-white hover:bg-[#E70078] rounded-full px-3 font-semibold",
-          cancelButton:
-            "bg-black/5 text-black hover:bg-black/10 rounded-full px-3 font-semibold",
+          description: "text-[0.8rem] text-white/65",
+          actionButton: "bg-[#0095F6] text-white hover:bg-[#0077C7] rounded-full px-3 font-semibold",
+          cancelButton: "bg-white/8 text-white hover:bg-white/14 rounded-full px-3 font-semibold",
         },
       }}
       {...props}

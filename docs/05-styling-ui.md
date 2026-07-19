@@ -26,25 +26,50 @@ Installed via the current (`shadcn@latest`) CLI, **not** the legacy
 
 ## Theming
 
-The product (Mou3amla) now uses an intentionally **fixed-light fintech** visual
-system built around a compact mobile layout. Pink/orange are reserved for
-CTAs, highlights, and active states - surfaces stay neutral (white/soft grey/
-dark grey), not pink-tinted or pure black:
+The product (Mou3amla) uses an intentionally **fixed-dark, Instagram-derived**
+visual system built around a compact mobile layout - migrated from an earlier
+fixed-light pink/orange fintech theme. Surfaces are pure black/near-black; a
+single 3-stop gradient supplies every semantic accent color used elsewhere:
 
-- `mou3amla.surface` / `mou3amla.card`: white surfaces
-- `mou3amla.bg`: neutral off-white page wash
-- `mou3amla.cardAlt`: neutral light-grey alt surface
-- `mou3amla.hero`: dark neutral surface (wallet pocket, dark action cards) - not pure black
-- `mou3amla.accent`: hot pink `#FF0083` for primary actions
-- `mou3amla.subtle`: orange `#FF8D28` for secondary emphasis
-- `mou3amla.destructive`: reserved for destructive and error states
+- `mou3amla.bg` / `mou3amla.surface`: pure black `#000000`
+- `mou3amla.card`: `#121212` - the standard elevated surface (cards, rows, chips)
+- `mou3amla.cardAlt`: `#1c1c1e` - alt surface / row dividers
+- `mou3amla.hero`: `#0A0A0A` - reserved for the inner fill of a
+  gradient-bordered card or an avatar's center (see `igGradient` below), not a
+  general-purpose "dark surface" - use `mou3amla.card` for that, since `hero`
+  is close enough to pure black that it reads as invisible directly against
+  the page background without a gradient border or ring around it
+- `mou3amla.accent`: Instagram blue `#0095F6` - primary actions, links,
+  **and** all "positive" semantic states (verified, confirmed, success) - see
+  `status-tone.ts` below
+- `mou3amla.subtle`: `#7A3EF0` (purple) - secondary emphasis, pending states
+- `mou3amla.destructive`: `#ED4956` (Instagram red) - destructive/error/unread states
+- `igGradient` (exported alongside `mou3amla`): `linear-gradient(135deg, #0095F6, #7A3EF0, #ED4956)`
+  - literally `accent`/`subtle`/`destructive` as gradient stops, so the flat
+    palette and the gradient can't visually drift apart. Reused for avatar
+    "story rings" (see `AppHeader`), the auth/passkey/verification hero logo
+    badge, and gradient-bordered highlight cards. Don't hand-roll a second
+    blue-purple-red gradient elsewhere - import this one.
 
 These screen-level colors come from `src/features/mou3amla/constants.ts`, not from
 the full shadcn semantic color scale. Wallet/provider brand colors in
-`src/features/wallets/constants.ts` remain the one deliberate exception.
+`src/features/wallets/constants.ts` remain the one deliberate exception -
+real fintech brand colors (Flouci green, Konnect teal, etc.), never touched
+by a Mou3amla palette change.
 
-- `src/components/layout/theme-provider.tsx` still wraps `next-themes` with
-  **`forcedTheme="light"`**. There is no user-facing light/dark toggle.
+**Status-tone colors are centralized**, not hand-rolled per screen: import
+`statusToneColor` from `src/features/mou3amla/status-tone.ts` (`"positive" |
+"pending" | "negative" | "neutral"`) rather than hardcoding a green/orange/red
+for a verified/confirmed/pending/rejected badge. This app previously had four
+independent, mutually-inconsistent hardcoded greens for "verified" alone
+before this was consolidated - don't reintroduce a fifth.
+
+- `src/components/layout/theme-provider.tsx` wraps `next-themes` with
+  **`forcedTheme="dark"`**. There is no user-facing light/dark toggle - this
+  is still a single fixed theme, just the opposite polarity from before.
+  `src/app/globals.css`'s `:root` and `.dark` blocks are kept identical on
+  purpose so the app looks right regardless of which class next-themes
+  actually applies.
 - The `<html>` tag keeps `suppressHydrationWarning`, which is still required by
   `next-themes`.
 - If you add a screen that should use the normal shadcn theme variables rather
@@ -66,9 +91,12 @@ The mobile shell also uses a shared frame primitive in
 outside the scrollable pane; only the body content should use the shell
 scroller.
 
-Recent performance tuning intentionally softened shell and card shadows in
-`src/features/mou3amla/constants.ts`. If you want more depth, add it carefully;
-heavy blur and oversized shadow stacks make low-end mobile devices feel slow.
+`cardShadow`/`raisedShadow` are plain dark elevation (`rgba(0,0,0,...)`), not a
+colored glow - a pink-tinted shadow made sense on the old white surfaces; on
+today's black surfaces a colored shadow would just look like a color cast, so
+these lean on real shadow depth instead, matching the mockup's mostly-flat,
+border-driven card style. If you want more depth, add it carefully; heavy
+blur and oversized shadow stacks make low-end mobile devices feel slow.
 
 ## Toasts
 

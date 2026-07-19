@@ -66,7 +66,7 @@ export function AccountsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
                 key={wallet.id}
                 className="rounded-[22px] border p-3.5 text-left transition-transform active:scale-[0.98]"
                 style={{
-                  background: isDefault ? "#FFF3F9" : mou3amla.card,
+                  background: isDefault ? alpha(mou3amla.accent, 0.1) : mou3amla.card,
                   borderColor: isDefault ? alpha(mou3amla.accent, 0.32) : mou3amla.border,
                   boxShadow: cardShadow,
                 }}

@@ -74,7 +74,7 @@ export function NotificationsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
                   onClick={() => actions.readNotification(notification.id)}
                   className="rounded-[22px] border p-4 text-left transition-transform active:scale-[0.98]"
                   style={{
-                    background: notification.unread ? "#FFF4FA" : mou3amla.card,
+                    background: notification.unread ? alpha(mou3amla.accent, 0.09) : mou3amla.card,
                     borderColor: notification.unread ? alpha(mou3amla.accent, 0.22) : mou3amla.border,
                     boxShadow: cardShadow,
                   }}

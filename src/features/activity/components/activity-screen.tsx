@@ -7,13 +7,21 @@ import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { statusToneColor } from "@/features/mou3amla/status-tone";
 
 const ACTIVITY_HIGHLIGHT_DURATION_MS = 3000;
 
 function statusTone(status: string) {
-  if (status === "confirmed") return { bg: alpha("#1DAA62", 0.12), color: "#17834C", label: "Confirmed" };
-  if (status === "failed") return { bg: alpha(mou3amla.destructive, 0.12), color: mou3amla.destructive, label: "Failed" };
-  return { bg: alpha(mou3amla.subtle, 0.14), color: mou3amla.subtle, label: "Initiated" };
+  if (status === "confirmed") {
+    const color = statusToneColor("positive");
+    return { bg: alpha(color, 0.12), color, label: "Confirmed" };
+  }
+  if (status === "failed") {
+    const color = statusToneColor("negative");
+    return { bg: alpha(color, 0.12), color, label: "Failed" };
+  }
+  const color = statusToneColor("pending");
+  return { bg: alpha(color, 0.14), color, label: "Initiated" };
 }
 
 export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
@@ -109,7 +117,7 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
                             "verified" (see linkDestination), and createPaymentIntent
                             separately rejects an unverified recipient - so this badge
                             reflects a real, server-enforced guarantee, not a claim. */}
-                        <div className="flex items-center gap-1 text-[9.5px] font-bold" style={{ color: "#17834C" }}>
+                        <div className="flex items-center gap-1 text-[9.5px] font-bold" style={{ color: statusToneColor("positive") }}>
                           <ShieldCheck className="size-3" />
                           Verified parties
                         </div>

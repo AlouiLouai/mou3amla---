@@ -4,7 +4,7 @@ import { ArrowRight, Globe, ShieldCheck, Sparkles } from "lucide-react";
 import { useActionState } from "react";
 import type { AuthFormState } from "@/features/auth/types";
 import { startPhoneAuth } from "@/features/auth/server/actions";
-import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 
 const initialState: AuthFormState = {};
 
@@ -21,10 +21,7 @@ export function AuthScreen() {
           className="relative mb-4 overflow-hidden rounded-[30px] px-5 pt-5 pb-6 text-white"
           style={{ background: mou3amla.hero, boxShadow: "0 26px 70px rgba(0,0,0,0.18)" }}
         >
-          <div
-            className="pointer-events-none absolute -top-14 right-[-28px] h-36 w-36 rounded-full"
-            style={{ background: "linear-gradient(135deg, rgba(255,0,131,0.95), rgba(255,141,40,0.88))" }}
-          />
+          <div className="pointer-events-none absolute -top-14 right-[-28px] h-36 w-36 rounded-full opacity-80" style={{ background: igGradient }} />
           <div className="relative flex items-center justify-between">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Onboarding</div>
@@ -36,7 +33,7 @@ export function AuthScreen() {
             </div>
           </div>
 
-          <div className="relative mt-5 flex items-center gap-3 rounded-[22px] bg-white px-4 py-3 text-black">
+          <div className="relative mt-5 flex items-center gap-3 rounded-[22px] px-4 py-3" style={{ background: mou3amla.card }}>
             <div
               className="flex size-11 items-center justify-center rounded-[16px]"
               style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
@@ -44,7 +41,9 @@ export function AuthScreen() {
               <ShieldCheck className="size-5" />
             </div>
             <div>
-              <div className="text-[13px] font-black">Phone plus username</div>
+              <div className="text-[13px] font-black" style={{ color: mou3amla.text }}>
+                Phone plus username
+              </div>
               <div className="text-[11px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
                 No split between sign in and sign up. Enter both once and continue.
               </div>
@@ -76,7 +75,10 @@ export function AuthScreen() {
               <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: mou3amla.textFaint }}>
                 Phone number
               </label>
-              <div className="flex items-center gap-3 rounded-[20px] border bg-white px-4 py-3.5" style={{ borderColor: mou3amla.borderStrong }}>
+              <div
+                className="flex items-center gap-3 rounded-[20px] border px-4 py-3.5"
+                style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
+              >
                 <span className="text-[15px] font-black" style={{ color: mou3amla.accent }}>
                   +216
                 </span>
@@ -87,7 +89,7 @@ export function AuthScreen() {
                   inputMode="numeric"
                   maxLength={8}
                   placeholder="20123456"
-                  className="flex-1 border-none bg-transparent text-[15px] outline-none placeholder:text-slate-300"
+                  className="flex-1 border-none bg-transparent text-[15px] outline-none placeholder:text-white/30"
                   style={{ color: mou3amla.text }}
                 />
               </div>
@@ -102,7 +104,10 @@ export function AuthScreen() {
               <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: mou3amla.textFaint }}>
                 Username handle
               </label>
-              <div className="flex items-center gap-3 rounded-[20px] border bg-white px-4 py-3.5" style={{ borderColor: mou3amla.borderStrong }}>
+              <div
+                className="flex items-center gap-3 rounded-[20px] border px-4 py-3.5"
+                style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
+              >
                 <span className="text-[15px] font-black" style={{ color: mou3amla.accent }}>
                   @
                 </span>
@@ -110,7 +115,7 @@ export function AuthScreen() {
                   name="username"
                   maxLength={24}
                   placeholder="username"
-                  className="flex-1 border-none bg-transparent text-[15px] lowercase outline-none placeholder:text-slate-300"
+                  className="flex-1 border-none bg-transparent text-[15px] lowercase outline-none placeholder:text-white/30"
                   style={{ color: mou3amla.text }}
                 />
               </div>

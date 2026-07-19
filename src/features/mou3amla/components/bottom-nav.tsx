@@ -27,10 +27,13 @@ export function BottomNav({ active, onHome, onSend, onActivity, onProfile }: Bot
   } as const;
 
   return (
-    <div className="flex justify-center px-3 pt-2 pb-[max(0.95rem,env(safe-area-inset-bottom))]" style={{ background: mou3amla.surface }}>
+    <div
+      className="flex justify-center px-3 pt-2 pb-[max(0.95rem,env(safe-area-inset-bottom))]"
+      style={{ background: "linear-gradient(180deg, transparent, #000000 60%)" }}
+    >
       <div
-        className="w-full overflow-hidden rounded-[28px] border bg-white/96 p-2"
-        style={{ borderColor: mou3amla.border, boxShadow: cardShadow, maxWidth: "480px" }}
+        className="w-full overflow-hidden rounded-[28px] border p-2 backdrop-blur-xl"
+        style={{ background: "rgba(18,18,18,0.92)", borderColor: mou3amla.border, boxShadow: cardShadow, maxWidth: "480px" }}
       >
         <div className="flex min-w-max gap-1">
           {NAV_ITEMS.map(({ key, label, icon: Icon }) => {

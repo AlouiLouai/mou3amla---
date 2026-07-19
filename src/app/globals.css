@@ -48,73 +48,79 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Both blocks intentionally carry the same dark values. This app forces a
+   single theme (see theme-provider.tsx's forcedTheme="dark") rather than
+   offering a real light/dark toggle, but next-themes still applies the
+   `.dark` class for whichever theme name is forced - keeping :root and
+   .dark identical means the app looks right regardless of which selector
+   actually matches, instead of quietly depending on next-themes' internals. */
 :root {
-  --background: #fafafa;
-  --foreground: #050505;
-  --card: #ffffff;
-  --card-foreground: #050505;
-  --popover: #ffffff;
-  --popover-foreground: #050505;
-  --primary: #ff0083;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #121212;
+  --card-foreground: #ffffff;
+  --popover: #121212;
+  --popover-foreground: #ffffff;
+  --primary: #0095f6;
   --primary-foreground: #ffffff;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #050505;
-  --muted: #f5f5f5;
-  --muted-foreground: rgba(5, 5, 5, 0.62);
-  --accent: #ff8d28;
-  --accent-foreground: #050505;
-  --destructive: #d93072;
-  --border: rgba(0, 0, 0, 0.08);
-  --input: rgba(0, 0, 0, 0.08);
-  --ring: rgba(255, 0, 131, 0.4);
-  --chart-1: #ff0083;
-  --chart-2: #ff8d28;
-  --chart-3: #050505;
-  --chart-4: #ffb55d;
-  --chart-5: #ff66b0;
+  --secondary: #1c1c1e;
+  --secondary-foreground: #ffffff;
+  --muted: #1c1c1e;
+  --muted-foreground: #a8a8a8;
+  --accent: #7a3ef0;
+  --accent-foreground: #ffffff;
+  --destructive: #ed4956;
+  --border: #262626;
+  --input: #262626;
+  --ring: rgba(0, 149, 246, 0.4);
+  --chart-1: #0095f6;
+  --chart-2: #7a3ef0;
+  --chart-3: #ed4956;
+  --chart-4: #ffffff;
+  --chart-5: #a8a8a8;
   --radius: 0.75rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #050505;
-  --sidebar-primary: #ff0083;
+  --sidebar: #121212;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #0095f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #fff1f7;
-  --sidebar-accent-foreground: #050505;
-  --sidebar-border: rgba(0, 0, 0, 0.08);
-  --sidebar-ring: rgba(255, 0, 131, 0.4);
+  --sidebar-accent: #1c1c1e;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #262626;
+  --sidebar-ring: rgba(0, 149, 246, 0.4);
 }
 
 .dark {
-  --background: #050505;
+  --background: #000000;
   --foreground: #ffffff;
-  --card: #111111;
+  --card: #121212;
   --card-foreground: #ffffff;
-  --popover: #111111;
+  --popover: #121212;
   --popover-foreground: #ffffff;
-  --primary: #ff0083;
+  --primary: #0095f6;
   --primary-foreground: #ffffff;
-  --secondary: #1d1d1d;
+  --secondary: #1c1c1e;
   --secondary-foreground: #ffffff;
-  --muted: #1a1a1a;
-  --muted-foreground: rgba(255, 255, 255, 0.68);
-  --accent: #ff8d28;
+  --muted: #1c1c1e;
+  --muted-foreground: #a8a8a8;
+  --accent: #7a3ef0;
   --accent-foreground: #ffffff;
-  --destructive: #ff4d93;
-  --border: rgba(255, 255, 255, 0.12);
-  --input: rgba(255, 255, 255, 0.14);
-  --ring: rgba(255, 0, 131, 0.44);
-  --chart-1: #ff0083;
-  --chart-2: #ff8d28;
-  --chart-3: #ffffff;
-  --chart-4: #ffb55d;
-  --chart-5: #ff66b0;
-  --sidebar: #111111;
+  --destructive: #ed4956;
+  --border: #262626;
+  --input: #262626;
+  --ring: rgba(0, 149, 246, 0.44);
+  --chart-1: #0095f6;
+  --chart-2: #7a3ef0;
+  --chart-3: #ed4956;
+  --chart-4: #ffffff;
+  --chart-5: #a8a8a8;
+  --sidebar: #121212;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ff0083;
+  --sidebar-primary: #0095f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1d1d1d;
+  --sidebar-accent: #1c1c1e;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: rgba(255, 0, 131, 0.44);
+  --sidebar-border: #262626;
+  --sidebar-ring: rgba(0, 149, 246, 0.44);
 }
 
 @layer base {
@@ -127,8 +133,8 @@
     min-height: 100vh; /* fallback for browsers without dvh support (older Android WebViews / Samsung Internet) */
     min-height: 100dvh;
     background-image:
-      radial-gradient(circle at top right, rgba(255, 0, 131, 0.04), transparent 28%),
-      radial-gradient(circle at bottom left, rgba(255, 141, 40, 0.05), transparent 26%);
+      radial-gradient(circle at top right, rgba(0, 149, 246, 0.06), transparent 28%),
+      radial-gradient(circle at bottom left, rgba(122, 62, 240, 0.06), transparent 26%);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: contain;
     text-rendering: optimizeLegibility;
@@ -195,7 +201,7 @@
   right: 0;
   bottom: 0;
   height: 3px;
-  background: #ff0083;
+  background: #0095f6;
   opacity: 0.55;
   transform-origin: left;
   animation: mou3amla-toast-progress 4000ms linear forwards;
@@ -271,10 +277,10 @@
 @keyframes mou3amla-glow {
   0%,
   100% {
-    box-shadow: 0 0 0px rgba(255, 0, 131, 0);
+    box-shadow: 0 0 0px rgba(0, 149, 246, 0);
   }
   50% {
-    box-shadow: 0 0 40px rgba(255, 0, 131, 0.22);
+    box-shadow: 0 0 40px rgba(0, 149, 246, 0.28);
   }
 }
 
@@ -284,13 +290,13 @@
 @keyframes mou3amla-activity-highlight {
   0%,
   80% {
-    background: rgba(255, 0, 131, 0.1);
-    border-color: rgba(255, 0, 131, 0.45);
-    box-shadow: 0 0 0 1px rgba(255, 0, 131, 0.12);
+    background: rgba(0, 149, 246, 0.14);
+    border-color: rgba(0, 149, 246, 0.5);
+    box-shadow: 0 0 0 1px rgba(0, 149, 246, 0.16);
   }
   100% {
     background: transparent;
-    box-shadow: 0 0 0 1px rgba(255, 0, 131, 0);
+    box-shadow: 0 0 0 1px rgba(0, 149, 246, 0);
   }
 }
 
@@ -321,7 +327,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  background: #000000;
   animation: mou3amla-splash-out 1.4s ease forwards;
 }
 
@@ -342,7 +348,7 @@
   font-weight: 600;
   font-size: 1rem;
   letter-spacing: 0.01em;
-  color: #ff0083;
+  color: #0095f6;
   white-space: nowrap;
 }
 

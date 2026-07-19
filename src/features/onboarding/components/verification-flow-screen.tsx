@@ -3,46 +3,51 @@ import { ArrowRight, CheckCircle2, ChevronLeft, Clock3, ShieldCheck, TriangleAle
 import type { AuthenticatedAppUser, VerificationStatus } from "@/features/auth/types";
 import { formatUsernameHandle } from "@/features/auth/lib/identity";
 import { DemoVerificationPanel } from "@/features/onboarding/components/demo-verification-panel";
-import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
+import { statusToneColor } from "@/features/mou3amla/status-tone";
 
 function statusMeta(status: VerificationStatus, isDemoApproval: boolean) {
   if (status === "verified") {
+    const tone = statusToneColor("positive");
     return {
       label: isDemoApproval ? "Verified (demo)" : "Verified",
       body: isDemoApproval
         ? "Simulated for this preview - production will run through an eKYC provider accepted by INPDP."
         : "RIB linking and trusted routes are unlocked for this profile.",
-      tone: "#139A63",
-      bg: "rgba(19,154,99,0.12)",
+      tone,
+      bg: alpha(tone, 0.12),
       icon: CheckCircle2,
     };
   }
 
   if (status === "pending") {
+    const tone = statusToneColor("pending");
     return {
       label: "Pending review",
       body: "A previous verification attempt is on file as pending review.",
-      tone: mou3amla.subtle,
-      bg: alpha(mou3amla.subtle, 0.14),
+      tone,
+      bg: alpha(tone, 0.14),
       icon: Clock3,
     };
   }
 
   if (status === "rejected") {
+    const tone = statusToneColor("negative");
     return {
       label: "Needs retry",
       body: "Your previous verification attempt didn't go through. Run the demo verification below to continue.",
-      tone: mou3amla.destructive,
-      bg: alpha(mou3amla.destructive, 0.12),
+      tone,
+      bg: alpha(tone, 0.12),
       icon: TriangleAlert,
     };
   }
 
+  const tone = statusToneColor("neutral");
   return {
     label: "Not started",
     body: "Verify your identity to unlock bank-account routes.",
-    tone: mou3amla.accent,
-    bg: alpha(mou3amla.accent, 0.1),
+    tone,
+    bg: alpha(tone, 0.1),
     icon: ShieldCheck,
   };
 }
@@ -72,15 +77,15 @@ export function VerificationFlowScreen({ user }: { user: AuthenticatedAppUser })
           style={{ background: mou3amla.hero, boxShadow: "0 26px 70px rgba(0,0,0,0.18)" }}
         >
           <div
-            className="pointer-events-none absolute -top-14 right-[-30px] h-36 w-36 rounded-full"
-            style={{ background: "linear-gradient(135deg, rgba(255,0,131,0.95), rgba(255,141,40,0.88))" }}
+            className="pointer-events-none absolute -top-14 right-[-30px] h-36 w-36 rounded-full opacity-80"
+            style={{ background: igGradient }}
           />
           <div className="relative">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Verification Studio</div>
             <div className="mt-2 text-[1.9rem] font-black leading-none">Verify your identity.</div>
           </div>
 
-          <div className="relative mt-5 rounded-[22px] bg-white px-4 py-3 text-black">
+          <div className="relative mt-5 rounded-[22px] px-4 py-3" style={{ background: mou3amla.card, color: mou3amla.text }}>
             <div className="text-[12px] font-black uppercase tracking-[0.22em]" style={{ color: mou3amla.textFaint }}>
               Profile
             </div>
@@ -91,7 +96,7 @@ export function VerificationFlowScreen({ user }: { user: AuthenticatedAppUser })
           </div>
         </div>
 
-        <div className="rounded-[30px] border bg-white px-5 pt-5 pb-5" style={{ borderColor: mou3amla.border, boxShadow: cardShadow }}>
+        <div className="rounded-[30px] border px-5 pt-5 pb-5" style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}>
           <div
             className="mb-4 rounded-[22px] border px-4 py-3"
             style={{ background: status.bg, borderColor: alpha(status.tone, 0.16), color: status.tone }}

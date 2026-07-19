@@ -10,6 +10,7 @@ import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { statusToneColor } from "@/features/mou3amla/status-tone";
 import { useNow } from "@/hooks/use-now";
 
 function CountdownBadge({ expiresAt, totalMs }: { expiresAt: number; totalMs: number }) {
@@ -128,7 +129,7 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
             </div>
 
             <div className="mt-3 flex items-end justify-between gap-3">
-              <div className="font-mono text-[1.85rem] font-black tracking-[0.16em]" style={{ color: mou3amla.hero }}>
+              <div className="font-mono text-[1.85rem] font-black tracking-[0.16em]" style={{ color: mou3amla.accent }}>
                 {nearbyHandoff?.code ?? "-----"}
               </div>
               <div className="text-right">
@@ -149,9 +150,9 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
           {nearbyHandoff && nearbyHandoff.status === "confirmed" ? (
             <div
               className="w-full rounded-[24px] border p-4 text-left"
-              style={{ background: "rgba(19,154,99,0.08)", borderColor: "rgba(19,154,99,0.24)" }}
+              style={{ background: alpha(statusToneColor("positive"), 0.08), borderColor: alpha(statusToneColor("positive"), 0.24) }}
             >
-              <div className="flex items-center gap-2" style={{ color: "#139A63" }}>
+              <div className="flex items-center gap-2" style={{ color: statusToneColor("positive") }}>
                 <CheckCircle2 className="size-5" />
                 <span className="text-[13px] font-black">Matched!</span>
               </div>
