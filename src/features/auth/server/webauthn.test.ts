@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
+vi.mock("next/headers", () => ({ headers: vi.fn() }));
 vi.mock("@simplewebauthn/server", () => ({
   generateRegistrationOptions: vi.fn(),
   verifyRegistrationResponse: vi.fn(),
@@ -9,6 +10,7 @@ vi.mock("@simplewebauthn/server", () => ({
 }));
 
 const { createAdminClient } = await import("@/lib/supabase/admin");
+const { headers } = await import("next/headers");
 const { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } = await import(
   "@simplewebauthn/server"
 );
@@ -24,6 +26,7 @@ function makeFakeAdmin(fromImpl: (table: string) => unknown) {
 
 beforeEach(() => {
   vi.mocked(createAdminClient).mockReset();
+  vi.mocked(headers).mockReset().mockResolvedValue(new Headers());
   vi.mocked(generateRegistrationOptions).mockReset();
   vi.mocked(verifyRegistrationResponse).mockReset();
   vi.mocked(generateAuthenticationOptions).mockReset();
@@ -111,6 +114,20 @@ describe("verifyRegistration", () => {
       expect.objectContaining({ user_id: USER_ID, credential_id: "cred-1", counter: 0, device_type: "singleDevice", backed_up: false }),
     );
   });
+
+  it("accepts the live localhost request origin in development when it differs only by port", async () => {
+    vi.mocked(headers).mockResolvedValue(new Headers({ origin: "http://localhost:3001" }));
+    vi.mocked(verifyRegistrationResponse).mockResolvedValue({ verified: false } as never);
+
+    await verifyRegistration(USER_ID, "chal", {} as never);
+
+    expect(verifyRegistrationResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedOrigin: ["http://localhost:3000", "http://localhost:3001"],
+        expectedRPID: "localhost",
+      }),
+    );
+  });
 });
 
 describe("buildAuthenticationOptions", () => {
@@ -173,5 +190,29 @@ describe("verifyAuthentication", () => {
 
     expect(result).toEqual({ ok: true });
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ counter: 1 }));
+  });
+
+  it("accepts the live localhost request origin for authentication too", async () => {
+    vi.mocked(headers).mockResolvedValue(new Headers({ origin: "http://localhost:3001" }));
+    const admin = makeFakeAdmin((table: string) => {
+      if (table !== "passkeys") throw new Error(`unexpected table ${table}`);
+      return {
+        select: () => ({
+          eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { credential_id: "cred-1", public_key: Buffer.from([1, 2, 3]).toString("base64"), counter: 0, transports: null }, error: null }) }) }),
+        }),
+        update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) })),
+      };
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(verifyAuthenticationResponse).mockResolvedValue({ verified: false } as never);
+
+    await verifyAuthentication(USER_ID, "chal", { id: "cred-1" } as never);
+
+    expect(verifyAuthenticationResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedOrigin: ["http://localhost:3000", "http://localhost:3001"],
+        expectedRPID: "localhost",
+      }),
+    );
   });
 });

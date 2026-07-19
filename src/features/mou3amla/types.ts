@@ -43,6 +43,8 @@ export interface InitialMou3amlaUser {
   activityLog: ActivityItem[];
   notifications: NotificationItem[];
   invoices: Invoice[];
+  initialScreen?: Screen;
+  highlightedActivityId?: string | null;
 }
 
 export type HandoffMode = "qr" | "nearby";

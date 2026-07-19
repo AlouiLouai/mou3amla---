@@ -139,7 +139,12 @@ external API) follows the same `xUnsafe` + wrapper split - see
   bare domain and origins must be that domain or a subdomain of it, so
   `localhost` (dev) and a real deployed domain (prod) can never both work
   under the same RP config - `NEXT_PUBLIC_APP_URL` must match wherever
-  you're actually testing.
+  you're actually testing. In local development specifically, verification
+  also tolerates the live loopback request origin (`localhost` /
+  `127.0.0.1`) when only the **port** differs from the configured dev URL,
+  which avoids false negatives when the browser is actually running on
+  `http://localhost:3001` while the env file still says
+  `http://localhost:3000`. Production stays pinned to the configured origin.
 - The registration/authentication ceremony is two round trips around one
   browser-side `navigator.credentials.create()`/`.get()` call: `get*Options`
   (`getPasskeyRegistrationOptions`/`getPasskeyAuthenticationOptions` in
@@ -300,10 +305,28 @@ external API) follows the same `xUnsafe` + wrapper split - see
   enforces the same RLS as the REST API, so a client can't construct a
   filter to see anyone else's notifications. Wired into
   `use-mou3amla-app.ts`; a `payment_received` notification also triggers a
-  toast. Requires `Mou3amlaState.profile.id` (threaded through from
-  `requireCurrentAppUser()` via `InitialMou3amlaUser`/`UserProfile`) - if you
-  see the subscription silently not firing, check that `id` actually made it
-  into `initialUser` in `src/app/home/page.tsx`.
+  toast. In the current provider-checkout demo flow, that notification is
+  intentionally emitted on **confirmed provider settlement**, not at intent
+  creation time, so the receiver only auto-jumps to Activity once Flouci or
+  Konnect verification says the payment really succeeded. Requires
+  `Mou3amlaState.profile.id` (threaded through from `requireCurrentAppUser()`
+  via `InitialMou3amlaUser`/`UserProfile`) - if you see the subscription
+  silently not firing, check that `id` actually made it into `initialUser` in
+  `src/app/home/page.tsx`.
+- **Hosted sandbox checkout is the current demo handoff shape for send-money.**
+  `createPaymentIntent` now creates the durable Mou3amla transaction row
+  first, then creates a provider checkout session server-side for the selected
+  source rail. Today only `flouci` and `konnect` are wired to live sandbox
+  APIs (`provider-checkouts.ts`); all other rails remain linkable and
+  selectable in the UI but must fail gracefully with a clear "planned/not
+  sandbox-wired yet" message instead of pretending to launch a real checkout.
+- **Provider finalization is server-verified and idempotent.** Browser return
+  pages live under `/payments/return/[provider]`; webhook endpoints live under
+  `/api/payments/providers/**`; both go through the same server-side verify +
+  finalize path (`provider-returns.ts` / `transaction-finalization.ts`). The
+  browser never decides success/failure on its own from a query string alone;
+  it always re-checks with the provider API before updating
+  `payment_transactions.status`.
 
 ## Nearby AirDrop-style handoff (mutual accept)
 
@@ -473,7 +496,13 @@ Read this before "fixing" something that looks incomplete:
   `NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`,
-  `QR_TOKEN_SECRET`.
+  `QR_TOKEN_SECRET`,
+  `KONNECT_API_KEY`,
+  `KONNECT_RECEIVER_WALLET_ID`,
+  `KONNECT_API_BASE_URL`,
+  `FLOUCI_PUBLIC_KEY`,
+  `FLOUCI_PRIVATE_KEY`,
+  `FLOUCI_API_BASE_URL`.
   (No KYC-provider vars exist right now - see KYC conventions above.)
 
 ## Package manager

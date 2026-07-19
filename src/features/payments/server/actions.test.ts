@@ -4,10 +4,12 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/features/auth/server/dal", () => ({ getSessionIdentity: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/features/payments/server/provider-checkouts", () => ({ createProviderCheckout: vi.fn() }));
 
 const { createAdminClient } = await import("@/lib/supabase/admin");
 const { getSessionIdentity } = await import("@/features/auth/server/dal");
 const { checkRateLimit } = await import("@/lib/rate-limit");
+const { createProviderCheckout } = await import("@/features/payments/server/provider-checkouts");
 const { createPaymentIntent } = await import("@/features/payments/server/actions");
 
 const SENDER_ID = "11111111-1111-1111-1111-111111111111";
@@ -54,17 +56,29 @@ function makeFakeAdmin(queue: unknown[] = []) {
 }
 
 const senderRow = { data: { id: SENDER_ID, username: "sender", display_name: "Sender Person" }, error: null };
-const sourceWalletRow = { data: { id: SOURCE_WALLET_ID, user_id: SENDER_ID, name: "Flouci", routing_value: "@sender" }, error: null };
+const sourceWalletRow = { data: { id: SOURCE_WALLET_ID, user_id: SENDER_ID, provider_id: "flouci", name: "Flouci", routing_value: "@sender" }, error: null };
 const recipientRow = {
   data: { id: RECIPIENT_ID, username: "recipientuser", display_name: "Recipient Person", verification_status: "verified" },
   error: null,
 };
 const recipientDestinationRow = {
-  data: { id: RECIPIENT_DESTINATION_ID, user_id: RECIPIENT_ID, name: "BIAT", routing_value: "12345678901234567890" },
+  data: { id: RECIPIENT_DESTINATION_ID, user_id: RECIPIENT_ID, provider_id: "biat", name: "BIAT", routing_value: "12345678901234567890" },
   error: null,
 };
 const transactionRow = {
-  data: { id: "tx-1", ref_id: "ref_abc123", amount: "25", created_at: "2026-07-18T10:00:00.000Z" },
+  data: {
+    id: "tx-1",
+    ref_id: "ref_abc123",
+    amount: "25",
+    status: "initiated",
+    metadata: {
+      provider_id: "flouci",
+      provider_name: "Flouci",
+      provider_checkout_url: "https://checkout.example/flouci",
+      provider_payment_ref: "flouci-pay-1",
+    },
+    created_at: "2026-07-18T10:00:00.000Z",
+  },
   error: null,
 };
 
@@ -72,6 +86,16 @@ beforeEach(() => {
   vi.mocked(createAdminClient).mockReset();
   vi.mocked(getSessionIdentity).mockReset().mockResolvedValue({ userId: SENDER_ID, phone: "+21620123456" } as never);
   vi.mocked(checkRateLimit).mockReset().mockResolvedValue(true);
+  vi.mocked(createProviderCheckout).mockReset().mockResolvedValue({
+    ok: true,
+    providerId: "flouci",
+    providerName: "Flouci",
+    checkoutUrl: "https://checkout.example/flouci",
+    providerPaymentRef: "flouci-pay-1",
+    providerStatus: "PENDING",
+    returnUrl: "https://app.example/payments/return/flouci?ref=ref_abc123",
+    webhookUrl: "https://app.example/api/payments/providers/flouci/webhook?ref=ref_abc123",
+  } as never);
 });
 
 describe("createPaymentIntent", () => {
@@ -107,6 +131,20 @@ describe("createPaymentIntent", () => {
     const result = await createPaymentIntent(VALID_INPUT);
 
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/choose one of your linked destinations/i) });
+  });
+
+  it("rejects when the selected source provider has no live sandbox checkout", async () => {
+    const unsupportedSourceWalletRow = {
+      data: { ...sourceWalletRow.data, provider_id: "d17", name: "D17" },
+      error: null,
+    };
+    const { admin } = makeFakeAdmin([senderRow, unsupportedSourceWalletRow, recipientRow]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await createPaymentIntent(VALID_INPUT);
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/only flouci and konnect/i) });
+    expect(createProviderCheckout).not.toHaveBeenCalled();
   });
 
   it("rejects when the recipient doesn't exist", async () => {
@@ -147,12 +185,11 @@ describe("createPaymentIntent", () => {
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/hasn't linked a destination/i) });
   });
 
-  it("creates the transaction and both notifications on success", async () => {
+  it("creates the transaction, sender notification, and checkout on success", async () => {
     const noDuplicate = { data: null, error: null };
     const notificationRows = {
       data: [
         { id: "notif-sender", user_id: SENDER_ID, type: "payment_sent", title: "t1", body: "b1", unread: true, created_at: "2026-07-18T10:00:00.000Z" },
-        { id: "notif-recipient", user_id: RECIPIENT_ID, type: "payment_received", title: "t2", body: "b2", unread: true, created_at: "2026-07-18T10:00:00.000Z" },
       ],
       error: null,
     };
@@ -173,9 +210,11 @@ describe("createPaymentIntent", () => {
     if (!result.ok) throw new Error("expected ok result");
     expect(result.intent).toMatchObject({ id: "tx-1", refId: "ref_abc123", recipient: "@recipientuser" });
     expect(result.senderNotification).toMatchObject({ id: "notif-sender", type: "payment_sent" });
+    expect(result.checkout).toMatchObject({ providerId: "flouci", url: "https://checkout.example/flouci" });
 
     const insertCall = calls.find((call) => call.table === "payment_transactions" && call.op === "insert");
     expect(insertCall?.args[0]).toMatchObject({ sender_user_id: SENDER_ID, recipient_user_id: RECIPIENT_ID, amount: 25 });
+    expect(createProviderCheckout).toHaveBeenCalled();
   });
 
   it("still returns success with a locally-built notification if the notification insert fails", async () => {
@@ -227,9 +266,11 @@ describe("createPaymentIntent", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected ok result");
     expect(result.intent.id).toBe("tx-1");
+    expect(result.checkout.url).toBe("https://checkout.example/flouci");
 
     const insertCall = calls.find((call) => call.table === "payment_transactions" && call.op === "insert");
     expect(insertCall).toBeUndefined();
+    expect(createProviderCheckout).not.toHaveBeenCalled();
   });
 
   it("never throws - unexpected errors are caught and reported as a friendly message", async () => {

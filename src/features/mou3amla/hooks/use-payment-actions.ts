@@ -1,8 +1,6 @@
 import { useCallback, type RefObject } from "react";
 import { toast } from "sonner";
 import { buildInvoice } from "@/features/invoices/lib/el-fatoora";
-import { attemptNativeHandoff } from "@/features/payments/lib/deep-link";
-import { buildTunpayUri } from "@/features/payments/lib/tunpay";
 import { createPaymentIntent } from "@/features/payments/server/actions";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
@@ -80,8 +78,7 @@ export function usePaymentActions({
       dispatch({
         isSendingPayment: false,
         currentIntent: result.intent,
-        screen: "activity",
-        highlightedActivityId: result.activity.id,
+        screen: "home",
         confetti: makeConfetti(),
         amount: "",
         recipientInput: "",
@@ -100,10 +97,11 @@ export function usePaymentActions({
       // verification_status === "verified" (see wallets/server/actions.ts).
       // Surfacing that here is reporting a real, enforced guarantee, not a
       // trust claim invented for the toast.
-      toast.success("Payment intent saved and handed off to the bank rail.", {
-        description: "Routed between two identity-verified Mou3amla accounts.",
+      toast.success(`Opening ${result.checkout.providerName} checkout...`, {
+        description: "Mou3amla saved the route first, then redirected you to the provider sandbox.",
       });
-      attemptNativeHandoff(buildTunpayUri(result.intent));
+
+      window.location.assign(result.checkout.url);
     })();
   }, [dispatch, stateRef]);
 

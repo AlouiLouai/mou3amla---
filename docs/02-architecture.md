@@ -13,9 +13,11 @@ src/
     page.tsx              # Stage 1 auth landing: phone + username
     verify/page.tsx       # Stage 2 passkey (WebAuthn) gate
     home/page.tsx         # Stage 3 authenticated dashboard
+    payments/return/      # Provider redirect landing pages (Flouci/Konnect)
     verify-identity/      # Identity verification entry (demo KYC flow only, see conventions)
     api/qr/               # Signed QR mint + recipient resolve
     api/nearby/           # Nearby 3-digit handoff publish/options/claim
+    api/payments/providers/# Provider webhooks / payment finalization callbacks
     auth/logout/route.ts  # Session teardown
 
   features/

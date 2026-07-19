@@ -1,5 +1,6 @@
 import "server-only";
 
+import { headers } from "next/headers";
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -35,9 +36,39 @@ type PasskeyVerificationRow = {
  * this is the one thing we control end-to-end, unlike Supabase's own
  * experimental passkey feature which turned out to reject valid credentials
  * even with a correctly configured Relying Party. */
-function getRpConfig() {
+function getConfiguredRpConfig() {
   const url = new URL(serverEnv.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
   return { rpID: url.hostname, origin: url.origin };
+}
+
+function isLoopbackHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+async function getRpConfig() {
+  const configured = getConfiguredRpConfig();
+  const expectedOrigins = new Set<string>([configured.origin]);
+
+  if (serverEnv.NODE_ENV !== "production" && isLoopbackHost(configured.rpID)) {
+    const requestOrigin = (await headers()).get("origin");
+
+    if (requestOrigin) {
+      try {
+        const requestUrl = new URL(requestOrigin);
+        if (requestUrl.hostname === configured.rpID || isLoopbackHost(requestUrl.hostname)) {
+          expectedOrigins.add(requestUrl.origin);
+        }
+      } catch {
+        // Ignore malformed Origin headers and keep the configured fallback.
+      }
+    }
+  }
+
+  return {
+    rpID: configured.rpID,
+    origin: configured.origin,
+    expectedOrigins: Array.from(expectedOrigins),
+  };
 }
 
 async function listCredentialDescriptors(userId: string) {
@@ -57,7 +88,7 @@ export async function hasPasskey(userId: string): Promise<boolean> {
 }
 
 export async function buildRegistrationOptions(userId: string, username: string): Promise<PublicKeyCredentialCreationOptionsJSON> {
-  const { rpID } = getRpConfig();
+  const { rpID } = await getRpConfig();
   const excludeCredentials = await listCredentialDescriptors(userId);
 
   return generateRegistrationOptions({
@@ -88,23 +119,23 @@ export async function verifyRegistration(
   challenge: string,
   response: RegistrationResponseJSON,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { rpID, origin } = getRpConfig();
+  const { rpID, origin, expectedOrigins } = await getRpConfig();
 
   let verification;
   try {
     verification = await verifyRegistrationResponse({
       response,
       expectedChallenge: challenge,
-      expectedOrigin: origin,
+      expectedOrigin: expectedOrigins,
       expectedRPID: rpID,
     });
   } catch (error) {
-    logger.error("verifyRegistrationResponse threw", error, { userId, rpID, origin });
+    logger.error("verifyRegistrationResponse threw", error, { userId, rpID, origin, expectedOrigins });
     return { ok: false, message: "We couldn't verify that passkey. Please try again." };
   }
 
   if (!verification.verified || !verification.registrationInfo) {
-    logger.warn("Passkey registration not verified", { userId, rpID, origin });
+    logger.warn("Passkey registration not verified", { userId, rpID, origin, expectedOrigins });
     return { ok: false, message: "We couldn't verify that passkey. Please try again." };
   }
 
@@ -130,7 +161,7 @@ export async function verifyRegistration(
 }
 
 export async function buildAuthenticationOptions(userId: string): Promise<PublicKeyCredentialRequestOptionsJSON | null> {
-  const { rpID } = getRpConfig();
+  const { rpID } = await getRpConfig();
   const allowCredentials = await listCredentialDescriptors(userId);
 
   if (allowCredentials.length === 0) {
@@ -149,7 +180,7 @@ export async function verifyAuthentication(
   challenge: string,
   response: AuthenticationResponseJSON,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { rpID, origin } = getRpConfig();
+  const { rpID, origin, expectedOrigins } = await getRpConfig();
   const admin = createAdminClient();
 
   const { data: passkey, error: lookupError } = await admin
@@ -169,7 +200,7 @@ export async function verifyAuthentication(
     verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challenge,
-      expectedOrigin: origin,
+      expectedOrigin: expectedOrigins,
       expectedRPID: rpID,
       credential: {
         id: passkey.credential_id,
@@ -179,12 +210,12 @@ export async function verifyAuthentication(
       },
     });
   } catch (error) {
-    logger.error("verifyAuthenticationResponse threw", error, { userId, rpID, origin });
+    logger.error("verifyAuthenticationResponse threw", error, { userId, rpID, origin, expectedOrigins });
     return { ok: false, message: "We couldn't verify that passkey. Please try again." };
   }
 
   if (!verification.verified) {
-    logger.warn("Passkey authentication not verified", { userId, rpID, origin });
+    logger.warn("Passkey authentication not verified", { userId, rpID, origin, expectedOrigins });
     return { ok: false, message: "We couldn't verify that passkey. Please try again." };
   }
 

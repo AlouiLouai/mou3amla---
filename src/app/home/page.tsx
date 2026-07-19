@@ -1,8 +1,15 @@
 import { requireCurrentAppUser } from "@/features/auth/server/dal";
 import { Mou3amlaApp } from "@/features/mou3amla/components/mou3amla-app";
 
-export default async function HomePage() {
+type HomePageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export default async function HomePage(props: HomePageProps) {
   const user = await requireCurrentAppUser();
+  const searchParams = await props.searchParams;
+  const highlightedRefId = typeof searchParams.payment_ref === "string" ? searchParams.payment_ref : "";
+  const highlightedActivity = highlightedRefId ? user.activityLog.find((item) => item.refId === highlightedRefId) ?? null : null;
 
   return (
     <Mou3amlaApp
@@ -18,6 +25,8 @@ export default async function HomePage() {
         activityLog: user.activityLog,
         notifications: user.notifications,
         invoices: user.invoices,
+        initialScreen: highlightedActivity ? "activity" : "home",
+        highlightedActivityId: highlightedActivity?.id ?? null,
       }}
     />
   );

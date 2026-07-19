@@ -43,12 +43,17 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!initialUser?.initialScreen && !initialUser?.highlightedActivityId) return;
+    router.replace("/home", { scroll: false });
+  }, [initialUser?.highlightedActivityId, initialUser?.initialScreen, router]);
+
   // Delivers "payment received" (and any other) notification the instant it's
   // inserted, instead of only on the next full page load - see
-  // use-realtime-notifications.ts. A payment_received event also carries the
-  // recipient's own Activity row (embedded in the notification's metadata at
-  // write time), so the recipient can jump straight to Activity and see it
-  // highlighted, the same moment the sender does.
+  // use-realtime-notifications.ts. A payment_received event is emitted only
+  // once the provider checkout is actually confirmed, and it carries the
+  // recipient's own Activity row in metadata so they can jump straight to
+  // Activity and see the confirmed transfer highlighted.
   useRealtimeNotifications(
     state.profile.id,
     useCallback(

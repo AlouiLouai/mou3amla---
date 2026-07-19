@@ -8,6 +8,7 @@ import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { useRecipientSearch } from "@/features/payments/hooks/use-recipient-search";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
+import { PROVIDERS } from "@/features/wallets/constants";
 
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "backspace"];
 
@@ -16,13 +17,17 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
   const searchEnabled = !state.recipientPreview && state.recipientInput.trim().length >= 2;
   const { results: recipientResults, isSearching } = useRecipientSearch(state.recipientInput, searchEnabled);
   const account = derived.account;
+  const sourceWallet = derived.sourceWallet;
+  const sourceProvider = sourceWallet ? PROVIDERS.find((provider) => provider.id === sourceWallet.providerId) ?? null : null;
   const amountDisplay = state.amount || "0";
   const recipientVerified = !state.recipientPreview || state.recipientPreview.verificationStatus === "verified";
+  const checkoutSupported = sourceProvider?.demoCheckoutStatus === "supported";
   const canGenerate =
     derived.hasAnyWallets &&
     Number.parseFloat(state.amount) > 0 &&
     state.recipientInput.trim().length > 0 &&
     recipientVerified &&
+    checkoutSupported &&
     !state.isSendingPayment;
   const header = (
     <AppHeader
@@ -42,6 +47,19 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
           style={{ background: mou3amla.card, borderColor: mou3amla.border, color: mou3amla.textMuted }}
         >
           Link at least one account on the dashboard before creating a payment intent.
+        </div>
+      ) : null}
+
+      {sourceWallet && !checkoutSupported ? (
+        <div
+          className="mb-4 rounded-2xl border p-4 text-[12px] leading-relaxed"
+          style={{
+            background: alpha(mou3amla.subtle, 0.08),
+            borderColor: alpha(mou3amla.subtle, 0.24),
+            color: mou3amla.textMuted,
+          }}
+        >
+          {sourceWallet.name} stays visible in the BCT story, but today only Flouci and Konnect are wired to a live sandbox checkout.
         </div>
       ) : null}
 
