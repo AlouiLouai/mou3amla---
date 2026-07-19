@@ -317,9 +317,21 @@ external API) follows the same `xUnsafe` + wrapper split - see
   `createPaymentIntent` now creates the durable Mou3amla transaction row
   first, then creates a provider checkout session server-side for the selected
   source rail. Today only `flouci` and `konnect` are wired to live sandbox
-  APIs (`provider-checkouts.ts`); all other rails remain linkable and
-  selectable in the UI but must fail gracefully with a clear "planned/not
-  sandbox-wired yet" message instead of pretending to launch a real checkout.
+  APIs (`provider-checkouts.ts`). The shell therefore tracks two separate
+  concepts on purpose: `sourceWalletId` remains the user's default *receive*
+  route (`linked_destinations.is_default` in Supabase), while the client-only
+  `sendSourceWalletId` is just the currently chosen live-checkout rail for the
+  send screen. Only linked Flouci/Konnect accounts should appear in that send
+  picker; other linked rails remain visible in account management and receive
+  routing, but must not pretend to launch a real checkout.
+- **Linked-destination deletion is an authenticated, rate-limited write path.**
+  `deleteDestination` in `src/features/wallets/server/actions.ts` follows the
+  same audit bar as linking and send-money: session check, per-user rate limit
+  (`delete-destination:<userId>`, 10/5min), ownership enforcement, wrapper
+  error logging, and unit coverage. If the deleted row was the default receive
+  route, the next remaining linked destination is promoted immediately; the
+  Accounts screen always asks for an explicit second confirmation before
+  removing a wallet or bank account from Mou3amla.
 - **Provider finalization is server-verified and idempotent.** Browser return
   pages live under `/payments/return/[provider]`; webhook endpoints live under
   `/api/payments/providers/**`; both go through the same server-side verify +

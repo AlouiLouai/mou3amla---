@@ -8,7 +8,6 @@ import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { useRecipientSearch } from "@/features/payments/hooks/use-recipient-search";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
-import { PROVIDERS } from "@/features/wallets/constants";
 
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "backspace"];
 
@@ -17,17 +16,15 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
   const searchEnabled = !state.recipientPreview && state.recipientInput.trim().length >= 2;
   const { results: recipientResults, isSearching } = useRecipientSearch(state.recipientInput, searchEnabled);
   const account = derived.account;
-  const sourceWallet = derived.sourceWallet;
-  const sourceProvider = sourceWallet ? PROVIDERS.find((provider) => provider.id === sourceWallet.providerId) ?? null : null;
+  const sourceWallet = derived.sendSourceWallet;
   const amountDisplay = state.amount || "0";
   const recipientVerified = !state.recipientPreview || state.recipientPreview.verificationStatus === "verified";
-  const checkoutSupported = sourceProvider?.demoCheckoutStatus === "supported";
   const canGenerate =
-    derived.hasAnyWallets &&
+    derived.supportedSendWallets.length > 0 &&
     Number.parseFloat(state.amount) > 0 &&
     state.recipientInput.trim().length > 0 &&
     recipientVerified &&
-    checkoutSupported &&
+    !!sourceWallet &&
     !state.isSendingPayment;
   const header = (
     <AppHeader
@@ -50,7 +47,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         </div>
       ) : null}
 
-      {sourceWallet && !checkoutSupported ? (
+      {derived.supportedSendWallets.length === 0 ? (
         <div
           className="mb-4 rounded-2xl border p-4 text-[12px] leading-relaxed"
           style={{
@@ -59,7 +56,18 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          {sourceWallet.name} stays visible in the BCT story, but today only Flouci and Konnect are wired to a live sandbox checkout.
+          Link Flouci or Konnect to launch a live sandbox checkout. Your other linked rails still stay available for receive routing and for the BCT interoperability story.
+        </div>
+      ) : account.wallets.length > derived.supportedSendWallets.length ? (
+        <div
+          className="mb-4 rounded-2xl border p-4 text-[12px] leading-relaxed"
+          style={{
+            background: alpha(mou3amla.subtle, 0.08),
+            borderColor: alpha(mou3amla.subtle, 0.24),
+            color: mou3amla.textMuted,
+          }}
+        >
+          Send opens a live sandbox checkout only for Flouci and Konnect. Other linked wallets and bank accounts stay on your profile for receiving.
         </div>
       ) : null}
 
@@ -72,13 +80,13 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border px-2 py-2"
             style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong }}
           >
-            {account.wallets.map((wallet) => {
-              const selected = wallet.id === account.sourceWalletId;
+            {derived.supportedSendWallets.map((wallet) => {
+              const selected = wallet.id === state.sendSourceWalletId;
               return (
                 <button
                   key={wallet.id}
                   type="button"
-                  onClick={() => actions.selectSource(wallet.id)}
+                  onClick={() => actions.selectSendSource(wallet.id)}
                   className="flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 transition-colors"
                   style={{
                     background: selected ? alpha(wallet.color, 0.16) : "transparent",

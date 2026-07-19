@@ -12,7 +12,11 @@ durable Mou3amla intent first, then redirects the payer into a provider-hosted
 sandbox checkout for the two rails with the clearest public test APIs today:
 **Flouci** and **Konnect**. Other rails still stay visible/linkable in the UI,
 but remain explicitly demo-visible/planned until comparable test handoffs
-exist. QR discovery still uses a real rotating-QR-code rail or a
+exist. In practice, that means a user's public/default receive route can still
+be any linked wallet or bank account, while the send screen only offers linked
+Flouci/Konnect sources for the live hosted-checkout demo. Linked destinations
+can also now be removed from the Accounts screen with a deliberate two-step
+confirmation. QR discovery still uses a real rotating-QR-code rail or a
 **simulated** BLE proximity indicator (real BLE peripheral advertising isn't
 possible from a browser - see
 [07-agent-guardrails.md](./07-agent-guardrails.md)).

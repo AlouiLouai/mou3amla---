@@ -34,6 +34,10 @@ const selectPrimarySchema = z.object({
   destinationId: z.string().uuid(),
 });
 
+const deleteDestinationSchema = z.object({
+  destinationId: z.string().uuid(),
+});
+
 function validateRoutingValue(type: RoutingType, value: string): string | null {
   if (type === "rib" && !/^\d{20}$/.test(value)) {
     return "A RIB is exactly 20 digits.";
@@ -202,6 +206,7 @@ export async function linkDestination(input: { providerId: string; routingValue:
 }
 
 type SetPrimaryDestinationResult = { ok: true } | { ok: false; message: string };
+type DeleteDestinationResult = { ok: true; deletedId: string; nextSourceWalletId: string } | { ok: false; message: string };
 
 async function setPrimaryDestinationUnsafe(input: { destinationId: string }): Promise<SetPrimaryDestinationResult> {
   const parsed = selectPrimarySchema.safeParse(input);
@@ -256,5 +261,96 @@ export async function setPrimaryDestination(input: { destinationId: string }): P
   } catch (error) {
     logger.error("Unhandled error setting primary destination", error, { destinationId: input.destinationId });
     return { ok: false, message: "We couldn't update your primary route right now." };
+  }
+}
+
+async function deleteDestinationUnsafe(input: { destinationId: string }): Promise<DeleteDestinationResult> {
+  const parsed = deleteDestinationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid destination first." };
+  }
+
+  const identity = await getSessionIdentity();
+  if (!identity) {
+    return { ok: false, message: "Your session expired. Sign in again." };
+  }
+
+  const withinLimit = await checkRateLimit(`delete-destination:${identity.userId}`, { max: 10, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many delete attempts. Please wait a few minutes and try again." };
+  }
+
+  const admin = createAdminClient();
+  const { data: destination, error: destinationError } = await admin
+    .from("linked_destinations")
+    .select("id, is_default")
+    .eq("id", parsed.data.destinationId)
+    .eq("user_id", identity.userId)
+    .maybeSingle<{ id: string; is_default: boolean }>();
+
+  if (destinationError || !destination) {
+    return { ok: false, message: "That destination doesn't belong to your account." };
+  }
+
+  const { error: deleteError } = await admin
+    .from("linked_destinations")
+    .delete()
+    .eq("id", parsed.data.destinationId)
+    .eq("user_id", identity.userId);
+
+  if (deleteError) {
+    return { ok: false, message: "We couldn't remove that destination right now." };
+  }
+
+  let nextSourceWalletId = "";
+
+  if (destination.is_default) {
+    const { data: fallbackDestination, error: fallbackError } = await admin
+      .from("linked_destinations")
+      .select("id")
+      .eq("user_id", identity.userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (fallbackError) {
+      return { ok: false, message: "We removed the destination, but couldn't reload your next default route." };
+    }
+
+    if (fallbackDestination) {
+      const { error: resetError } = await admin
+        .from("linked_destinations")
+        .update({ is_default: false })
+        .eq("user_id", identity.userId)
+        .eq("is_default", true);
+
+      if (resetError) {
+        return { ok: false, message: "We removed the destination, but couldn't refresh your default route yet." };
+      }
+
+      const { error: applyError } = await admin
+        .from("linked_destinations")
+        .update({ is_default: true })
+        .eq("id", fallbackDestination.id)
+        .eq("user_id", identity.userId);
+
+      if (applyError) {
+        return { ok: false, message: "We removed the destination, but couldn't promote the next route yet." };
+      }
+
+      nextSourceWalletId = fallbackDestination.id;
+    }
+  }
+
+  revalidatePath("/home");
+  return { ok: true, deletedId: parsed.data.destinationId, nextSourceWalletId };
+}
+
+export async function deleteDestination(input: { destinationId: string }): Promise<DeleteDestinationResult> {
+  try {
+    return await deleteDestinationUnsafe(input);
+  } catch (error) {
+    logger.error("Unhandled error deleting destination", error, { destinationId: input.destinationId });
+    return { ok: false, message: "We couldn't remove that destination right now. Please try again." };
   }
 }

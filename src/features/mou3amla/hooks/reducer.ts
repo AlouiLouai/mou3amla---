@@ -1,5 +1,5 @@
 import type { InitialMou3amlaUser, Mou3amlaState } from "@/features/mou3amla/types";
-import { makeConfetti } from "@/features/mou3amla/hooks/utils";
+import { getPreferredSendWalletId, makeConfetti } from "@/features/mou3amla/hooks/utils";
 
 export type Patch = Partial<Mou3amlaState> | ((prev: Mou3amlaState) => Partial<Mou3amlaState> | null);
 
@@ -40,6 +40,7 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
     },
     wallets: initialUser?.wallets ?? [],
     sourceWalletId: initialUser?.sourceWalletId ?? "",
+    sendSourceWalletId: getPreferredSendWalletId(initialUser?.wallets ?? [], initialUser?.sourceWalletId ?? ""),
     activityLog: initialUser?.activityLog ?? [],
     notifications: initialUser?.notifications ?? [],
     invoices: initialUser?.invoices ?? [],

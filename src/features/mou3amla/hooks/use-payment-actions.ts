@@ -4,7 +4,7 @@ import { buildInvoice } from "@/features/invoices/lib/el-fatoora";
 import { createPaymentIntent } from "@/features/payments/server/actions";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
-import { makeConfetti } from "@/features/mou3amla/hooks/utils";
+import { getPreferredSendWalletId, makeConfetti } from "@/features/mou3amla/hooks/utils";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 export function usePaymentActions({
@@ -47,8 +47,8 @@ export function usePaymentActions({
     const amount = parseFloat(stateRef.current.amount);
     const recipient = stateRef.current.recipientInput.trim();
 
-    if (!stateRef.current.wallets.length || !stateRef.current.sourceWalletId) {
-      toast.error("Link and choose a destination account first.");
+    if (!stateRef.current.wallets.length || !stateRef.current.sendSourceWalletId) {
+      toast.error("Link Flouci or Konnect first, then choose the wallet that should open checkout.");
       return;
     }
 
@@ -62,7 +62,7 @@ export function usePaymentActions({
 
     void (async () => {
       const result = await createPaymentIntent({
-        sourceWalletId: stateRef.current.sourceWalletId,
+        sourceWalletId: stateRef.current.sendSourceWalletId,
         recipientUsername: recipient,
         amount,
       });
@@ -146,6 +146,10 @@ export function usePaymentActions({
             recipientPreview: payload.recipient,
             screen: "generate-intent",
             scanManualInput: "",
+            sendSourceWalletId: getPreferredSendWalletId(
+              stateRef.current.wallets,
+              stateRef.current.sendSourceWalletId || stateRef.current.sourceWalletId,
+            ),
           });
 
           toast.success(`Recipient found: @${payload.recipient.username}`);

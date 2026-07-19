@@ -3,9 +3,9 @@ import type { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
-import { applyDefaultWallet } from "@/features/mou3amla/hooks/utils";
+import { applyDefaultWallet, getPreferredSendWalletId } from "@/features/mou3amla/hooks/utils";
 import { PROVIDERS } from "@/features/wallets/constants";
-import { linkDestination, setPrimaryDestination } from "@/features/wallets/server/actions";
+import { deleteDestination, linkDestination, setPrimaryDestination } from "@/features/wallets/server/actions";
 
 export function useWalletActions({
   dispatch,
@@ -74,6 +74,10 @@ export function useWalletActions({
       dispatch((s) => ({
         wallets: [...s.wallets, result.wallet],
         sourceWalletId: result.sourceWalletId || s.sourceWalletId || result.wallet.id,
+        sendSourceWalletId: getPreferredSendWalletId(
+          [...s.wallets, result.wallet],
+          s.sendSourceWalletId || result.sourceWalletId || s.sourceWalletId || result.wallet.id,
+        ),
         linkConnectingId: null,
         linkOpen: false,
         linkIdentifierInput: "",
@@ -108,6 +112,43 @@ export function useWalletActions({
     [dispatch, stateRef],
   );
 
+  const selectSendSource = useCallback(
+    (id: string) => {
+      dispatch({ sendSourceWalletId: id });
+    },
+    [dispatch],
+  );
+
+  const deleteLinkedDestination = useCallback(
+    async (id: string) => {
+      const wallet = stateRef.current.wallets.find((entry) => entry.id === id);
+      if (!wallet) {
+        return { ok: false, message: "That destination no longer exists." };
+      }
+
+      const result = await deleteDestination({ destinationId: id });
+      if (!result.ok) {
+        toast.error(result.message);
+        return result;
+      }
+
+      dispatch((s) => {
+        const wallets = s.wallets.filter((entry) => entry.id !== id);
+        const sourceWalletId = result.nextSourceWalletId || (s.sourceWalletId === id ? "" : s.sourceWalletId);
+
+        return {
+          wallets: applyDefaultWallet(wallets, sourceWalletId),
+          sourceWalletId,
+          sendSourceWalletId: getPreferredSendWalletId(wallets, s.sendSourceWalletId === id ? sourceWalletId : s.sendSourceWalletId),
+        };
+      });
+
+      toast.success(`${wallet.name} removed from linked accounts.`);
+      return result;
+    },
+    [dispatch, stateRef],
+  );
+
   return {
     openLink,
     closeLink,
@@ -116,5 +157,7 @@ export function useWalletActions({
     onLinkIdentifierChange,
     confirmLinkWallet,
     selectSource,
+    selectSendSource,
+    deleteLinkedDestination,
   };
 }

@@ -72,6 +72,7 @@ export interface Mou3amlaState {
   profile: UserProfile;
   wallets: LinkedWallet[];
   sourceWalletId: string;
+  sendSourceWalletId: string;
   activityLog: ActivityItem[];
   notifications: NotificationItem[];
   invoices: Invoice[];

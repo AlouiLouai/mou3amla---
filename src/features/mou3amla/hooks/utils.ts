@@ -1,4 +1,5 @@
 import type { LinkedWallet } from "@/features/wallets/types";
+import { isSupportedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 
 export function makeConfetti() {
   const colors = ["#FF0083", "#FF8D28", "#050505", "#FFC4E3"];
@@ -15,6 +16,20 @@ export function applyDefaultWallet(wallets: LinkedWallet[], selectedId: string) 
     ...wallet,
     isDefault: wallet.id === selectedId,
   }));
+}
+
+export function getSupportedCheckoutWallets(wallets: LinkedWallet[]) {
+  return wallets.filter((wallet) => isSupportedCheckoutProvider(wallet.providerId));
+}
+
+export function getPreferredSendWalletId(wallets: LinkedWallet[], preferredId: string) {
+  const supportedWallets = getSupportedCheckoutWallets(wallets);
+
+  if (supportedWallets.some((wallet) => wallet.id === preferredId)) {
+    return preferredId;
+  }
+
+  return supportedWallets[0]?.id ?? "";
 }
 
 export function vibrate(pattern: number | number[]) {

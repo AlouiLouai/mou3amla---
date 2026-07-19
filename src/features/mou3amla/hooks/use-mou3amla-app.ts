@@ -11,6 +11,7 @@ import { initialState, reducer } from "@/features/mou3amla/hooks/reducer";
 import { useNotificationActions } from "@/features/mou3amla/hooks/use-notification-actions";
 import { usePaymentActions } from "@/features/mou3amla/hooks/use-payment-actions";
 import { useQrNearbyActions } from "@/features/mou3amla/hooks/use-qr-nearby-actions";
+import { getPreferredSendWalletId, getSupportedCheckoutWallets } from "@/features/mou3amla/hooks/utils";
 import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
 
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
@@ -102,7 +103,17 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       return;
     }
 
-    dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null });
+    const sendSourceWalletId = getPreferredSendWalletId(
+      stateRef.current.wallets,
+      stateRef.current.sendSourceWalletId || stateRef.current.sourceWalletId,
+    );
+
+    if (!sendSourceWalletId) {
+      toast.error("Link Flouci or Konnect to launch a live sandbox checkout. Other linked rails still work for receiving.");
+      return;
+    }
+
+    dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null, sendSourceWalletId });
   }, []);
   const goReceiveQr = useCallback((mode: HandoffMode = "qr") => {
     if (!stateRef.current.wallets.length) {
@@ -115,6 +126,11 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const goScanQr = useCallback((mode: HandoffMode = "qr") => {
     if (!stateRef.current.wallets.length) {
       toast.error("Link an account first so Mou3amla can route your outgoing payment.");
+      return;
+    }
+
+    if (!getSupportedCheckoutWallets(stateRef.current.wallets).length) {
+      toast.error("Link Flouci or Konnect first to open a live checkout after scanning.");
       return;
     }
 
@@ -147,6 +163,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     derived: {
       account,
       sourceWallet: state.wallets.find((wallet) => wallet.id === state.sourceWalletId) ?? null,
+      sendSourceWallet: state.wallets.find((wallet) => wallet.id === state.sendSourceWalletId) ?? null,
+      supportedSendWallets: getSupportedCheckoutWallets(state.wallets),
       hasAnyWallets: state.wallets.length > 0,
       unreadNotifications: state.notifications.filter((item) => item.unread).length,
       availableProviders: PROVIDERS.filter((provider) => !state.wallets.some((wallet) => wallet.providerId === provider.id)),

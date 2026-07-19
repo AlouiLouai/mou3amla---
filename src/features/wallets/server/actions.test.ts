@@ -8,7 +8,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const { createAdminClient } = await import("@/lib/supabase/admin");
 const { getSessionIdentity } = await import("@/features/auth/server/dal");
 const { checkRateLimit } = await import("@/lib/rate-limit");
-const { linkDestination, setPrimaryDestination } = await import("@/features/wallets/server/actions");
+const { deleteDestination, linkDestination, setPrimaryDestination } = await import("@/features/wallets/server/actions");
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const OTHER_USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -36,7 +36,12 @@ function makeFrom(queue: unknown[]) {
         calls.push({ table, op: "update", args });
         return builder;
       },
+      delete: (...args: unknown[]) => {
+        calls.push({ table, op: "delete", args });
+        return builder;
+      },
       eq: () => builder,
+      neq: () => builder,
       order: () => builder,
       limit: () => builder,
       maybeSingle: () => Promise.resolve(result),
@@ -266,5 +271,98 @@ describe("setPrimaryDestination", () => {
     const updateCalls = calls.filter((call) => call.op === "update");
     expect(updateCalls[0].args[0]).toEqual({ is_default: false });
     expect(updateCalls[1].args[0]).toEqual({ is_default: true });
+  });
+});
+
+describe("deleteDestination", () => {
+  const VALID_DESTINATION_ID = "44444444-4444-4444-8444-444444444444";
+  const FALLBACK_DESTINATION_ID = "55555555-5555-4555-8555-555555555555";
+
+  it("rejects a non-uuid destination id without touching the database", async () => {
+    const result = await deleteDestination({ destinationId: "not-a-uuid" });
+
+    expect(result).toEqual({ ok: false, message: expect.any(String) });
+    expect(getSessionIdentity).not.toHaveBeenCalled();
+  });
+
+  it("requires an active session", async () => {
+    vi.mocked(getSessionIdentity).mockResolvedValue(null);
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/session expired/i) });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects when rate-limited, before touching the database", async () => {
+    vi.mocked(checkRateLimit).mockResolvedValue(false);
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/too many/i) });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects a destination that doesn't belong to the caller", async () => {
+    const { admin } = makeFakeAdmin([{ data: null, error: null }]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/doesn't belong/i) });
+  });
+
+  it("deletes a non-default destination without changing the default route", async () => {
+    const { admin, calls } = makeFakeAdmin([
+      { data: { id: VALID_DESTINATION_ID, is_default: false }, error: null },
+      { data: null, error: null },
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: true, deletedId: VALID_DESTINATION_ID, nextSourceWalletId: "" });
+    expect(calls.find((call) => call.op === "delete")?.table).toBe("linked_destinations");
+  });
+
+  it("deletes the default destination and promotes the next available one", async () => {
+    const { admin, calls } = makeFakeAdmin([
+      { data: { id: VALID_DESTINATION_ID, is_default: true }, error: null },
+      { data: null, error: null },
+      { data: { id: FALLBACK_DESTINATION_ID }, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: true, deletedId: VALID_DESTINATION_ID, nextSourceWalletId: FALLBACK_DESTINATION_ID });
+    const updateCalls = calls.filter((call) => call.op === "update");
+    expect(updateCalls[0].args[0]).toEqual({ is_default: false });
+    expect(updateCalls[1].args[0]).toEqual({ is_default: true });
+  });
+
+  it("deletes the only remaining destination and leaves no default route", async () => {
+    const { admin } = makeFakeAdmin([
+      { data: { id: VALID_DESTINATION_ID, is_default: true }, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: true, deletedId: VALID_DESTINATION_ID, nextSourceWalletId: "" });
+  });
+
+  it("never throws - unexpected errors are caught and reported as a friendly message", async () => {
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    const result = await deleteDestination({ destinationId: VALID_DESTINATION_ID });
+
+    expect(result).toEqual({ ok: false, message: expect.any(String) });
   });
 });
