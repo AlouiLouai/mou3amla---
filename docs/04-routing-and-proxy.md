@@ -11,6 +11,7 @@ Important app routes in this project:
 - `/` -> Stage 1 landing screen for `+216` phone + `@username`
 - `/verify` -> Stage 2 passkey (WebAuthn) gate
 - `/home` -> authenticated dashboard shell
+- `/payments/return/[provider]` -> authenticated provider-checkout return landing page; verifies the provider result server-side, finalizes the transaction, then redirects back into `/home?payment_ref=...`
 - `/verify-identity` -> identity verification entry screen (demo KYC flow only, see [06-conventions.md](./06-conventions.md#kyc-conventions))
 - `/api/qr/mint` -> mints a signed rotating QR payload for the authenticated recipient
 - `/api/qr/resolve` -> verifies a signed QR payload and resolves recipient routing preview
@@ -20,6 +21,8 @@ Important app routes in this project:
 - `/api/nearby/status` -> polled by both sides of a nearby match to read/react to status changes
 - `/api/nearby/accept` -> either side accepts the match; recipient is only revealed once both have
 - `/api/users/search` -> recipient username typeahead for the send screen (own admin-client query, since RLS only allows reading your own profile row)
+- `/api/payments/providers/flouci/webhook` -> Flouci checkout webhook finalizer
+- `/api/payments/providers/konnect/webhook` -> Konnect checkout webhook finalizer
 - `/auth/logout` -> destroys the Supabase session
 - `/~offline` -> offline fallback
 - `/serwist/[path]` -> service worker build/serve route

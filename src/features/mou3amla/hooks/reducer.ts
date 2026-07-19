@@ -10,7 +10,7 @@ export function reducer(state: Mou3amlaState, patch: Patch): Mou3amlaState {
 
 export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
   return {
-    screen: "home",
+    screen: initialUser?.initialScreen ?? "home",
     initialHandoffMode: "qr",
     linkOpen: false,
     linkStep: "provider",
@@ -43,6 +43,6 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
     activityLog: initialUser?.activityLog ?? [],
     notifications: initialUser?.notifications ?? [],
     invoices: initialUser?.invoices ?? [],
-    highlightedActivityId: null,
+    highlightedActivityId: initialUser?.highlightedActivityId ?? null,
   };
 }

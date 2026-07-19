@@ -1,6 +1,8 @@
 export type IntentStatus = "building" | "dispatched" | "confirmed";
 export type PersistedTransactionStatus = "initiated" | "confirmed" | "failed";
 
+export type SupportedCheckoutProviderId = "flouci" | "konnect";
+
 export interface PaymentIntent {
   id: string;
   refId: string;
@@ -10,6 +12,12 @@ export interface PaymentIntent {
   sourceWalletId: string;
   createdAt: number;
   status: IntentStatus;
+}
+
+export interface PaymentCheckoutLaunch {
+  providerId: SupportedCheckoutProviderId;
+  providerName: string;
+  url: string;
 }
 
 /** Rotating proximity token encoded into the receive-screen QR code. */

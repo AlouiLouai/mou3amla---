@@ -5,7 +5,10 @@ import { z } from "zod";
 import type { ActivityItem } from "@/features/activity/types";
 import { getSessionIdentity } from "@/features/auth/server/dal";
 import type { NotificationItem } from "@/features/notifications/types";
-import type { PaymentIntent } from "@/features/payments/types";
+import { isSupportedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
+import type { PaymentCheckoutLaunch, PaymentIntent } from "@/features/payments/types";
+import { createProviderCheckout } from "@/features/payments/server/provider-checkouts";
+import type { PaymentTransactionMetadata } from "@/features/payments/server/transaction-metadata";
 import { generateRefId } from "@/features/payments/lib/tunpay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -20,6 +23,7 @@ type SenderProfileRow = {
 type DestinationRow = {
   id: string;
   user_id: string;
+  provider_id: string;
   name: string;
   routing_value: string;
 };
@@ -31,10 +35,12 @@ type RecipientProfileRow = {
   verification_status: "unverified" | "pending" | "verified" | "rejected";
 };
 
-type TransactionInsertRow = {
+type TransactionRow = {
   id: string;
   ref_id: string;
   amount: number | string;
+  status: "initiated" | "confirmed" | "failed";
+  metadata: PaymentTransactionMetadata | null;
   created_at: string;
 };
 
@@ -70,6 +76,10 @@ function formatActivityDate(value: string): string {
   }).format(date);
 }
 
+function normalizeAmount(value: number | string): number {
+  return typeof value === "number" ? value : Number.parseFloat(value);
+}
+
 type CreatePaymentIntentInput = {
   sourceWalletId: string;
   recipientUsername: string;
@@ -82,6 +92,7 @@ type CreatePaymentIntentResult =
       intent: PaymentIntent;
       activity: ActivityItem;
       senderNotification: NotificationItem;
+      checkout: PaymentCheckoutLaunch;
     }
   | { ok: false; message: string };
 
@@ -110,7 +121,7 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       admin.from("profiles").select("id, username, display_name").eq("id", identity.userId).maybeSingle<SenderProfileRow>(),
       admin
         .from("linked_destinations")
-        .select("id, user_id, name, routing_value")
+        .select("id, user_id, provider_id, name, routing_value")
         .eq("id", parsed.data.sourceWalletId)
         .eq("user_id", identity.userId)
         .maybeSingle<DestinationRow>(),
@@ -129,6 +140,13 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     return { ok: false, message: "Choose one of your linked destinations first." };
   }
 
+  if (!isSupportedCheckoutProvider(sourceWallet.provider_id)) {
+    return {
+      ok: false,
+      message: `${sourceWallet.name} is visible in the demo, but only Flouci and Konnect are wired to a live sandbox checkout right now.`,
+    };
+  }
+
   if (recipientError || !recipient) {
     return { ok: false, message: "That recipient doesn't exist in Mou3amla yet." };
   }
@@ -143,7 +161,7 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
 
   const { data: recipientDestination, error: recipientDestinationError } = await admin
     .from("linked_destinations")
-    .select("id, user_id, name, routing_value")
+    .select("id, user_id, provider_id, name, routing_value")
     .eq("user_id", recipient.id)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: true })
@@ -154,34 +172,74 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     return { ok: false, message: "That recipient hasn't linked a destination yet." };
   }
 
-  // A double-tap or a slow-network retry from the same screen resubmits the
-  // exact same (sender, destination, recipient, amount) tuple within seconds
-  // - reuse that row instead of writing a second transaction + a second pair
-  // of notifications for what was really one user action.
   const { data: recentDuplicate } = await admin
     .from("payment_transactions")
-    .select("id, ref_id, amount, created_at")
+    .select("id, ref_id, amount, status, metadata, created_at")
     .eq("sender_user_id", senderProfile.id)
     .eq("recipient_user_id", recipient.id)
     .eq("sender_destination_id", sourceWallet.id)
     .eq("amount", parsed.data.amount)
+    .eq("status", "initiated")
     .gte("created_at", new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle<TransactionInsertRow>();
+    .maybeSingle<TransactionRow>();
 
-  let transaction: TransactionInsertRow;
-  let notificationRows: NotificationInsertRow[];
+  let transaction: TransactionRow;
+  let checkout: PaymentCheckoutLaunch;
+  let notificationRows: NotificationInsertRow[] = [];
 
-  if (recentDuplicate) {
+  const duplicateProviderId = recentDuplicate?.metadata?.provider_id;
+  if (recentDuplicate && recentDuplicate.metadata?.provider_checkout_url && duplicateProviderId && isSupportedCheckoutProvider(duplicateProviderId)) {
     transaction = recentDuplicate;
+    checkout = {
+      providerId: duplicateProviderId,
+      providerName: recentDuplicate.metadata.provider_name ?? sourceWallet.name,
+      url: recentDuplicate.metadata.provider_checkout_url,
+    };
+
     const { data: existingNotifications } = await admin
       .from("notifications")
       .select("id, user_id, type, title, body, unread, created_at")
-      .eq("transaction_id", transaction.id);
+      .eq("transaction_id", transaction.id)
+      .eq("user_id", senderProfile.id);
     notificationRows = (existingNotifications ?? []) as NotificationInsertRow[];
   } else {
     const refId = generateRefId();
+    const checkoutResult = await createProviderCheckout({
+      providerId: sourceWallet.provider_id,
+      providerName: sourceWallet.name,
+      refId,
+      amount: parsed.data.amount,
+      payerPhone: identity.phone,
+      recipientHandle: `@${recipient.username}`,
+    });
+
+    if (!checkoutResult.ok) {
+      return checkoutResult;
+    }
+
+    checkout = {
+      providerId: checkoutResult.providerId,
+      providerName: checkoutResult.providerName,
+      url: checkoutResult.checkoutUrl,
+    };
+
+    const metadata: PaymentTransactionMetadata = {
+      sender_display_name: senderProfile.display_name,
+      sender_username: senderProfile.username,
+      sender_wallet_name: sourceWallet.name,
+      recipient_wallet_name: recipientDestination.name,
+      provider_id: checkoutResult.providerId,
+      provider_name: checkoutResult.providerName,
+      provider_checkout_url: checkoutResult.checkoutUrl,
+      provider_payment_ref: checkoutResult.providerPaymentRef,
+      provider_status: checkoutResult.providerStatus,
+      provider_return_url: checkoutResult.returnUrl,
+      provider_webhook_url: checkoutResult.webhookUrl,
+      demo_checkout_mode: "hosted",
+    };
+
     const { data: inserted, error: insertError } = await admin
       .from("payment_transactions")
       .insert({
@@ -194,15 +252,10 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
         recipient_username: recipient.username,
         recipient_display_name: recipient.display_name,
         status: "initiated",
-        metadata: {
-          sender_display_name: senderProfile.display_name,
-          sender_username: senderProfile.username,
-          sender_wallet_name: sourceWallet.name,
-          recipient_wallet_name: recipientDestination.name,
-        },
+        metadata,
       })
-      .select("id, ref_id, amount, created_at")
-      .single<TransactionInsertRow>();
+      .select("id, ref_id, amount, status, metadata, created_at")
+      .single<TransactionRow>();
 
     if (insertError || !inserted) {
       return { ok: false, message: "We couldn't save this payment route yet. Please retry." };
@@ -214,69 +267,30 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       actor_user_id: recipient.id,
       transaction_id: transaction.id,
       type: "payment_sent" as const,
-      title: "Intent TUNPAY cree",
-      body: `Votre paiement vers @${recipient.username} a ete route a TUNPAY.`,
+      title: `Checkout ${sourceWallet.name} pret`,
+      body: `Votre paiement vers @${recipient.username} est pret via ${sourceWallet.name}.`,
       unread: true,
-      // Must be present (even if empty) alongside recipientNotificationDraft:
-      // a bulk .insert([a, b]) builds one INSERT from the union of both
-      // objects' keys, and sends an explicit NULL - not "use the column
-      // default" - for whichever row is missing a key present on the other.
-      // `metadata` is NOT NULL, so omitting it here made the *entire*
-      // 2-row insert fail with a not-null violation, silently dropping the
-      // recipient's payment_received row (and with it, their Realtime
-      // notification and Activity redirect) along with this one.
       metadata: {},
     };
 
-    const recipientNotificationDraft = {
-      user_id: recipient.id,
-      actor_user_id: senderProfile.id,
-      transaction_id: transaction.id,
-      type: "payment_received" as const,
-      title: "Intent de paiement recu",
-      body: `@${senderProfile.username} a prepare ${parsed.data.amount.toFixed(3)} DT a votre attention.`,
-      unread: true,
-      // Carries enough to build the recipient's own Activity row client-side
-      // the instant this notification arrives over Realtime, without a
-      // second round-trip - see useRealtimeNotifications.
-      metadata: {
-        activity: {
-          id: transaction.id,
-          refId: transaction.ref_id,
-          type: "receive" as const,
-          counterparty: senderProfile.display_name,
-          counterpartyHandle: `@${senderProfile.username}`,
-          wallet: recipientDestination.name,
-          amount: parsed.data.amount,
-          date: formatActivityDate(transaction.created_at),
-          status: "initiated" as const,
-        },
-      },
-    };
-
-    const { data: inserted2, error: notificationError } = await admin
+    const { data: insertedNotifications, error: notificationError } = await admin
       .from("notifications")
-      .insert([senderNotificationDraft, recipientNotificationDraft])
+      .insert(senderNotificationDraft)
       .select("id, user_id, type, title, body, unread, created_at");
 
-    // The payment route itself already committed above - a notification-insert
-    // failure must not report the whole intent as failed (the client would show
-    // an error and the transaction row would silently exist anyway, inviting a
-    // duplicate retry). Log it and fall back to locally-built notification data
-    // below; the in-app notification is a nice-to-have, not the source of truth.
     if (notificationError) {
-      logger.error("Failed to insert payment notifications", notificationError, { transactionId: transaction.id });
+      logger.error("Failed to insert sender payment notification", notificationError, { transactionId: transaction.id });
     }
 
-    notificationRows = (inserted2 ?? []) as NotificationInsertRow[];
+    notificationRows = (insertedNotifications ?? []) as NotificationInsertRow[];
   }
 
   const senderNotificationRow = notificationRows.find((row) => row.user_id === senderProfile.id);
   const senderNotification: NotificationItem = {
     id: senderNotificationRow?.id ?? transaction.id,
     type: senderNotificationRow?.type ?? "payment_sent",
-    title: senderNotificationRow?.title ?? "Intent TUNPAY cree",
-    body: senderNotificationRow?.body ?? `Votre paiement vers @${recipient.username} a ete route a TUNPAY.`,
+    title: senderNotificationRow?.title ?? `Checkout ${checkout.providerName} pret`,
+    body: senderNotificationRow?.body ?? `Votre paiement vers @${recipient.username} est pret via ${checkout.providerName}.`,
     unread: senderNotificationRow?.unread ?? true,
     createdAt: senderNotificationRow?.created_at ?? transaction.created_at,
   };
@@ -288,12 +302,12 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     intent: {
       id: transaction.id,
       refId: transaction.ref_id,
-      amount: Number(transaction.amount),
+      amount: normalizeAmount(transaction.amount),
       recipient: `@${recipient.username}`,
       recipientDisplayName: recipient.display_name,
       sourceWalletId: sourceWallet.id,
       createdAt: new Date(transaction.created_at).getTime(),
-      status: "dispatched",
+      status: transaction.status === "confirmed" ? "confirmed" : "dispatched",
     },
     activity: {
       id: transaction.id,
@@ -302,19 +316,15 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       counterparty: recipient.display_name,
       counterpartyHandle: `@${recipient.username}`,
       wallet: sourceWallet.name,
-      amount: Number(transaction.amount),
+      amount: normalizeAmount(transaction.amount),
       date: formatActivityDate(transaction.created_at),
-      status: "initiated",
+      status: transaction.status,
     },
     senderNotification,
+    checkout,
   };
 }
 
-// Every *expected* failure above already returns a typed { ok: false } result.
-// This just catches anything unexpected (a thrown error from the Supabase
-// client, a bug) so a single bad request can never crash the server action -
-// the client gets a normal error toast and the failure is still logged with
-// enough context to diagnose.
 export async function createPaymentIntent(input: CreatePaymentIntentInput): Promise<CreatePaymentIntentResult> {
   try {
     return await createPaymentIntentUnsafe(input);

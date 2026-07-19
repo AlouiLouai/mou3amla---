@@ -1,44 +1,48 @@
-# Mou3amla — Project Specs
+# Mou3amla - Project Specs
 
 `mou3amla` is the repo/company name (Tunisian Arabic for "transaction"); the
 product built inside it is **Mou3amla**, a **zero-liability payment routing
 layer** for Tunisia built on top of TUNPAY (BCT/SMT's interoperability rail).
 Mou3amla never holds a balance, moves funds itself, or stores banking
-credentials — it maps a public `@username` to a destination-only routing
+credentials - it maps a public `@username` to a destination-only routing
 identifier (wallet tag / merchant id / RIB) for a real provider (Flouci, D17,
 walletii, BIAT, Amen Pay, etc.), and hands off the actual payment to the
-user's own banking app via a `tunpay://` deep link (web-gateway fallback),
-discovered via a real rotating-QR-code rail or a **simulated** BLE proximity
-indicator (real BLE peripheral advertising isn't possible from a browser —
-see [07-agent-guardrails.md](./07-agent-guardrails.md)).
+user's own banking rail. For the current demo build, send-money now creates a
+durable Mou3amla intent first, then redirects the payer into a provider-hosted
+sandbox checkout for the two rails with the clearest public test APIs today:
+**Flouci** and **Konnect**. Other rails still stay visible/linkable in the UI,
+but remain explicitly demo-visible/planned until comparable test handoffs
+exist. QR discovery still uses a real rotating-QR-code rail or a
+**simulated** BLE proximity indicator (real BLE peripheral advertising isn't
+possible from a browser - see
+[07-agent-guardrails.md](./07-agent-guardrails.md)).
 Authentication now uses a single Supabase-backed entry flow: one landing
 screen collects a Tunisian `+216` phone number plus a unique `@username`,
 then routes every user through a passkey (WebAuthn) gate before sending them
-to the home dashboard — new identities register a device passkey, returning
+to the home dashboard - new identities register a device passkey, returning
 identities sign in with it, both via a self-hosted WebAuthn implementation
 (`@simplewebauthn/server`/`@simplewebauthn/browser`, storing credentials in
 `public.passkeys`) rather than Supabase Auth's native passkey support, whose
-experimental verify endpoint proved unreliable — see
+experimental verify endpoint proved unreliable - see
 [06-conventions.md](./06-conventions.md#auth-conventions). No SMS provider,
 OTP, or password is stored or transmitted. Digital identity verification is
-a separate flow launched from
-the dashboard banner or profile. It currently runs as a visibly-labeled
-simulated demo (no real eKYC provider is wired up yet — Mou3amla itself
-never captures or stores identity documents or biometric data, and won't
-once a real provider accepted under INPDP is integrated either). The same Supabase
-`verification_status` controls which high-trust features unlock, including
-linking any wallet or bank destination, and every status change is recorded
-in `verification_events` for audit.
+a separate flow launched from the dashboard banner or profile. It currently
+runs as a visibly-labeled simulated demo (no real eKYC provider is wired up
+yet - Mou3amla itself never captures or stores identity documents or biometric
+data, and won't once a real provider accepted under INPDP is integrated
+either). The same Supabase `verification_status` controls which high-trust
+features unlock, including linking any wallet or bank destination, and every
+status change is recorded in `verification_events` for audit.
 Linked destinations, routed payment records, and in-app notifications now
 persist in Supabase instead of living only in the client shell.
 Mode Professionnel accounts get a lightweight El Fatoora micro-invoicing
 view. The app is split into domain feature folders (`auth`, `onboarding`,
-`wallets`, `payments`, `activity`, `notifications`, `invoices`, `profile`) plus a `mou3amla`
-shell that owns the shared state/routing — see
+`wallets`, `payments`, `activity`, `notifications`, `invoices`, `profile`)
+plus a `mou3amla` shell that owns the shared state/routing - see
 [02-architecture.md](./02-architecture.md) for where things live.
 
 This folder is the source of truth for how this app is built. It exists so
-that anyone — human or AI coding agent — can make correct changes without
+that anyone - human or AI coding agent - can make correct changes without
 guessing, re-deriving conventions from scratch, or introducing a pattern that
 conflicts with what's already here.
 
@@ -63,5 +67,5 @@ path to not breaking things.
 
 These docs describe **intent and pattern**, not a changelog. When you add a
 new feature slice, a new shared primitive, or change a convention, update the
-relevant doc in the same PR. Don't let this drift from the code — a stale doc
+relevant doc in the same PR. Don't let this drift from the code - a stale doc
 that confidently says the wrong thing is worse than no doc at all.

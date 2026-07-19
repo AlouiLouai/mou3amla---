@@ -12,6 +12,7 @@ export interface Provider {
   network: string;
   subtitle: string;
   acceptedRoutingTypes: RoutingType[];
+  demoCheckoutStatus?: "supported" | "planned";
 }
 
 /** A linked destination — Mou3amla never sees or stores a balance for this. */

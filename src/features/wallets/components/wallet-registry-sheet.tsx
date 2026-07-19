@@ -93,7 +93,19 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
                   <WalletIcon id={provider.id} initials={provider.initials} className="size-4.5" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-[13px] font-bold">{provider.name}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[13px] font-bold">{provider.name}</div>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]"
+                      style={{
+                        background:
+                          provider.demoCheckoutStatus === "supported" ? alpha(mou3amla.accent, 0.12) : alpha(mou3amla.text, 0.08),
+                        color: provider.demoCheckoutStatus === "supported" ? mou3amla.accent : mou3amla.textMuted,
+                      }}
+                    >
+                      {provider.demoCheckoutStatus === "supported" ? "sandbox ready" : "planned"}
+                    </span>
+                  </div>
                   <div className="text-[11px]" style={{ color: mou3amla.textMuted }}>
                     {provider.subtitle}
                   </div>

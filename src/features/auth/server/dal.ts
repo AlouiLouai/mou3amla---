@@ -9,6 +9,7 @@ import type { AppProfileRecord, AuthenticatedAppUser, VerificationStatus } from 
 import { computeStampDuty } from "@/features/invoices/lib/el-fatoora";
 import type { Invoice } from "@/features/invoices/types";
 import type { NotificationItem } from "@/features/notifications/types";
+import type { PaymentTransactionMetadata } from "@/features/payments/server/transaction-metadata";
 import type { LinkedWallet } from "@/features/wallets/types";
 
 type ProfileRow = {
@@ -35,13 +36,6 @@ type LinkedDestinationRow = {
   created_at: string;
 };
 
-type TransactionMetadata = {
-  sender_display_name?: string;
-  sender_username?: string;
-  sender_wallet_name?: string;
-  recipient_wallet_name?: string;
-};
-
 type TransactionRow = {
   id: string;
   ref_id: string;
@@ -51,7 +45,7 @@ type TransactionRow = {
   recipient_username: string;
   recipient_display_name: string | null;
   status: ActivityItem["status"];
-  metadata: TransactionMetadata | null;
+  metadata: PaymentTransactionMetadata | null;
   created_at: string;
 };
 
