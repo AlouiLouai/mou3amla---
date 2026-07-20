@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { ActivityItem } from "@/features/activity/types";
 import { getSessionIdentity } from "@/features/auth/server/dal";
 import type { NotificationItem } from "@/features/notifications/types";
-import { isSupportedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
+import { isCheckoutServiceDown, isMockCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 import type { PaymentCheckoutLaunch, PaymentIntent } from "@/features/payments/types";
 import { createProviderCheckout } from "@/features/payments/server/provider-checkouts";
 import type { PaymentTransactionMetadata } from "@/features/payments/server/transaction-metadata";
@@ -140,10 +140,17 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     return { ok: false, message: "Choose one of your linked destinations first." };
   }
 
-  if (!isSupportedCheckoutProvider(sourceWallet.provider_id)) {
+  if (isCheckoutServiceDown(sourceWallet.provider_id)) {
     return {
       ok: false,
-      message: `${sourceWallet.name} is visible in the demo, but only Flouci and Konnect are wired to a live sandbox checkout right now.`,
+      message: `${sourceWallet.name} is temporarily unavailable in this demo. Choose another linked account to keep testing.`,
+    };
+  }
+
+  if (!isMockCheckoutProvider(sourceWallet.provider_id)) {
+    return {
+      ok: false,
+      message: `${sourceWallet.name} isn't available in the internal mock checkout yet.`,
     };
   }
 
@@ -190,7 +197,7 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   let notificationRows: NotificationInsertRow[] = [];
 
   const duplicateProviderId = recentDuplicate?.metadata?.provider_id;
-  if (recentDuplicate && recentDuplicate.metadata?.provider_checkout_url && duplicateProviderId && isSupportedCheckoutProvider(duplicateProviderId)) {
+  if (recentDuplicate && recentDuplicate.metadata?.provider_checkout_url && duplicateProviderId) {
     transaction = recentDuplicate;
     checkout = {
       providerId: duplicateProviderId,
@@ -237,7 +244,7 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       provider_status: checkoutResult.providerStatus,
       provider_return_url: checkoutResult.returnUrl,
       provider_webhook_url: checkoutResult.webhookUrl,
-      demo_checkout_mode: "hosted",
+      demo_checkout_mode: "internal_mock",
     };
 
     const { data: inserted, error: insertError } = await admin
@@ -267,8 +274,8 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       actor_user_id: recipient.id,
       transaction_id: transaction.id,
       type: "payment_sent" as const,
-      title: `Checkout ${sourceWallet.name} pret`,
-      body: `Votre paiement vers @${recipient.username} est pret via ${sourceWallet.name}.`,
+      title: `Mock checkout ${sourceWallet.name} pret`,
+      body: `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${sourceWallet.name}.`,
       unread: true,
       metadata: {},
     };
@@ -289,8 +296,8 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   const senderNotification: NotificationItem = {
     id: senderNotificationRow?.id ?? transaction.id,
     type: senderNotificationRow?.type ?? "payment_sent",
-    title: senderNotificationRow?.title ?? `Checkout ${checkout.providerName} pret`,
-    body: senderNotificationRow?.body ?? `Votre paiement vers @${recipient.username} est pret via ${checkout.providerName}.`,
+    title: senderNotificationRow?.title ?? `Mock checkout ${checkout.providerName} pret`,
+    body: senderNotificationRow?.body ?? `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${checkout.providerName}.`,
     unread: senderNotificationRow?.unread ?? true,
     createdAt: senderNotificationRow?.created_at ?? transaction.created_at,
   };

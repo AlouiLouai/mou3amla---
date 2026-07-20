@@ -56,7 +56,10 @@ function makeFakeAdmin(queue: unknown[] = []) {
 }
 
 const senderRow = { data: { id: SENDER_ID, username: "sender", display_name: "Sender Person" }, error: null };
-const sourceWalletRow = { data: { id: SOURCE_WALLET_ID, user_id: SENDER_ID, provider_id: "flouci", name: "Flouci", routing_value: "@sender" }, error: null };
+const sourceWalletRow = {
+  data: { id: SOURCE_WALLET_ID, user_id: SENDER_ID, provider_id: "biat", name: "BIAT", routing_value: "12345678901234567890" },
+  error: null,
+};
 const recipientRow = {
   data: { id: RECIPIENT_ID, username: "recipientuser", display_name: "Recipient Person", verification_status: "verified" },
   error: null,
@@ -72,10 +75,10 @@ const transactionRow = {
     amount: "25",
     status: "initiated",
     metadata: {
-      provider_id: "flouci",
-      provider_name: "Flouci",
-      provider_checkout_url: "https://checkout.example/flouci",
-      provider_payment_ref: "flouci-pay-1",
+      provider_id: "biat",
+      provider_name: "BIAT",
+      provider_checkout_url: "/dev/mock-checkout?ref=ref_abc123",
+      provider_payment_ref: "MOCK_ref_abc123",
     },
     created_at: "2026-07-18T10:00:00.000Z",
   },
@@ -88,13 +91,13 @@ beforeEach(() => {
   vi.mocked(checkRateLimit).mockReset().mockResolvedValue(true);
   vi.mocked(createProviderCheckout).mockReset().mockResolvedValue({
     ok: true,
-    providerId: "flouci",
-    providerName: "Flouci",
-    checkoutUrl: "https://checkout.example/flouci",
-    providerPaymentRef: "flouci-pay-1",
-    providerStatus: "PENDING",
-    returnUrl: "https://app.example/payments/return/flouci?ref=ref_abc123",
-    webhookUrl: "https://app.example/api/payments/providers/flouci/webhook?ref=ref_abc123",
+    providerId: "biat",
+    providerName: "BIAT",
+    checkoutUrl: "/dev/mock-checkout?ref=ref_abc123",
+    providerPaymentRef: "MOCK_ref_abc123",
+    providerStatus: "DEVELOPMENT_MOCK_PENDING",
+    returnUrl: "/dev/mock-checkout?ref=ref_abc123",
+    webhookUrl: "/dev/mock-checkout?ref=ref_abc123",
   } as never);
 });
 
@@ -133,9 +136,9 @@ describe("createPaymentIntent", () => {
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/choose one of your linked destinations/i) });
   });
 
-  it("rejects when the selected source provider has no live sandbox checkout", async () => {
+  it("rejects when the selected source provider is temporarily down", async () => {
     const unsupportedSourceWalletRow = {
-      data: { ...sourceWalletRow.data, provider_id: "d17", name: "D17" },
+      data: { ...sourceWalletRow.data, provider_id: "flouci", name: "Flouci" },
       error: null,
     };
     const { admin } = makeFakeAdmin([senderRow, unsupportedSourceWalletRow, recipientRow]);
@@ -143,7 +146,7 @@ describe("createPaymentIntent", () => {
 
     const result = await createPaymentIntent(VALID_INPUT);
 
-    expect(result).toEqual({ ok: false, message: expect.stringMatching(/only flouci and konnect/i) });
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/temporarily unavailable/i) });
     expect(createProviderCheckout).not.toHaveBeenCalled();
   });
 
@@ -210,7 +213,7 @@ describe("createPaymentIntent", () => {
     if (!result.ok) throw new Error("expected ok result");
     expect(result.intent).toMatchObject({ id: "tx-1", refId: "ref_abc123", recipient: "@recipientuser" });
     expect(result.senderNotification).toMatchObject({ id: "notif-sender", type: "payment_sent" });
-    expect(result.checkout).toMatchObject({ providerId: "flouci", url: "https://checkout.example/flouci" });
+    expect(result.checkout).toMatchObject({ providerId: "biat", url: "/dev/mock-checkout?ref=ref_abc123" });
 
     const insertCall = calls.find((call) => call.table === "payment_transactions" && call.op === "insert");
     expect(insertCall?.args[0]).toMatchObject({ sender_user_id: SENDER_ID, recipient_user_id: RECIPIENT_ID, amount: 25 });
@@ -266,7 +269,7 @@ describe("createPaymentIntent", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected ok result");
     expect(result.intent.id).toBe("tx-1");
-    expect(result.checkout.url).toBe("https://checkout.example/flouci");
+    expect(result.checkout.url).toBe("/dev/mock-checkout?ref=ref_abc123");
 
     const insertCall = calls.find((call) => call.table === "payment_transactions" && call.op === "insert");
     expect(insertCall).toBeUndefined();

@@ -12,7 +12,7 @@ export interface Provider {
   network: string;
   subtitle: string;
   acceptedRoutingTypes: RoutingType[];
-  demoCheckoutStatus?: "supported" | "planned";
+  demoCheckoutStatus?: "mock" | "service_down";
 }
 
 /** A linked destination — Mou3amla never sees or stores a balance for this. */

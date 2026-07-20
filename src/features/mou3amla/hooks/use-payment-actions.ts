@@ -48,7 +48,7 @@ export function usePaymentActions({
     const recipient = stateRef.current.recipientInput.trim();
 
     if (!stateRef.current.wallets.length || !stateRef.current.sendSourceWalletId) {
-      toast.error("Link Flouci or Konnect first, then choose the wallet that should open checkout.");
+      toast.error("Link an available wallet or bank route first, then choose the one that should open the mock checkout.");
       return;
     }
 
@@ -97,8 +97,8 @@ export function usePaymentActions({
       // verification_status === "verified" (see wallets/server/actions.ts).
       // Surfacing that here is reporting a real, enforced guarantee, not a
       // trust claim invented for the toast.
-      toast.success(`Opening ${result.checkout.providerName} checkout...`, {
-        description: "Mou3amla saved the route first, then redirected you to the provider sandbox.",
+      toast.success(`Opening the ${result.checkout.providerName} mock checkout...`, {
+        description: "Mou3amla saved the route first, then opened the in-app development payment demo.",
       });
 
       window.location.assign(result.checkout.url);

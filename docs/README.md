@@ -8,15 +8,17 @@ credentials - it maps a public `@username` to a destination-only routing
 identifier (wallet tag / merchant id / RIB) for a real provider (Flouci, D17,
 walletii, BIAT, Amen Pay, etc.), and hands off the actual payment to the
 user's own banking rail. For the current demo build, send-money now creates a
-durable Mou3amla intent first, then redirects the payer into a provider-hosted
-sandbox checkout for the two rails with the clearest public test APIs today:
-**Flouci** and **Konnect**. Other rails still stay visible/linkable in the UI,
-but remain explicitly demo-visible/planned until comparable test handoffs
-exist. In practice, that means a user's public/default receive route can still
-be any linked wallet or bank account, while the send screen only offers linked
-Flouci/Konnect sources for the live hosted-checkout demo. Linked destinations
-can also now be removed from the Accounts screen with a deliberate two-step
-confirmation. QR discovery still uses a real rotating-QR-code rail or a
+durable Mou3amla intent first, then opens an internal Mou3amla-branded
+development checkout at `/dev/mock-checkout` so the payment UI can still be
+demonstrated while third-party sandboxes are unstable. Flouci and Konnect stay
+visible in the provider list as explicit **service down** references rather
+than active link/send options; the other rails remain linkable and route into
+that internal mock checkout instead. In practice, that means a user's
+public/default receive route can still be any linked wallet or bank account,
+while the send screen now offers any linked non-disabled rail as the source
+for the in-app demo handoff. Linked destinations can also now be removed from
+the Accounts screen with a deliberate two-step confirmation. QR discovery
+still uses a real rotating-QR-code rail or a
 **simulated** BLE proximity indicator (real BLE peripheral advertising isn't
 possible from a browser - see
 [07-agent-guardrails.md](./07-agent-guardrails.md)).
@@ -66,6 +68,7 @@ path to not breaking things.
 | [06-conventions.md](./06-conventions.md) | Naming, `"use client"` boundaries, Server Actions, env/config |
 | [07-agent-guardrails.md](./07-agent-guardrails.md) | Explicit do/don't list, known hallucination traps for this stack |
 | [08-testing.md](./08-testing.md) | Vitest setup, the `server-only` mock gotcha, how to mock Supabase in a test |
+| [09-bct-sandbox-readiness.md](./09-bct-sandbox-readiness.md) | BCT Sandbox prep, volunteer-test structure, current Flouci/KYC readiness notes |
 
 ## Keeping this up to date
 

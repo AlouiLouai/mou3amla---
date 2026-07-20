@@ -1,8 +1,8 @@
 import "server-only";
 
 import { serverEnv } from "@/config/env.server";
-import type { SupportedCheckoutProviderId } from "@/features/payments/types";
-import { isSupportedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
+import type { HostedCheckoutProviderId } from "@/features/payments/types";
+import { isCheckoutServiceDown, isHostedCheckoutProvider, isMockCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 import { logger } from "@/lib/logger";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -21,7 +21,7 @@ type CreateCheckoutInput = {
 export type CreateCheckoutResult =
   | {
       ok: true;
-      providerId: SupportedCheckoutProviderId;
+      providerId: string;
       providerName: string;
       checkoutUrl: string;
       providerPaymentRef: string;
@@ -34,7 +34,7 @@ export type CreateCheckoutResult =
 export type ProviderVerificationResult =
   | {
       ok: true;
-      providerId: SupportedCheckoutProviderId;
+      providerId: HostedCheckoutProviderId;
       providerStatus: string;
       resolvedStatus: "initiated" | "confirmed" | "failed";
       providerPaymentRef: string;
@@ -53,13 +53,10 @@ function getAppUrl() {
   return appUrl ? appUrl.replace(/\/+$/, "") : null;
 }
 
-function getDigitsOnlyPhone(phone: string | null): string | undefined {
-  if (!phone) return undefined;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length >= 8) {
-    return digits.slice(-8);
-  }
-  return undefined;
+function buildMockCheckoutUrl(refId: string) {
+  const path = `/dev/mock-checkout?ref=${encodeURIComponent(refId)}`;
+  const appUrl = getAppUrl();
+  return appUrl ? `${appUrl}${path}` : path;
 }
 
 async function readJson<T>(input: string, init: RequestInit): Promise<T> {
@@ -91,129 +88,30 @@ async function readJson<T>(input: string, init: RequestInit): Promise<T> {
   return parsed as T;
 }
 
-async function createKonnectCheckout(input: Omit<CreateCheckoutInput, "providerId">): Promise<CreateCheckoutResult> {
-  const appUrl = getAppUrl();
-  const apiKey = serverEnv.KONNECT_API_KEY;
-  const receiverWalletId = serverEnv.KONNECT_RECEIVER_WALLET_ID;
-
-  if (!appUrl || !apiKey || !receiverWalletId) {
-    return { ok: false, message: "Konnect sandbox keys are not configured yet for this demo." };
+function createMockCheckout(input: CreateCheckoutInput): CreateCheckoutResult {
+  if (isCheckoutServiceDown(input.providerId)) {
+    return { ok: false, message: `${input.providerName} is temporarily unavailable in this demo. Choose another linked route for now.` };
   }
 
-  const returnUrl = `${appUrl}/payments/return/konnect?ref=${encodeURIComponent(input.refId)}`;
-  const webhookUrl = `${appUrl}/api/payments/providers/konnect/webhook?ref=${encodeURIComponent(input.refId)}`;
-  const payerPhone = getDigitsOnlyPhone(input.payerPhone);
-
-  type KonnectCreateResponse = {
-    payUrl?: string;
-    paymentRef?: string;
-  };
-
-  const payload = await readJson<KonnectCreateResponse>(`${serverEnv.KONNECT_API_BASE_URL ?? DEFAULT_KONNECT_BASE_URL}/payments/init-payment`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      receiverWalletId,
-      token: "TND",
-      amount: Math.round(input.amount * 1000),
-      type: "immediate",
-      description: `Mou3amla payment to ${input.recipientHandle}`,
-      acceptedPaymentMethods: ["wallet", "bank_card", "e-DINAR"],
-      lifespan: 10,
-      checkoutForm: true,
-      addPaymentFeesToAmount: false,
-      orderId: input.refId,
-      webhook: webhookUrl,
-      silentWebhook: true,
-      successUrl: returnUrl,
-      failUrl: returnUrl,
-      ...(payerPhone ? { phoneNumber: payerPhone } : {}),
-    }),
-  });
-
-  if (!payload.payUrl || !payload.paymentRef) {
-    return { ok: false, message: "Konnect did not return a valid checkout session." };
+  if (!isMockCheckoutProvider(input.providerId)) {
+    return { ok: false, message: "This payment rail is not available in the internal mock checkout yet." };
   }
 
+  const checkoutUrl = buildMockCheckoutUrl(input.refId);
   return {
     ok: true,
-    providerId: "konnect",
+    providerId: input.providerId,
     providerName: input.providerName,
-    checkoutUrl: payload.payUrl,
-    providerPaymentRef: payload.paymentRef,
-    providerStatus: "pending",
-    returnUrl,
-    webhookUrl,
-  };
-}
-
-async function createFlouciCheckout(input: Omit<CreateCheckoutInput, "providerId">): Promise<CreateCheckoutResult> {
-  const appUrl = getAppUrl();
-  const publicKey = serverEnv.FLOUCI_PUBLIC_KEY;
-  const privateKey = serverEnv.FLOUCI_PRIVATE_KEY;
-
-  if (!appUrl || !publicKey || !privateKey) {
-    return { ok: false, message: "Flouci sandbox keys are not configured yet for this demo." };
-  }
-
-  const returnUrl = `${appUrl}/payments/return/flouci?ref=${encodeURIComponent(input.refId)}`;
-  const webhookUrl = `${appUrl}/api/payments/providers/flouci/webhook?ref=${encodeURIComponent(input.refId)}`;
-
-  type FlouciCreateResponse = {
-    result?: {
-      success?: boolean;
-      payment_id?: string;
-      link?: string;
-    };
-  };
-
-  const payload = await readJson<FlouciCreateResponse>(`${serverEnv.FLOUCI_API_BASE_URL ?? DEFAULT_FLOUCI_BASE_URL}/generate_payment`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${publicKey}:${privateKey}`,
-    },
-    body: JSON.stringify({
-      amount: Math.round(input.amount * 1000).toString(),
-      success_link: returnUrl,
-      fail_link: returnUrl,
-      webhook: webhookUrl,
-      developer_tracking_id: input.refId,
-      session_timeout_secs: 1200,
-      accept_card: true,
-      client_id: input.recipientHandle,
-    }),
-  });
-
-  if (!payload.result?.success || !payload.result.payment_id || !payload.result.link) {
-    return { ok: false, message: "Flouci did not return a valid checkout session." };
-  }
-
-  return {
-    ok: true,
-    providerId: "flouci",
-    providerName: input.providerName,
-    checkoutUrl: payload.result.link,
-    providerPaymentRef: payload.result.payment_id,
-    providerStatus: "PENDING",
-    returnUrl,
-    webhookUrl,
+    checkoutUrl,
+    providerPaymentRef: `MOCK_${input.refId}`,
+    providerStatus: "DEVELOPMENT_MOCK_PENDING",
+    returnUrl: checkoutUrl,
+    webhookUrl: checkoutUrl,
   };
 }
 
 export async function createProviderCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
-  if (!isSupportedCheckoutProvider(input.providerId)) {
-    return { ok: false, message: "This payment rail is visible in the demo, but only Flouci and Konnect are wired to a live sandbox today." };
-  }
-
-  if (input.providerId === "konnect") {
-    return createKonnectCheckout(input);
-  }
-
-  return createFlouciCheckout(input);
+  return createMockCheckout(input);
 }
 
 async function verifyKonnectPayment(providerPaymentRef: string): Promise<ProviderVerificationResult> {
@@ -287,7 +185,7 @@ export async function verifyProviderPayment(
   providerId: string,
   metadata: ProviderTransactionMetadataShape | null | undefined,
 ): Promise<ProviderVerificationResult> {
-  if (!isSupportedCheckoutProvider(providerId)) {
+  if (!isHostedCheckoutProvider(providerId)) {
     return { ok: false, message: "This payment rail is not wired to a sandbox verification flow." };
   }
 

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSessionIdentity } from "@/features/auth/server/dal";
-import { PROVIDERS } from "@/features/wallets/constants";
+import { getProviderById, isProviderServiceDown } from "@/features/wallets/constants";
 import type { LinkedWallet, RoutingType } from "@/features/wallets/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -101,9 +101,13 @@ async function linkDestinationUnsafe(input: { providerId: string; routingValue: 
     return { ok: false, message: "Too many linking attempts. Please wait a few minutes and try again." };
   }
 
-  const provider = PROVIDERS.find((entry) => entry.id === parsed.data.providerId);
+  const provider = getProviderById(parsed.data.providerId);
   if (!provider) {
     return { ok: false, message: "That provider is not supported yet." };
+  }
+
+  if (isProviderServiceDown(provider.id)) {
+    return { ok: false, message: `${provider.name} is temporarily unavailable in this demo. Link another account for now.` };
   }
 
   const routingType = provider.acceptedRoutingTypes[0];

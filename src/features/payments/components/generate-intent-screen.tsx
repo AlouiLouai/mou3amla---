@@ -57,7 +57,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          Link Flouci or Konnect to launch a live sandbox checkout. Your other linked rails still stay available for receive routing and for the BCT interoperability story.
+          Link one of the currently available wallets or bank routes to open Mou3amla&apos;s internal development checkout. Flouci and Konnect are temporarily down in this demo.
         </div>
       ) : account.wallets.length > derived.supportedSendWallets.length ? (
         <div
@@ -68,7 +68,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          Send opens a live sandbox checkout only for Flouci and Konnect. Other linked wallets and bank accounts stay on your profile for receiving.
+          Send now opens an internal Mou3amla mock checkout for available rails. Flouci and Konnect stay visible as service-down references only.
         </div>
       ) : null}
 
@@ -304,7 +304,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
       >
         {state.isSendingPayment ? <Loader2 className="size-4.5 animate-spin" /> : <Send className="size-4.5" />}
-        Send via TUNPAY
+        Open Mock Checkout
       </button>
     </ScreenFrame>
   );

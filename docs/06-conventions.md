@@ -294,8 +294,9 @@ external API) follows the same `xUnsafe` + wrapper split - see
   rejection, missing-destination rejection, the success path, and that a
   failed notification insert doesn't fail the whole payment (the transaction
   already committed by that point).
-- **Payment notifications are delivered over Supabase Realtime, not just on
-  next page load.** `useRealtimeNotifications`
+- **Payment notifications are delivered over Supabase Realtime, with a
+  durable polling fallback, not just on next page load.**
+  `useRealtimeNotifications`
   (`src/features/notifications/hooks/use-realtime-notifications.ts`)
   subscribes to `postgres_changes` INSERT events on `public.notifications`
   filtered to the current user - enabled via `alter publication
@@ -305,25 +306,34 @@ external API) follows the same `xUnsafe` + wrapper split - see
   enforces the same RLS as the REST API, so a client can't construct a
   filter to see anyone else's notifications. Wired into
   `use-mou3amla-app.ts`; a `payment_received` notification also triggers a
-  toast. In the current provider-checkout demo flow, that notification is
-  intentionally emitted on **confirmed provider settlement**, not at intent
-  creation time, so the receiver only auto-jumps to Activity once Flouci or
-  Konnect verification says the payment really succeeded. Requires
+  toast. The same hook also polls the recent notification rows every few
+  seconds as a backstop, so a receiver still auto-jumps to Activity if their
+  browser misses the websocket insert entirely (for example, a transient local
+  dev websocket hiccup or an unapplied Realtime-publication migration in a
+  demo database). In the current internal-mock-checkout demo flow, that
+  notification is intentionally emitted only once the mock checkout is
+  explicitly simulated as **success**, not at intent creation time, so the
+  receiver only auto-jumps to Activity once the demo operator confirms the
+  payment. Requires
   `Mou3amlaState.profile.id` (threaded through from `requireCurrentAppUser()`
   via `InitialMou3amlaUser`/`UserProfile`) - if you see the subscription
   silently not firing, check that `id` actually made it into `initialUser` in
   `src/app/home/page.tsx`.
-- **Hosted sandbox checkout is the current demo handoff shape for send-money.**
+- **Internal mock checkout is the current demo handoff shape for send-money.**
   `createPaymentIntent` now creates the durable Mou3amla transaction row
-  first, then creates a provider checkout session server-side for the selected
-  source rail. Today only `flouci` and `konnect` are wired to live sandbox
-  APIs (`provider-checkouts.ts`). The shell therefore tracks two separate
-  concepts on purpose: `sourceWalletId` remains the user's default *receive*
-  route (`linked_destinations.is_default` in Supabase), while the client-only
-  `sendSourceWalletId` is just the currently chosen live-checkout rail for the
-  send screen. Only linked Flouci/Konnect accounts should appear in that send
-  picker; other linked rails remain visible in account management and receive
-  routing, but must not pretend to launch a real checkout.
+  first, then creates a Mou3amla-owned `/dev/mock-checkout` session server-side
+  for the selected source rail. Flouci and Konnect are intentionally disabled
+  for new linking with a visible service-down state; the other linked rails can
+  launch the internal mock screen instead. The shell therefore tracks two
+  separate concepts on purpose: `sourceWalletId` remains the user's default
+  *receive* route (`linked_destinations.is_default` in Supabase), while the
+  client-only `sendSourceWalletId` is just the currently chosen source rail for
+  the mock checkout screen.
+- **The mock checkout must stay obviously internal.** `/dev/mock-checkout`
+  shows a persistent `DEVELOPMENT MOCK ENVIRONMENT - NO REAL MONEY MOVED`
+  banner, Mou3amla-native styling, sender/receiver/amount details, and
+  explicit success/failure simulation controls. Do not clone a third-party
+  payment brand's exact checkout visuals or wording inside this route.
 - **Linked-destination deletion is an authenticated, rate-limited write path.**
   `deleteDestination` in `src/features/wallets/server/actions.ts` follows the
   same audit bar as linking and send-money: session check, per-user rate limit

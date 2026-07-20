@@ -11,6 +11,7 @@ Important app routes in this project:
 - `/` -> Stage 1 landing screen for `+216` phone + `@username`
 - `/verify` -> Stage 2 passkey (WebAuthn) gate
 - `/home` -> authenticated dashboard shell
+- `/dev/mock-checkout` -> authenticated internal payment demo page; displays the current transaction and lets the user simulate success or failure
 - `/payments/return/[provider]` -> authenticated provider-checkout return landing page; verifies the provider result server-side, finalizes the transaction, then redirects back into `/home?payment_ref=...`
 - `/verify-identity` -> identity verification entry screen (demo KYC flow only, see [06-conventions.md](./06-conventions.md#kyc-conventions))
 - `/api/qr/mint` -> mints a signed rotating QR payload for the authenticated recipient

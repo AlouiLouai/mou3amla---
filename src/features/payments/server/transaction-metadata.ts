@@ -12,5 +12,5 @@ export type PaymentTransactionMetadata = {
   provider_failure_reason?: string;
   provider_return_url?: string;
   provider_webhook_url?: string;
-  demo_checkout_mode?: "hosted";
+  demo_checkout_mode?: "hosted" | "internal_mock";
 };

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
 import { applyDefaultWallet, getPreferredSendWalletId } from "@/features/mou3amla/hooks/utils";
-import { PROVIDERS } from "@/features/wallets/constants";
+import { getProviderById, isProviderServiceDown, PROVIDERS } from "@/features/wallets/constants";
 import { deleteDestination, linkDestination, setPrimaryDestination } from "@/features/wallets/server/actions";
 
 export function useWalletActions({
@@ -30,7 +30,7 @@ export function useWalletActions({
 
   const selectLinkProvider = useCallback(
     (providerId: string) => {
-      const provider = PROVIDERS.find((entry) => entry.id === providerId);
+      const provider = getProviderById(providerId);
 
       if (!provider) {
         return;
@@ -38,6 +38,11 @@ export function useWalletActions({
 
       if (stateRef.current.profile.verificationStatus !== "verified") {
         toast.error("Complete digital identity verification before linking a wallet or bank account.");
+        return;
+      }
+
+      if (isProviderServiceDown(provider.id)) {
+        toast.error(`${provider.name} is temporarily unavailable right now. Choose another route for the demo.`);
         return;
       }
 

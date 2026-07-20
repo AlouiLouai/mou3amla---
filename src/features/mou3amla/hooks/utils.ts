@@ -1,5 +1,5 @@
 import type { LinkedWallet } from "@/features/wallets/types";
-import { isSupportedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
+import { isMockCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 import type { ActivityItem } from "@/features/activity/types";
 
 export interface RecentContact {
@@ -78,12 +78,12 @@ export function applyDefaultWallet(wallets: LinkedWallet[], selectedId: string) 
   }));
 }
 
-export function getSupportedCheckoutWallets(wallets: LinkedWallet[]) {
-  return wallets.filter((wallet) => isSupportedCheckoutProvider(wallet.providerId));
+export function getMockCheckoutWallets(wallets: LinkedWallet[]) {
+  return wallets.filter((wallet) => isMockCheckoutProvider(wallet.providerId));
 }
 
 export function getPreferredSendWalletId(wallets: LinkedWallet[], preferredId: string) {
-  const supportedWallets = getSupportedCheckoutWallets(wallets);
+  const supportedWallets = getMockCheckoutWallets(wallets);
 
   if (supportedWallets.some((wallet) => wallet.id === preferredId)) {
     return preferredId;

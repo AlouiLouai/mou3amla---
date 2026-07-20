@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { alpha, raisedShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { isProviderServiceDown } from "@/features/wallets/constants";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 
 const ROUTING_LABELS = {
@@ -73,46 +74,52 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
                 Complete identity verification before linking a wallet or bank account.
               </div>
             ) : null}
-            {derived.availableProviders.map((provider) => (
-              <button
-                key={provider.id}
-                type="button"
-                onClick={() => actions.selectLinkProvider(provider.id)}
-                disabled={account.profile.verificationStatus !== "verified"}
-                className="flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-transform active:scale-[0.98] disabled:active:scale-100"
-                style={{
-                  background: mou3amla.cardAlt,
-                  borderColor: mou3amla.border,
-                  opacity: account.profile.verificationStatus !== "verified" ? 0.55 : 1,
-                }}
-              >
-                <div
-                  className="flex size-[38px] shrink-0 items-center justify-center rounded-[12px] text-[11px] font-extrabold"
-                  style={{ background: alpha(provider.color, 0.16), color: provider.color }}
+            {derived.availableProviders.map((provider) => {
+              const serviceDown = isProviderServiceDown(provider.id);
+              const disabled = account.profile.verificationStatus !== "verified" || serviceDown;
+
+              return (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => actions.selectLinkProvider(provider.id)}
+                  disabled={disabled}
+                  className="flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-transform active:scale-[0.98] disabled:active:scale-100"
+                  style={{
+                    background: mou3amla.cardAlt,
+                    borderColor: serviceDown ? alpha(mou3amla.destructive, 0.35) : mou3amla.border,
+                    opacity: disabled ? 0.6 : 1,
+                  }}
                 >
-                  <WalletIcon id={provider.id} initials={provider.initials} className="size-4.5" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className="text-[13px] font-bold">{provider.name}</div>
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]"
-                      style={{
-                        background:
-                          provider.demoCheckoutStatus === "supported" ? alpha(mou3amla.accent, 0.12) : alpha(mou3amla.text, 0.08),
-                        color: provider.demoCheckoutStatus === "supported" ? mou3amla.accent : mou3amla.textMuted,
-                      }}
-                    >
-                      {provider.demoCheckoutStatus === "supported" ? "sandbox ready" : "planned"}
-                    </span>
+                  <div
+                    className="flex size-[38px] shrink-0 items-center justify-center rounded-[12px] text-[11px] font-extrabold"
+                    style={{ background: alpha(provider.color, 0.16), color: provider.color }}
+                  >
+                    <WalletIcon id={provider.id} initials={provider.initials} className="size-4.5" />
                   </div>
-                  <div className="text-[11px]" style={{ color: mou3amla.textMuted }}>
-                    {provider.subtitle}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="text-[13px] font-bold">{provider.name}</div>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]"
+                        style={{
+                          background: serviceDown ? alpha(mou3amla.destructive, 0.14) : alpha(mou3amla.accent, 0.12),
+                          color: serviceDown ? mou3amla.destructive : mou3amla.accent,
+                        }}
+                      >
+                        {serviceDown ? "service down" : "mock checkout"}
+                      </span>
+                    </div>
+                    <div className="text-[11px]" style={{ color: serviceDown ? mou3amla.destructive : mou3amla.textMuted }}>
+                      {serviceDown
+                        ? "Temporary sandbox outage. Keep this disabled in demos to avoid a broken third-party handoff."
+                        : `${provider.subtitle}. Linked routes use Mou3amla's internal development checkout for demos.`}
+                    </div>
                   </div>
-                </div>
-                <ChevronRight className="size-4" style={{ color: mou3amla.textFaint }} />
-              </button>
-            ))}
+                  <ChevronRight className="size-4" style={{ color: mou3amla.textFaint }} />
+                </button>
+              );
+            })}
             {derived.availableProviders.length === 0 ? (
               <div className="p-5 text-center text-[12.5px]" style={{ color: mou3amla.textMuted }}>
                 All available providers are already linked.

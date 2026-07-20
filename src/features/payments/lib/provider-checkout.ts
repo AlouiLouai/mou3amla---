@@ -1,7 +1,16 @@
-import type { SupportedCheckoutProviderId } from "@/features/payments/types";
+import { canUseMockCheckout, isProviderServiceDown } from "@/features/wallets/constants";
+import type { HostedCheckoutProviderId } from "@/features/payments/types";
 
-const SUPPORTED_CHECKOUT_PROVIDERS = new Set<SupportedCheckoutProviderId>(["flouci", "konnect"]);
+const HOSTED_CHECKOUT_PROVIDERS = new Set<HostedCheckoutProviderId>(["flouci", "konnect"]);
 
-export function isSupportedCheckoutProvider(providerId: string): providerId is SupportedCheckoutProviderId {
-  return SUPPORTED_CHECKOUT_PROVIDERS.has(providerId as SupportedCheckoutProviderId);
+export function isHostedCheckoutProvider(providerId: string): providerId is HostedCheckoutProviderId {
+  return HOSTED_CHECKOUT_PROVIDERS.has(providerId as HostedCheckoutProviderId);
+}
+
+export function isMockCheckoutProvider(providerId: string) {
+  return canUseMockCheckout(providerId);
+}
+
+export function isCheckoutServiceDown(providerId: string) {
+  return isProviderServiceDown(providerId);
 }

@@ -1,7 +1,7 @@
 export type IntentStatus = "building" | "dispatched" | "confirmed";
 export type PersistedTransactionStatus = "initiated" | "confirmed" | "failed";
 
-export type SupportedCheckoutProviderId = "flouci" | "konnect";
+export type HostedCheckoutProviderId = "flouci" | "konnect";
 
 export interface PaymentIntent {
   id: string;
@@ -15,7 +15,7 @@ export interface PaymentIntent {
 }
 
 export interface PaymentCheckoutLaunch {
-  providerId: SupportedCheckoutProviderId;
+  providerId: string;
   providerName: string;
   url: string;
 }

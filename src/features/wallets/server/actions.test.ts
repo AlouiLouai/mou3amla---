@@ -106,9 +106,16 @@ describe("linkDestination", () => {
   });
 
   it("rejects an invalid wallet tag", async () => {
-    const result = await linkDestination({ providerId: "flouci", routingValue: "a" });
+    const result = await linkDestination({ providerId: "walletii", routingValue: "a" });
 
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/wallet tag/i) });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects a provider that is currently service down", async () => {
+    const result = await linkDestination({ providerId: "flouci", routingValue: "@demo" });
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/temporarily unavailable/i) });
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
@@ -184,11 +191,11 @@ describe("linkDestination", () => {
       {
         data: {
           id: "dest-2",
-          provider_id: "flouci",
-          name: "Flouci",
-          network: "Flouci",
-          color: "#2FE6A3",
-          initials: "FL",
+          provider_id: "walletii",
+          name: "walletii by Ooredoo",
+          network: "Ooredoo - TUNPAY",
+          color: "#A78BFA",
+          initials: "WT",
           routing_type: "wallet_tag",
           routing_value: "@newtag",
           is_default: false,
@@ -198,7 +205,7 @@ describe("linkDestination", () => {
     ]);
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
 
-    const result = await linkDestination({ providerId: "flouci", routingValue: "newtag" });
+    const result = await linkDestination({ providerId: "walletii", routingValue: "newtag" });
 
     expect(result).toEqual({ ok: true, wallet: expect.objectContaining({ isDefault: false }), sourceWalletId: "" });
     const insertCall = calls.find((call) => call.op === "insert");

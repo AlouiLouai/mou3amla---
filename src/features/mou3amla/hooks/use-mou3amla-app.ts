@@ -11,7 +11,7 @@ import { initialState, reducer } from "@/features/mou3amla/hooks/reducer";
 import { useNotificationActions } from "@/features/mou3amla/hooks/use-notification-actions";
 import { usePaymentActions } from "@/features/mou3amla/hooks/use-payment-actions";
 import { useQrNearbyActions } from "@/features/mou3amla/hooks/use-qr-nearby-actions";
-import { getPreferredSendWalletId, getRecentContacts, getSupportedCheckoutWallets } from "@/features/mou3amla/hooks/utils";
+import { getMockCheckoutWallets, getPreferredSendWalletId, getRecentContacts } from "@/features/mou3amla/hooks/utils";
 import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
 
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
@@ -57,16 +57,18 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   // Activity and see the confirmed transfer highlighted.
   useRealtimeNotifications(
     state.profile.id,
+    state.notifications.map((item) => item.id),
     useCallback(
-      ({ notification, activity }) => {
-        dispatch((s) => {
-          if (s.notifications.some((item) => item.id === notification.id)) {
-            return null;
-          }
-          return { notifications: [notification, ...s.notifications] };
-        });
+      ({ notification, activity, transactionId }) => {
+        if (stateRef.current.notifications.some((item) => item.id === notification.id)) {
+          return;
+        }
+
+        dispatch((s) => ({ notifications: [notification, ...s.notifications] }));
 
         if (notification.type === "payment_received") {
+          const fallbackActivityId = activity?.id ?? transactionId ?? null;
+
           // The sender could only reach this point because both accounts are
           // identity-verified: linking a source destination requires the
           // sender's own verification_status === "verified", and this
@@ -77,13 +79,11 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
             description: `${notification.body} Routed between two identity-verified Mou3amla accounts.`,
           });
 
-          if (activity) {
-            dispatch((s) => ({
-              activityLog: s.activityLog.some((item) => item.id === activity.id) ? s.activityLog : [activity, ...s.activityLog],
-              screen: "activity",
-              highlightedActivityId: activity.id,
-            }));
-          }
+          dispatch((s) => ({
+            activityLog: activity ? (s.activityLog.some((item) => item.id === activity.id) ? s.activityLog : [activity, ...s.activityLog]) : s.activityLog,
+            screen: "activity",
+            highlightedActivityId: fallbackActivityId,
+          }));
         }
       },
       [dispatch],
@@ -110,7 +110,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     );
 
     if (!sendSourceWalletId) {
-      toast.error("Link Flouci or Konnect to launch a live sandbox checkout. Other linked rails still work for receiving.");
+      toast.error("Link an available wallet or bank route first to open the internal mock checkout.");
       return;
     }
 
@@ -130,8 +130,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       return;
     }
 
-    if (!getSupportedCheckoutWallets(stateRef.current.wallets).length) {
-      toast.error("Link Flouci or Konnect first to open a live checkout after scanning.");
+    if (!getMockCheckoutWallets(stateRef.current.wallets).length) {
+      toast.error("Link an available wallet or bank route first to open the internal mock checkout after scanning.");
       return;
     }
 
@@ -167,7 +167,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       account,
       sourceWallet: state.wallets.find((wallet) => wallet.id === state.sourceWalletId) ?? null,
       sendSourceWallet: state.wallets.find((wallet) => wallet.id === state.sendSourceWalletId) ?? null,
-      supportedSendWallets: getSupportedCheckoutWallets(state.wallets),
+      supportedSendWallets: getMockCheckoutWallets(state.wallets),
       hasAnyWallets: state.wallets.length > 0,
       unreadNotifications: state.notifications.filter((item) => item.unread).length,
       availableProviders: PROVIDERS.filter((provider) => !state.wallets.some((wallet) => wallet.providerId === provider.id)),

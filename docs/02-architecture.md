@@ -13,6 +13,7 @@ src/
     page.tsx              # Stage 1 auth landing: phone + username
     verify/page.tsx       # Stage 2 passkey (WebAuthn) gate
     home/page.tsx         # Stage 3 authenticated dashboard
+    dev/mock-checkout/    # Internal Mou3amla-branded payment demo route
     payments/return/      # Provider redirect landing pages (Flouci/Konnect)
     verify-identity/      # Identity verification entry (demo KYC flow only, see conventions)
     api/qr/               # Signed QR mint + recipient resolve

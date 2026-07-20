@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireCurrentAppUser } from "@/features/auth/server/dal";
-import { isSupportedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
+import { isHostedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 import { verifyAndFinalizeProviderReturn } from "@/features/payments/server/provider-returns";
 
 type PaymentReturnPageProps = {
@@ -13,7 +13,7 @@ export default async function PaymentReturnPage(props: PaymentReturnPageProps) {
   await requireCurrentAppUser();
 
   const refId = typeof searchParams.ref === "string" ? searchParams.ref : "";
-  if (!refId || !isSupportedCheckoutProvider(provider)) {
+  if (!refId || !isHostedCheckoutProvider(provider)) {
     redirect("/home");
   }
 

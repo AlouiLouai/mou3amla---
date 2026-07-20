@@ -12,9 +12,9 @@ export const PROVIDERS: Provider[] = [
     initials: "FL",
     color: "#2FE6A3",
     network: "Flouci - TUNPAY",
-    subtitle: "Mobile Wallet - TUNPAY",
+    subtitle: "Mobile Wallet - Service temporarily unavailable",
     acceptedRoutingTypes: ["wallet_tag", "merchant_id"],
-    demoCheckoutStatus: "supported",
+    demoCheckoutStatus: "service_down",
   },
   {
     id: "konnect",
@@ -22,9 +22,9 @@ export const PROVIDERS: Provider[] = [
     initials: "KN",
     color: "#0E7490",
     network: "Konnect - Checkout",
-    subtitle: "Hosted Checkout - Sandbox",
+    subtitle: "Hosted Checkout - Service temporarily unavailable",
     acceptedRoutingTypes: ["merchant_id"],
-    demoCheckoutStatus: "supported",
+    demoCheckoutStatus: "service_down",
   },
   {
     id: "walletii",
@@ -34,7 +34,7 @@ export const PROVIDERS: Provider[] = [
     network: "Ooredoo - TUNPAY",
     subtitle: "Mobile Wallet - TUNPAY",
     acceptedRoutingTypes: ["wallet_tag"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "d17",
@@ -44,7 +44,7 @@ export const PROVIDERS: Provider[] = [
     network: "La Poste - TUNPAY",
     subtitle: "Mobile Wallet - La Poste",
     acceptedRoutingTypes: ["wallet_tag", "merchant_id"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "orangemoney",
@@ -54,7 +54,7 @@ export const PROVIDERS: Provider[] = [
     network: "Orange - TUNPAY",
     subtitle: "Mobile Wallet - TUNPAY",
     acceptedRoutingTypes: ["wallet_tag"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "zitounapay",
@@ -64,7 +64,7 @@ export const PROVIDERS: Provider[] = [
     network: "Banque Zitouna - TUNPAY",
     subtitle: "Mobile Wallet - TUNPAY",
     acceptedRoutingTypes: ["wallet_tag"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "sobflous",
@@ -74,7 +74,7 @@ export const PROVIDERS: Provider[] = [
     network: "Sobflous - TUNPAY",
     subtitle: "Electronic Wallet",
     acceptedRoutingTypes: ["wallet_tag"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "biat",
@@ -84,7 +84,7 @@ export const PROVIDERS: Provider[] = [
     network: "BIAT - Interbank",
     subtitle: "Bank Account - RIB",
     acceptedRoutingTypes: ["rib"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "amenpay",
@@ -94,7 +94,7 @@ export const PROVIDERS: Provider[] = [
     network: "Amen Bank - Interbank",
     subtitle: "Bank Account - RIB",
     acceptedRoutingTypes: ["rib"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "attijari",
@@ -104,7 +104,7 @@ export const PROVIDERS: Provider[] = [
     network: "Attijari Bank - Interbank",
     subtitle: "Bank Account - RIB",
     acceptedRoutingTypes: ["rib"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
   {
     id: "clictopay",
@@ -114,6 +114,18 @@ export const PROVIDERS: Provider[] = [
     network: "SMT - Interbank",
     subtitle: "Bank Card / RIB - ClicToPay",
     acceptedRoutingTypes: ["rib"],
-    demoCheckoutStatus: "planned",
+    demoCheckoutStatus: "mock",
   },
 ];
+
+export function getProviderById(providerId: string) {
+  return PROVIDERS.find((provider) => provider.id === providerId) ?? null;
+}
+
+export function isProviderServiceDown(providerId: string) {
+  return getProviderById(providerId)?.demoCheckoutStatus === "service_down";
+}
+
+export function canUseMockCheckout(providerId: string) {
+  return getProviderById(providerId)?.demoCheckoutStatus === "mock";
+}
