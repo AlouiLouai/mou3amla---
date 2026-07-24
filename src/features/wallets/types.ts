@@ -12,7 +12,11 @@ export interface Provider {
   network: string;
   subtitle: string;
   acceptedRoutingTypes: RoutingType[];
-  demoCheckoutStatus?: "mock" | "service_down";
+  /** "service_down" = temporary sandbox outage (Konnect); "pending_approval"
+   * = waiting on a real business-registration/KYB step before sandbox
+   * onboarding can open (Flouci) - see docs/09-bct-sandbox-readiness.md. Both
+   * are unavailable for linking/checkout, only the reason shown differs. */
+  demoCheckoutStatus?: "mock" | "hosted" | "service_down" | "pending_approval";
 }
 
 /** A linked destination — Mou3amla never sees or stores a balance for this. */

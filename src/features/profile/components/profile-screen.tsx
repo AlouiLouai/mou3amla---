@@ -1,11 +1,16 @@
-import type { ReactNode } from "react";
-import { BadgeCheck, Bell, ChevronRight, CreditCard, Landmark, LogOut, Share2, ShieldCheck } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { BadgeCheck, Bell, BookOpen, ChevronRight, FileText, Globe, Landmark, LifeBuoy, LogOut, Moon, Share2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
+import { ThemeToggle } from "@/features/mou3amla/components/theme-toggle";
 import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { statusToneColor } from "@/features/mou3amla/status-tone";
+import { LanguageSheet } from "@/features/i18n/components/language-sheet";
+import { useTranslation } from "@/features/i18n/language-store";
+import { LANGUAGES } from "@/features/i18n/translations";
+import { InfoSheet } from "@/features/profile/components/info-sheet";
 
 function verificationTone(status: string, isDemoApproval: boolean) {
   if (status === "verified") {
@@ -24,9 +29,13 @@ function verificationTone(status: string, isDemoApproval: boolean) {
   return { bg: alpha(color, 0.1), color, label: "Not verified" };
 }
 
+type ActiveSheet = "language" | "support" | "terms" | "privacy" | null;
+
 export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { derived, actions } = mou3amlaApp;
   const account = derived.account;
+  const { t, language } = useTranslation();
+  const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const initials = account.profile.fullName
     .split(" ")
     .map((part) => part[0])
@@ -35,6 +44,7 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
     .toUpperCase();
   const verification = verificationTone(account.profile.verificationStatus, account.profile.kycProviderStatus === "Demo Approved");
   const footer = renderAppFooter("profile", actions);
+  const currentLanguageLabel = LANGUAGES.find((option) => option.id === language)?.nativeLabel ?? language;
 
   const copyInviteLink = () => {
     const link = `mou3amla.app/u/${account.profile.username}`;
@@ -77,34 +87,77 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
         </div>
 
         <div className="mb-4 grid grid-cols-3 gap-2">
-          <InfoTile label="Destinations" value={String(account.wallets.length)} />
-          <InfoTile label="Payments" value={String(account.activityLog.length)} />
-          <InfoTile label="Unread" value={String(derived.unreadNotifications)} />
+          <InfoTile label={t("profile.stat.destinations")} value={String(account.wallets.length)} />
+          <InfoTile label={t("profile.stat.payments")} value={String(account.activityLog.length)} />
+          <InfoTile label={t("profile.stat.unread")} value={String(derived.unreadNotifications)} />
         </div>
 
+        <SectionLabel>{t("profile.section.preferences")}</SectionLabel>
+        <div className="mb-4 flex flex-col gap-2">
+          <div
+            className="flex items-center justify-between rounded-[22px] border px-4 py-3"
+            style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
+          >
+            <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+              <Moon className="size-4" style={{ color: mou3amla.accent }} />
+              {t("profile.darkMode")}
+            </span>
+            <ThemeToggle onLabel={t("profile.darkMode.on")} offLabel={t("profile.darkMode.off")} />
+          </div>
+          <ActionCard
+            icon={<Globe className="size-4" style={{ color: mou3amla.accent }} />}
+            label={t("profile.language")}
+            value={currentLanguageLabel}
+            onClick={() => setActiveSheet("language")}
+          />
+          <ActionCard
+            icon={<Bell className="size-4" style={{ color: mou3amla.accent }} />}
+            label={t("profile.notificationsPreference")}
+            value={`${derived.unreadNotifications} unread`}
+            onClick={actions.goNotifications}
+          />
+        </div>
+
+        <SectionLabel>{t("profile.section.account")}</SectionLabel>
         <div className="mb-4 flex flex-col gap-2">
           <LinkCard
             href="/verify-identity"
             icon={<Landmark className="size-4" style={{ color: mou3amla.accent }} />}
-            label="Identity verification"
+            label={t("profile.identityVerification")}
             value={account.profile.verificationStatus}
           />
           <InfoRow
             icon={<ShieldCheck className="size-4" style={{ color: mou3amla.accent }} />}
-            label="Passkeys & security"
+            label={t("profile.passkeysSecurity")}
             value={`${account.profile.passkeyCount} device${account.profile.passkeyCount === 1 ? "" : "s"}`}
           />
+        </div>
+
+        <SectionLabel>{t("profile.section.others")}</SectionLabel>
+        <div className="mb-4 flex flex-col gap-2">
           <ActionCard
-            icon={<Bell className="size-4" style={{ color: mou3amla.accent }} />}
-            label="Notification center"
-            value={`${derived.unreadNotifications} unread`}
-            onClick={actions.goNotifications}
+            icon={<LifeBuoy className="size-4" style={{ color: mou3amla.accent }} />}
+            label={t("profile.support")}
+            value=""
+            onClick={() => setActiveSheet("support")}
           />
           <ActionCard
-            icon={<CreditCard className="size-4" style={{ color: mou3amla.accent }} />}
-            label="Payment routes"
-            value={derived.sourceWallet?.name ?? "None"}
-            onClick={actions.goHome}
+            icon={<FileText className="size-4" style={{ color: mou3amla.accent }} />}
+            label={t("profile.termsOfUse")}
+            value=""
+            onClick={() => setActiveSheet("terms")}
+          />
+          <ActionCard
+            icon={<ShieldCheck className="size-4" style={{ color: mou3amla.accent }} />}
+            label={t("profile.privacyPolicy")}
+            value=""
+            onClick={() => setActiveSheet("privacy")}
+          />
+          <ActionCard
+            icon={<BookOpen className="size-4" style={{ color: mou3amla.accent }} />}
+            label={t("profile.guidedTour")}
+            value=""
+            onClick={() => toast(t("guidedTour.comingSoon"))}
           />
         </div>
 
@@ -120,9 +173,9 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
                 <Share2 className="size-4" style={{ color: mou3amla.accent }} />
               </span>
               <span>
-                <span className="block text-[13px] font-black">Invite friends</span>
+                <span className="block text-[13px] font-black">{t("profile.inviteFriends")}</span>
                 <span className="block text-[10.5px] font-semibold" style={{ color: mou3amla.textMuted }}>
-                  Share your @username, get paid faster
+                  {t("profile.inviteFriends.subtitle")}
                 </span>
               </span>
             </span>
@@ -138,11 +191,42 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
           >
             <span className="flex items-center gap-2.5 text-[13px] font-semibold" style={{ color: mou3amla.destructive }}>
               <LogOut className="size-4" />
-              Log out
+              {t("profile.logout")}
             </span>
           </button>
         </form>
+
+        <LanguageSheet open={activeSheet === "language"} onClose={() => setActiveSheet(null)} />
+        <InfoSheet
+          open={activeSheet === "support"}
+          title={t("sheet.support.title")}
+          body={t("sheet.support.body")}
+          closeLabel={t("sheet.close")}
+          onClose={() => setActiveSheet(null)}
+        />
+        <InfoSheet
+          open={activeSheet === "terms"}
+          title={t("sheet.terms.title")}
+          body={t("sheet.terms.body")}
+          closeLabel={t("sheet.close")}
+          onClose={() => setActiveSheet(null)}
+        />
+        <InfoSheet
+          open={activeSheet === "privacy"}
+          title={t("sheet.privacy.title")}
+          body={t("sheet.privacy.body")}
+          closeLabel={t("sheet.close")}
+          onClose={() => setActiveSheet(null)}
+        />
     </ScreenFrame>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: mou3amla.textFaint }}>
+      {children}
+    </div>
   );
 }
 

@@ -54,26 +54,55 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
   const admin = createAdminClient();
   const nowIso = new Date().toISOString();
 
-  let query = admin
-    .from("nearby_handoffs")
-    .select("challenge_code")
-    .neq("owner_user_id", userId)
-    .eq("status", "published")
-    .gt("expires_at", nowIso);
+  function baseQuery() {
+    return admin
+      .from("nearby_handoffs")
+      .select("challenge_code")
+      .neq("owner_user_id", userId)
+      .eq("status", "published")
+      .gt("expires_at", nowIso)
+      // `expires_at` is freshly set on every rotation (publish upserts it
+      // unconditionally); `created_at` is not - an owner's very first
+      // publish for that row's unique owner_user_id sets it once, and a
+      // later upsert-on-conflict only touches the columns actually in its
+      // payload, which never included created_at. Ordering by created_at
+      // silently sank long-session owners in the ranking behind anyone who
+      // started publishing more recently, even though both had equally
+      // fresh, currently-valid codes.
+      .order("expires_at", { ascending: false });
+  }
 
-  // Bound "nearby" to plausible physical proximity when the payer shared a
-  // coarse location - rows without a location (owner declined permission)
-  // are correctly excluded by the range filter's NULL semantics. Without a
-  // location from the payer, fall back to the unfiltered recent pool.
+  // Geolocation is a *preference*, not a gate: coarse browser geolocation
+  // (especially desktop/indoor) can easily be off by more than
+  // NEARBY_GEO_MATCH_RADIUS_DEG even for two phones in the same room, and a
+  // NULL geo_lat/geo_lng (owner declined the permission prompt) makes every
+  // >=/<= comparison below evaluate to NULL - i.e. silently excluded - per
+  // Postgres NULL semantics. Treating that as a hard filter meant a single
+  // denied permission on either side made a otherwise-valid code invisible
+  // forever, with no error surfaced anywhere. Try the geo-bounded query
+  // first (it's a meaningful anti-abuse/precision signal when it works),
+  // but always fall back to the unfiltered pool rather than ever returning
+  // zero real candidates when a real one exists.
+  let rows: NearbyRow[] | null = null;
+  let error: { message: string } | null = null;
+
   if (hasLocation) {
-    query = query
+    const geoQuery = baseQuery()
       .gte("geo_lat", lat - NEARBY_GEO_MATCH_RADIUS_DEG)
       .lte("geo_lat", lat + NEARBY_GEO_MATCH_RADIUS_DEG)
       .gte("geo_lng", lng - NEARBY_GEO_MATCH_RADIUS_DEG)
-      .lte("geo_lng", lng + NEARBY_GEO_MATCH_RADIUS_DEG);
+      .lte("geo_lng", lng + NEARBY_GEO_MATCH_RADIUS_DEG)
+      .limit(4);
+    const geoResult = await geoQuery;
+    rows = geoResult.data as NearbyRow[] | null;
+    error = geoResult.error;
   }
 
-  const { data: rows, error } = await query.order("created_at", { ascending: false }).limit(4);
+  if (!error && (!rows || rows.length === 0)) {
+    const fallback = await baseQuery().limit(4);
+    rows = fallback.data as NearbyRow[] | null;
+    error = fallback.error;
+  }
 
   if (error) {
     return NextResponse.json({ message: "We couldn't load nearby codes right now." }, { status: 500 });

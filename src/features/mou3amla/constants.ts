@@ -1,18 +1,23 @@
-// Dark, Instagram-derived palette: pure black surfaces throughout, with a
-// single 3-stop gradient (blue -> purple -> red) supplying every semantic
-// accent color used elsewhere in this object - accent/subtle/destructive are
-// literally that gradient's own stops, so the palette and igGradient can
-// never visually drift apart.
+// Instagram-derived palette, now theme-reactive: bg/surface/card/border/text
+// tokens resolve through CSS custom properties (see :root/.dark in
+// globals.css) so the app-wide light/dark toggle repaints every screen that
+// uses this object without per-component changes. accent/subtle/destructive
+// stay fixed hex in both themes - brand/semantic colors, not surfaces - and
+// are literally igGradient's own stops, so the palette and igGradient can
+// never visually drift apart. `hero` also stays fixed dark: it's the
+// deliberately-always-dark surface used by hero banner cards
+// (passkey-screen, verification-flow-screen) and paired with hardcoded white
+// text there - see docs/05-styling-ui.md.
 export const mou3amla = {
-  bg: "#000000",
-  surface: "#000000",
-  card: "#121212",
-  cardAlt: "#1c1c1e",
-  border: "#262626",
-  borderStrong: "#363636",
-  text: "#FFFFFF",
-  textMuted: "#A8A8A8",
-  textFaint: "#555555",
+  bg: "var(--mou3amla-bg)",
+  surface: "var(--mou3amla-surface)",
+  card: "var(--mou3amla-card)",
+  cardAlt: "var(--mou3amla-card-alt)",
+  border: "var(--mou3amla-border)",
+  borderStrong: "var(--mou3amla-border-strong)",
+  text: "var(--mou3amla-text)",
+  textMuted: "var(--mou3amla-text-muted)",
+  textFaint: "var(--mou3amla-text-faint)",
   accent: "#0095F6",
   subtle: "#7A3EF0",
   destructive: "#ED4956",
@@ -24,8 +29,17 @@ export const mou3amla = {
 // string rather than each hand-rolling their own stops.
 export const igGradient = "linear-gradient(135deg, #0095F6, #7A3EF0, #ED4956)";
 
-export function alpha(hex: string, opacity: number): string {
-  const value = parseInt(hex.slice(1), 16);
+// Accepts either a literal hex color (accent/subtle/destructive/hero) or one
+// of the var(--mou3amla-*) references above - hex takes the fast manual-math
+// path unchanged from before; a CSS var goes through color-mix() so the
+// resulting translucent color still tracks whichever theme is active instead
+// of being computed once against a color that may no longer apply.
+export function alpha(color: string, opacity: number): string {
+  if (color.startsWith("var(")) {
+    return `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
+  }
+
+  const value = parseInt(color.slice(1), 16);
   const r = (value >> 16) & 255;
   const g = (value >> 8) & 255;
   const b = value & 255;

@@ -150,20 +150,20 @@ export function useQrNearbyActions({
   // manual "Refresh" tap, and React Strict Mode's dev-only double-invoke can
   // all trigger this within the same instant; without this guard that's
   // multiple overlapping requests instead of one.
-  const optionsInFlightRef = useRef<Promise<string[] | null> | null>(null);
+  const optionsInFlightRef = useRef<Promise<{ options: string[]; hasLiveMatch: boolean } | null> | null>(null);
 
   const loadNearbyOptions = useCallback(() => {
     dispatch({ isLoadingNearbyOptions: true });
 
-    const performLoad = async (): Promise<string[] | null> => {
+    const performLoad = async (): Promise<{ options: string[]; hasLiveMatch: boolean } | null> => {
       const geo = await resolveNearbyGeo();
       const query = geo ? `?lat=${geo.lat}&lng=${geo.lng}` : "";
       const response = await fetchWithTimeout(`/api/nearby/options${query}`, {
         method: "GET",
         cache: "no-store",
       });
-      const payload = (await response.json()) as { message?: string; options?: string[] };
-      return response.ok && payload.options ? payload.options : null;
+      const payload = (await response.json()) as { message?: string; options?: string[]; hasLiveMatch?: boolean };
+      return response.ok && payload.options ? { options: payload.options, hasLiveMatch: !!payload.hasLiveMatch } : null;
     };
 
     void (async () => {
@@ -174,17 +174,17 @@ export function useQrNearbyActions({
           });
         }
 
-        const options = await optionsInFlightRef.current;
+        const result = await optionsInFlightRef.current;
 
-        if (!options) {
-          dispatch({ isLoadingNearbyOptions: false, nearbyOptions: [] });
+        if (!result) {
+          dispatch({ isLoadingNearbyOptions: false, nearbyOptions: [], hasLiveNearbyMatch: false });
           toast.error("We couldn't load nearby codes right now.");
           return;
         }
 
-        dispatch({ isLoadingNearbyOptions: false, nearbyOptions: options });
+        dispatch({ isLoadingNearbyOptions: false, nearbyOptions: result.options, hasLiveNearbyMatch: result.hasLiveMatch });
       } catch {
-        dispatch({ isLoadingNearbyOptions: false, nearbyOptions: [] });
+        dispatch({ isLoadingNearbyOptions: false, nearbyOptions: [], hasLiveNearbyMatch: false });
         toast.error("We couldn't load nearby codes right now.");
       }
     })();
@@ -232,6 +232,7 @@ export function useQrNearbyActions({
               expiresAt: payload.handoff.expiresAt,
             },
             nearbyOptions: [],
+            hasLiveNearbyMatch: false,
           });
         } catch {
           toast.dismiss(loadingToast);
@@ -327,7 +328,7 @@ export function useQrNearbyActions({
   // publish rotation; the payer has no equivalent, so this is the payer's
   // only path back to a usable state once their matched code goes stale.
   const expirePayerMatch = useCallback(() => {
-    dispatch((s) => (s.payerMatch ? { payerMatch: null, nearbyOptions: [] } : null));
+    dispatch((s) => (s.payerMatch ? { payerMatch: null, nearbyOptions: [], hasLiveNearbyMatch: false } : null));
     toast.error("That nearby match expired. Choose another code.");
   }, [dispatch]);
 
@@ -412,6 +413,13 @@ export function useQrNearbyActions({
           if (previousStatus === "published" && row.status !== "published") {
             vibrate([80, 60, 80]);
           }
+          // A lighter tick for "the payer just accepted their side too" -
+          // the AirDrop-style connecting animation (NearbyConnecting) needs
+          // its own haptic beat distinct from the initial match buzz and the
+          // final confirm buzz, same as real AirDrop ticks at each stage.
+          if (!stateRef.current.nearbyHandoff?.payerAccepted && row.payer_accepted_at) {
+            vibrate([50, 40, 50]);
+          }
           // Also syncs code/expiresAt, not just status/accepted flags - a
           // backstop against the rare case where two of this owner's own
           // publish requests raced (e.g. React Strict Mode's dev-only
@@ -437,7 +445,7 @@ export function useQrNearbyActions({
         }
 
         if (!row) {
-          dispatch((s) => (s.payerMatch ? { payerMatch: null, nearbyOptions: [] } : null));
+          dispatch((s) => (s.payerMatch ? { payerMatch: null, nearbyOptions: [], hasLiveNearbyMatch: false } : null));
           toast.error("That nearby match expired or was cancelled. Choose another code.");
           return;
         }
@@ -445,6 +453,10 @@ export function useQrNearbyActions({
         if (row.status === "confirmed") {
           void resolveConfirmedRecipient(row.challenge_code);
           return;
+        }
+
+        if (!stateRef.current.payerMatch?.ownerAccepted && row.owner_accepted_at) {
+          vibrate([50, 40, 50]);
         }
 
         dispatch((s) =>

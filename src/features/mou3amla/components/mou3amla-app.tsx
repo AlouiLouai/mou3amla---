@@ -3,18 +3,19 @@
 import dynamic from "next/dynamic";
 import { ContactsScreen } from "@/features/mou3amla/components/contacts-screen";
 import { HomeScreen } from "@/features/mou3amla/components/home-screen";
-import { mou3amla } from "@/features/mou3amla/constants";
+import { alpha, mou3amla } from "@/features/mou3amla/constants";
 import { useMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import type { InitialMou3amlaUser } from "@/features/mou3amla/types";
 import { WalletRegistrySheet } from "@/features/wallets/components/wallet-registry-sheet";
 
 function ScreenLoading() {
+  const skeletonStyle = { background: alpha(mou3amla.text, 0.06) };
   return (
     <div className="flex flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
-      <div className="mb-4 h-10 w-32 rounded-full bg-white/6" />
-      <div className="mb-3 h-28 rounded-[28px] bg-white/6" />
-      <div className="mb-3 h-24 rounded-[24px] bg-white/6" />
-      <div className="h-24 rounded-[24px] bg-white/6" />
+      <div className="mb-4 h-10 w-32 rounded-full" style={skeletonStyle} />
+      <div className="mb-3 h-28 rounded-[28px]" style={skeletonStyle} />
+      <div className="mb-3 h-24 rounded-[24px]" style={skeletonStyle} />
+      <div className="h-24 rounded-[24px]" style={skeletonStyle} />
     </div>
   );
 }
@@ -75,11 +76,11 @@ export function Mou3amlaApp({ initialUser }: { initialUser: InitialMou3amlaUser 
         >
           <div
             className="pointer-events-none absolute -top-14 right-[-20px] h-44 w-44 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(0,149,246,0.14), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, var(--mou3amla-shell-glow-1), transparent 70%)" }}
           />
           <div
             className="pointer-events-none absolute -bottom-16 left-[-34px] h-44 w-44 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(122,62,240,0.14), transparent 68%)" }}
+            style={{ background: "radial-gradient(circle, var(--mou3amla-shell-glow-2), transparent 68%)" }}
           />
 
           <div

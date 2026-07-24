@@ -6,6 +6,7 @@ import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
+import { BCT_SANDBOX_TEST_LIMIT_TND } from "@/features/payments/constants";
 import { useRecipientSearch } from "@/features/payments/hooks/use-recipient-search";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 
@@ -19,9 +20,12 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
   const sourceWallet = derived.sendSourceWallet;
   const amountDisplay = state.amount || "0";
   const recipientVerified = !state.recipientPreview || state.recipientPreview.verificationStatus === "verified";
+  const parsedAmount = Number.parseFloat(state.amount);
+  const exceedsSandboxCap = parsedAmount > BCT_SANDBOX_TEST_LIMIT_TND;
   const canGenerate =
     derived.supportedSendWallets.length > 0 &&
-    Number.parseFloat(state.amount) > 0 &&
+    parsedAmount > 0 &&
+    !exceedsSandboxCap &&
     state.recipientInput.trim().length > 0 &&
     recipientVerified &&
     !!sourceWallet &&
@@ -31,7 +35,6 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
       profile={account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
-      onScan={() => actions.goScanQr()}
       onBack={actions.goHome}
     />
   );
@@ -57,7 +60,8 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          Link one of the currently available wallets or bank routes to open Mou3amla&apos;s internal development checkout. Flouci and Konnect are temporarily down in this demo.
+          Link one of the currently available wallets or bank routes to open Mou3amla&apos;s checkout flow. Flouci is waiting for business
+          approval and Konnect is down for the moment in this demo.
         </div>
       ) : account.wallets.length > derived.supportedSendWallets.length ? (
         <div
@@ -68,7 +72,8 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          Send now opens an internal Mou3amla mock checkout for available rails. Flouci and Konnect stay visible as service-down references only.
+          Available rails open Mou3amla&apos;s internal TUNPAY-style mock checkout. Flouci (awaiting approval) and Konnect (down for the
+          moment) stay visible as reference-only routes.
         </div>
       ) : null}
 
@@ -280,6 +285,17 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             </button>
           ))}
         </div>
+        <div
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]"
+          style={{
+            color: exceedsSandboxCap ? mou3amla.destructive : mou3amla.textMuted,
+            background: exceedsSandboxCap ? alpha(mou3amla.destructive, 0.1) : alpha(mou3amla.subtle, 0.08),
+            borderColor: exceedsSandboxCap ? alpha(mou3amla.destructive, 0.3) : alpha(mou3amla.subtle, 0.24),
+          }}
+        >
+          <ShieldCheck className="size-3" />
+          BCT Test Limit: Max {BCT_SANDBOX_TEST_LIMIT_TND} TND / transaction
+        </div>
       </div>
 
       <div className="my-4 grid grid-cols-3 gap-2">
@@ -304,7 +320,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
       >
         {state.isSendingPayment ? <Loader2 className="size-4.5 animate-spin" /> : <Send className="size-4.5" />}
-        Open Mock Checkout
+        {sourceWallet?.providerId === "konnect" ? "Open Konnect Checkout" : "Open Mock Checkout"}
       </button>
     </ScreenFrame>
   );

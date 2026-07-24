@@ -25,6 +25,7 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
     nearbyHandoff: null,
     payerMatch: null,
     nearbyOptions: [],
+    hasLiveNearbyMatch: false,
     isLoadingNearbyOptions: false,
     scanManualInput: "",
     confetti: makeConfetti(),

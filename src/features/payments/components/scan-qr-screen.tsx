@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { HandCoins, RefreshCw, Waves } from "lucide-react";
+import { HandCoins, RefreshCw, Smartphone, User, Waves } from "lucide-react";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
+import { NearbyConnecting } from "@/features/payments/components/nearby-connecting";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -169,8 +170,8 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
           </div>
 
           {payerMatch ? (
-            <div className="rounded-[20px] border p-4" style={{ background: mou3amla.card, borderColor: mou3amla.border }}>
-              <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2 px-1">
                 <div className="flex items-center gap-2">
                   <HandCoins className="size-4.5" style={{ color: mou3amla.accent }} />
                   <span className="text-[13px] font-black">Matched code {payerMatch.code}</span>
@@ -182,28 +183,21 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
                   <NearbyCountdown expiresAt={payerMatch.expiresAt} />
                 </div>
               </div>
-              <p className="mt-1.5 mb-3 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                Both phones vibrated - confirm on your side too. The recipient reveals once you both accept.
-              </p>
-              <button
-                type="button"
-                onClick={acceptPayerMatch}
-                disabled={payerMatch.payerAccepted}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-[13.5px] font-black disabled:opacity-60"
-                style={{ background: mou3amla.accent, color: "#FFFFFF" }}
-              >
-                {payerMatch.payerAccepted ? "Waiting for the other phone..." : "Accept this match"}
-              </button>
-              <button
-                type="button"
-                onClick={cancelPayerMatch}
-                className="mt-2 w-full text-center text-[11.5px] font-bold"
-                style={{ color: mou3amla.textMuted }}
-              >
-                Not this one? Cancel and pick another code
-              </button>
+              <NearbyConnecting
+                selfAccepted={payerMatch.payerAccepted}
+                otherAccepted={payerMatch.ownerAccepted}
+                selfIcon={<User className="size-5" />}
+                otherIcon={<Smartphone className="size-5" />}
+                title="Connecting..."
+                subtitle="Both phones vibrated - confirm on your side too. The recipient reveals once you both accept."
+                acceptLabel="Accept this match"
+                waitingLabel="Waiting for the other phone..."
+                cancelLabel="Not this one? Cancel and pick another code"
+                onAccept={acceptPayerMatch}
+                onCancel={cancelPayerMatch}
+              />
             </div>
-          ) : (
+          ) : state.hasLiveNearbyMatch ? (
             <div className="grid grid-cols-2 gap-2.5">
               {state.nearbyOptions.map((code) => (
                 <button
@@ -217,15 +211,24 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
                 </button>
               ))}
             </div>
-          )}
-
-          {!payerMatch && state.nearbyOptions.length === 0 ? (
-            <div className="mt-3 text-[11px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-              {state.isLoadingNearbyOptions
-                ? "Looking for nearby users..."
-                : "No active nearby code yet. Ask the recipient to open their receive screen and refresh."}
+          ) : (
+            // No real code is currently published anywhere near this
+            // request - the 4-code grid above only ever renders when at
+            // least one option is real (see hasLiveNearbyMatch). Showing
+            // placeholder/decoy digits here instead would be indistinguishable
+            // from a real choice and guaranteed to fail every tap.
+            <div
+              className="rounded-[20px] border border-dashed px-4 py-6 text-center"
+              style={{ borderColor: mou3amla.borderStrong, color: mou3amla.textMuted }}
+            >
+              <div className="text-[12.5px] font-bold" style={{ color: mou3amla.text }}>
+                {state.isLoadingNearbyOptions ? "Looking for nearby codes..." : "No one's broadcasting a nearby code right now"}
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed">
+                Ask the recipient to open their receive screen, then tap Refresh.
+              </p>
             </div>
-          ) : null}
+          )}
         </div>
       )}
     </ScreenFrame>

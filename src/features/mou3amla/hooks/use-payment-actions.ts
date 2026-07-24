@@ -2,6 +2,7 @@ import { useCallback, type RefObject } from "react";
 import { toast } from "sonner";
 import { buildInvoice } from "@/features/invoices/lib/el-fatoora";
 import { createPaymentIntent } from "@/features/payments/server/actions";
+import { BCT_SANDBOX_TEST_LIMIT_TND } from "@/features/payments/constants";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
 import { getPreferredSendWalletId, makeConfetti } from "@/features/mou3amla/hooks/utils";
@@ -48,12 +49,17 @@ export function usePaymentActions({
     const recipient = stateRef.current.recipientInput.trim();
 
     if (!stateRef.current.wallets.length || !stateRef.current.sendSourceWalletId) {
-      toast.error("Link an available wallet or bank route first, then choose the one that should open the mock checkout.");
+      toast.error("Link an available wallet or bank route first, then choose the one that should open the checkout.");
       return;
     }
 
     if (!amount || amount <= 0 || !recipient) {
       toast.error("Enter both a recipient and an amount.");
+      return;
+    }
+
+    if (amount > BCT_SANDBOX_TEST_LIMIT_TND) {
+      toast.error(`Sandbox test transactions are capped at ${BCT_SANDBOX_TEST_LIMIT_TND} TND while Mou3amla is under BCT regulatory testing.`);
       return;
     }
 
@@ -97,8 +103,12 @@ export function usePaymentActions({
       // verification_status === "verified" (see wallets/server/actions.ts).
       // Surfacing that here is reporting a real, enforced guarantee, not a
       // trust claim invented for the toast.
-      toast.success(`Opening the ${result.checkout.providerName} mock checkout...`, {
-        description: "Mou3amla saved the route first, then opened the in-app development payment demo.",
+      const isKonnectHostedCheckout = result.checkout.providerId === "konnect";
+
+      toast.success(`Opening the ${result.checkout.providerName} checkout...`, {
+        description: isKonnectHostedCheckout
+          ? "Mou3amla saved the route first, then opened the real Konnect sandbox checkout."
+          : "Mou3amla saved the route first, then opened the in-app development payment demo.",
       });
 
       window.location.assign(result.checkout.url);

@@ -14,6 +14,7 @@ export function MockCheckoutControls({ refId, status }: MockCheckoutControlsProp
   const [message, setMessage] = useState<string | null>(null);
   const [pendingOutcome, setPendingOutcome] = useState<"confirmed" | "failed" | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [disclosureAcknowledged, setDisclosureAcknowledged] = useState(false);
 
   if (status !== "initiated") {
     return (
@@ -57,13 +58,31 @@ export function MockCheckoutControls({ refId, status }: MockCheckoutControlsProp
     });
   }
 
+  const canSimulate = disclosureAcknowledged && !isPending;
+
   return (
     <div className="space-y-3">
+      <label
+        className="flex cursor-pointer items-start gap-2.5 rounded-[18px] border px-4 py-3 text-[11.5px] leading-relaxed"
+        style={{ background: "#F8FAFC", borderColor: "#E2E8F0", color: "#475569" }}
+      >
+        <input
+          type="checkbox"
+          checked={disclosureAcknowledged}
+          onChange={(e) => setDisclosureAcknowledged(e.target.checked)}
+          className="mt-0.5 size-4 shrink-0"
+        />
+        <span>
+          I acknowledge that this transaction is routed in a controlled BCT Regulatory Sandbox environment. No real funds are held by
+          Mou3amla.
+        </span>
+      </label>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <button
           type="button"
           onClick={() => run("confirmed")}
-          disabled={isPending}
+          disabled={!canSimulate}
           className="flex items-center justify-center gap-2 rounded-[22px] border px-4 py-4 text-[13px] font-black transition-opacity disabled:opacity-60"
           style={{
             background: "#EFF6FF",
@@ -78,7 +97,7 @@ export function MockCheckoutControls({ refId, status }: MockCheckoutControlsProp
         <button
           type="button"
           onClick={() => run("failed")}
-          disabled={isPending}
+          disabled={!canSimulate}
           className="flex items-center justify-center gap-2 rounded-[22px] border px-4 py-4 text-[13px] font-black transition-opacity disabled:opacity-60"
           style={{
             background: "#FEF2F2",

@@ -30,12 +30,15 @@ All icons are generated, not static assets, using `next/og`'s
 To change the icon look, edit these route files directly. Do not add PNG files
 to `public/` for this purpose because nothing references them.
 
-All four rely on the shared `Mou3amlaMark` (`src/features/mou3amla/mark.tsx`), which
-takes a `maskable` prop. Pass it **only** from the `-maskable` route: it
-shrinks the badge so its corners stay inside Android's ~40%-radius
-adaptive-icon safe zone. Some Android launchers (and plain circular masks)
-crop anything outside that circle, so don't reuse the non-maskable (`0.74`
-scale) badge for `purpose: "maskable"` icons.
+All four rely on the shared `Mou3amlaMark` (`src/features/mou3amla/mark.tsx`) -
+the same gradient-ring "m" badge `LogoLockup` draws inline on the auth/splash
+screen, reproduced with fixed hex colors (not `mou3amla.*` tokens: Satori has
+no DOM/CSSOM and can't resolve `var(--mou3amla-*)`, and an app icon should
+look identical regardless of the viewer's theme anyway). It takes a
+`maskable` prop - pass it **only** from the `-maskable` route: it shrinks the
+badge so it stays inside Android's adaptive-icon safe zone. Some launchers
+crop content outside that zone, so don't reuse the non-maskable (full-size)
+badge for `purpose: "maskable"` icons.
 
 ## Cross-device viewport height
 

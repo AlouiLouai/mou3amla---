@@ -1,6 +1,6 @@
 # BCT Sandbox Readiness
 
-Last updated: 2026-07-20
+Last updated: 2026-07-23
 
 This note is a practical preparation document for presenting **Mou3amla** to
 the **Banque Centrale de Tunisie (BCT)** Sandbox.
@@ -65,6 +65,42 @@ The BCT also asks for:
 - Honest mock labeling for KYC and payment checkout.
 - Serious product framing for routing, auditability, and user protection.
 
+## On-screen demo affordances already implemented
+
+These were added directly to the live demo to make the BCT eligibility
+pillars (innovation, quantifiable client benefit, technically tested
+solution, regulatory risk management, volunteer client protection, exit
+strategy) visible on screen rather than only in this document:
+
+- **Test-limit cap**: `BCT_SANDBOX_TEST_LIMIT_TND` in
+  [../src/features/payments/constants.ts](../src/features/payments/constants.ts)
+  (currently 500 TND) is enforced both server-side (`sendPaymentSchema` in
+  `payments/server/actions.ts`) and client-side (`generate-intent-screen.tsx`,
+  `use-payment-actions.ts`), and shown as a badge under the amount on the
+  send screen. This is a **proposed** figure for the written test plan, not
+  a number BCT has mandated - change the constant if the submitted test plan
+  uses a different cap.
+- **Identity/architecture badges**: "Passkey Verified" and "Non-Custodial"
+  badges on the sender/receiver cards in the mock checkout
+  (`app/dev/mock-checkout/page.tsx`). Both are true today, not aspirational -
+  every account is passkey-gated and Mou3amla never holds a balance.
+- **Orchestration fee line**: Order Summary shows "0.000 TND (Free P2P
+  Routing)" - accurate because there is no fee logic anywhere in
+  `payments/` today.
+- **Volunteer disclosure checkbox**: `mock-checkout-controls.tsx` requires an
+  explicit acknowledgement ("routed in a controlled BCT Regulatory Sandbox
+  environment... no real funds are held") before the Simulate Success/Failure
+  buttons unlock.
+- **Dispatch log / audit payload viewer**: `DispatchLogButton`
+  (`payments/components/dispatch-log-button.tsx`) opens a JSON view built
+  from the session's real `payment_transactions` row (ref id, provider,
+  amount, status) - not a static sample. Useful as a live audit-trail demo
+  for BCT reviewers.
+
+None of this replaces the actual written dossier (test plan, risk register,
+volunteer notice, etc.) required below - it makes the product itself
+demonstrate the same commitments the paperwork will describe.
+
 ## What Mou3amla misses right now
 
 These are the main gaps today:
@@ -88,16 +124,19 @@ What is missing:
 
 Current state:
 
-- The send-money flow uses an internal mock checkout.
-- This is acceptable for demos, but weak if presented as already operational
-  payment acceptance.
+- Most send-money flows still use an internal mock checkout.
+- Konnect is now wired as a real hosted sandbox pay-in path, which is stronger
+  for demo credibility than a mock-only story.
+- This is better than a fully mocked payment layer, but it is still not the
+  same thing as a production-ready interoperable settlement partnership.
 
 What is missing:
 
-- at least one real provider integration path, or
+- a settlement partner path that matches Mou3amla's cross-provider routing
+  thesis, not just merchant collection
 - a signed integration roadmap with one regulated partner, or
-- a precise explanation of what the sandbox is meant to validate before those
-  integrations go live
+- a precise explanation of what the sandbox is meant to validate before deeper
+  interoperable integrations go live
 
 ### 3. Formal sandbox test package
 
@@ -286,7 +325,7 @@ Suggested scenarios:
 3. wallet/bank route linking
 4. QR receive flow
 5. nearby handoff flow
-6. send-money into internal mock checkout
+6. send-money into Mou3amla mock checkout or Konnect hosted sandbox checkout
 7. sender activity confirmation
 8. receiver notification and activity confirmation
 

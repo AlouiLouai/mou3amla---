@@ -48,45 +48,70 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Both blocks intentionally carry the same dark values. This app forces a
-   single theme (see theme-provider.tsx's forcedTheme="dark") rather than
-   offering a real light/dark toggle, but next-themes still applies the
-   `.dark` class for whichever theme name is forced - keeping :root and
-   .dark identical means the app looks right regardless of which selector
-   actually matches, instead of quietly depending on next-themes' internals. */
+/* :root = light theme, .dark = dark theme (the original, still-default
+   look). next-themes toggles the `.dark` class on <html> (see
+   theme-provider.tsx / profile settings). Both blocks also carry
+   --mou3amla-* - the tokens src/features/mou3amla/constants.ts's `mou3amla`
+   object resolves through - so every screen built on that object repaints
+   automatically; only accent/subtle/destructive/hero (fixed brand colors,
+   not surfaces) stay outside this system by design. The pre-authentication
+   brand shell (splash screen, phone/username entry, passkey screen)
+   deliberately opts back into a permanent dark look regardless of this
+   toggle by wrapping its own root in a nested `.dark` class - see
+   auth-screen.tsx / passkey-screen.tsx. */
 :root {
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #121212;
-  --card-foreground: #ffffff;
-  --popover: #121212;
-  --popover-foreground: #ffffff;
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #f7f7f8;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
   --primary: #0095f6;
   --primary-foreground: #ffffff;
-  --secondary: #1c1c1e;
-  --secondary-foreground: #ffffff;
-  --muted: #1c1c1e;
-  --muted-foreground: #a8a8a8;
+  --secondary: #f0f0f2;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f0f0f2;
+  --muted-foreground: #6b6b70;
   --accent: #7a3ef0;
   --accent-foreground: #ffffff;
   --destructive: #ed4956;
-  --border: #262626;
-  --input: #262626;
+  --border: #e5e5e7;
+  --input: #e5e5e7;
   --ring: rgba(0, 149, 246, 0.4);
   --chart-1: #0095f6;
   --chart-2: #7a3ef0;
   --chart-3: #ed4956;
-  --chart-4: #ffffff;
-  --chart-5: #a8a8a8;
+  --chart-4: #0a0a0a;
+  --chart-5: #6b6b70;
   --radius: 0.75rem;
-  --sidebar: #121212;
-  --sidebar-foreground: #ffffff;
+  --sidebar: #f7f7f8;
+  --sidebar-foreground: #0a0a0a;
   --sidebar-primary: #0095f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1c1c1e;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #262626;
+  --sidebar-accent: #f0f0f2;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #e5e5e7;
   --sidebar-ring: rgba(0, 149, 246, 0.4);
+
+  --mou3amla-bg: #ffffff;
+  --mou3amla-surface: #ffffff;
+  --mou3amla-card: #f7f7f8;
+  --mou3amla-card-alt: #f0f0f2;
+  --mou3amla-border: #e5e5e7;
+  --mou3amla-border-strong: #d1d1d6;
+  --mou3amla-text: #0a0a0a;
+  --mou3amla-text-muted: #6b6b70;
+  --mou3amla-text-faint: #9b9ba1;
+  /* Same accent/subtle hues as the dark corner-glow below, at much lower
+     alpha - a tint this faint reads as an imperceptible vignette on near-
+     black but as a visible smudge on white, so light mode needs a smaller
+     dose to look equally subtle, not the same rgba value. */
+  --mou3amla-glow-1: rgba(0, 149, 246, 0.03);
+  --mou3amla-glow-2: rgba(122, 62, 240, 0.025);
+  /* Stronger dose for the app shell's two corner blobs (mou3amla-app.tsx) -
+     same reasoning, scaled to their higher dark-mode baseline (14%, not 6%). */
+  --mou3amla-shell-glow-1: rgba(0, 149, 246, 0.05);
+  --mou3amla-shell-glow-2: rgba(122, 62, 240, 0.045);
 }
 
 .dark {
@@ -121,6 +146,20 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #262626;
   --sidebar-ring: rgba(0, 149, 246, 0.44);
+
+  --mou3amla-bg: #000000;
+  --mou3amla-surface: #000000;
+  --mou3amla-card: #121212;
+  --mou3amla-card-alt: #1c1c1e;
+  --mou3amla-border: #262626;
+  --mou3amla-border-strong: #363636;
+  --mou3amla-text: #ffffff;
+  --mou3amla-text-muted: #a8a8a8;
+  --mou3amla-text-faint: #555555;
+  --mou3amla-glow-1: rgba(0, 149, 246, 0.06);
+  --mou3amla-glow-2: rgba(122, 62, 240, 0.06);
+  --mou3amla-shell-glow-1: rgba(0, 149, 246, 0.14);
+  --mou3amla-shell-glow-2: rgba(122, 62, 240, 0.14);
 }
 
 @layer base {
@@ -133,8 +172,8 @@
     min-height: 100vh; /* fallback for browsers without dvh support (older Android WebViews / Samsung Internet) */
     min-height: 100dvh;
     background-image:
-      radial-gradient(circle at top right, rgba(0, 149, 246, 0.06), transparent 28%),
-      radial-gradient(circle at bottom left, rgba(122, 62, 240, 0.06), transparent 26%);
+      radial-gradient(circle at top right, var(--mou3amla-glow-1), transparent 28%),
+      radial-gradient(circle at bottom left, var(--mou3amla-glow-2), transparent 26%);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: contain;
     text-rendering: optimizeLegibility;
@@ -259,6 +298,21 @@
   100% {
     transform: scale(1.9);
     opacity: 0;
+  }
+}
+
+/* The AirDrop-style "connecting" dots between the two device nodes in
+   NearbyConnecting (see nearby-connecting.tsx) - a breathing scale+opacity
+   pulse, staggered per-dot via animation-delay for a left-to-right ripple. */
+@keyframes mou3amla-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
   }
 }
 

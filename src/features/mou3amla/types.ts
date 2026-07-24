@@ -68,6 +68,11 @@ export interface Mou3amlaState {
   nearbyHandoff: NearbyHandoff | null;
   payerMatch: NearbyMatchState | null;
   nearbyOptions: string[];
+  /** Whether at least one of `nearbyOptions` is a real published code, not
+   * padding - decoys are visually indistinguishable from a real code on
+   * purpose (see nearby-code.ts), so the UI needs this to tell "nobody's
+   * broadcasting nearby right now" apart from "here are 4 codes to try". */
+  hasLiveNearbyMatch: boolean;
   isLoadingNearbyOptions: boolean;
   scanManualInput: string;
   confetti: ConfettiPiece[];

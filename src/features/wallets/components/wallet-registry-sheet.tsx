@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { alpha, raisedShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
-import { isProviderServiceDown } from "@/features/wallets/constants";
+import { canUseHostedCheckout, isProviderPendingApproval, isProviderServiceDown } from "@/features/wallets/constants";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 
 const ROUTING_LABELS = {
@@ -76,6 +76,8 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
             ) : null}
             {derived.availableProviders.map((provider) => {
               const serviceDown = isProviderServiceDown(provider.id);
+              const pendingApproval = isProviderPendingApproval(provider.id);
+              const hostedCheckout = canUseHostedCheckout(provider.id);
               const disabled = account.profile.verificationStatus !== "verified" || serviceDown;
 
               return (
@@ -107,13 +109,17 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
                           color: serviceDown ? mou3amla.destructive : mou3amla.accent,
                         }}
                       >
-                        {serviceDown ? "service down" : "mock checkout"}
+                        {pendingApproval ? "waiting for approval" : serviceDown ? "down for the moment" : hostedCheckout ? "hosted checkout" : "mock checkout"}
                       </span>
                     </div>
                     <div className="text-[11px]" style={{ color: serviceDown ? mou3amla.destructive : mou3amla.textMuted }}>
-                      {serviceDown
-                        ? "Temporary sandbox outage. Keep this disabled in demos to avoid a broken third-party handoff."
-                        : `${provider.subtitle}. Linked routes use Mou3amla's internal development checkout for demos.`}
+                      {pendingApproval
+                        ? `${provider.subtitle}. Sandbox onboarding opens once the business registration (RNE) step is approved.`
+                        : serviceDown
+                          ? `${provider.subtitle}. Keep this disabled in demos to avoid a broken third-party handoff.`
+                          : hostedCheckout
+                            ? `${provider.subtitle}. Linked routes open Konnect's real sandbox checkout for demos.`
+                            : `${provider.subtitle}. Linked routes use Mou3amla's internal development checkout for demos.`}
                     </div>
                   </div>
                   <ChevronRight className="size-4" style={{ color: mou3amla.textFaint }} />

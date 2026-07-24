@@ -1,12 +1,13 @@
-import { Bell, ChevronLeft, ScanLine } from "lucide-react";
+import { Bell, ChevronLeft } from "lucide-react";
 import { alpha, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UserProfile } from "@/features/mou3amla/types";
+import { useTranslation } from "@/features/i18n/language-store";
 
-function greeting(): string {
+function greetingKey(): "greeting.morning" | "greeting.afternoon" | "greeting.evening" {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return "greeting.morning";
+  if (hour < 18) return "greeting.afternoon";
+  return "greeting.evening";
 }
 
 // The one header every authenticated screen shares - avatar, greeting, bell.
@@ -22,13 +23,11 @@ export function AppHeader({
   profile,
   unreadNotifications,
   onNotifications,
-  onScan,
   onBack,
 }: {
   profile: UserProfile;
   unreadNotifications: number;
   onNotifications: () => void;
-  onScan?: () => void;
   onBack?: () => void;
 }) {
   const initials = profile.fullName
@@ -37,6 +36,7 @@ export function AppHeader({
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const { t } = useTranslation();
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 pt-[max(0.85rem,env(safe-area-inset-top))] pb-3">
@@ -68,25 +68,13 @@ export function AppHeader({
                 disagree on the hour near a boundary or across timezones, so
                 this text is allowed to differ between SSR and hydration. */}
             <div className="truncate text-[11px] font-normal" style={{ color: mou3amla.textMuted }} suppressHydrationWarning>
-              {greeting()} — routes ready
+              {t(greetingKey())} — {t("greeting.routesReady")}
             </div>
           </div>
         </div>
       )}
 
       <div className="flex shrink-0 items-center gap-2">
-        {onScan ? (
-          <button
-            type="button"
-            onClick={() => onScan()}
-            aria-label="Scan QR"
-            className="flex size-10 shrink-0 items-center justify-center rounded-full"
-            style={{ background: alpha(mou3amla.text, 0.06) }}
-          >
-            <ScanLine className="size-4" style={{ color: mou3amla.text }} />
-          </button>
-        ) : null}
-
         <button
           type="button"
           onClick={onNotifications}
