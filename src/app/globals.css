@@ -301,6 +301,19 @@
   }
 }
 
+/* The sweeping conic-gradient wedge in NearbyRadar
+   (components/ui/nearby-radar.tsx) - shared by the pre-signup proximity
+   preview and the real receive/scan nearby screens, a continuous full
+   rotation rather than a bounce so it reads as "actively scanning". */
+@keyframes mou3amla-radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* The AirDrop-style "connecting" dots between the two device nodes in
    NearbyConnecting (see nearby-connecting.tsx) - a breathing scale+opacity
    pulse, staggered per-dot via animation-delay for a left-to-right ripple. */
@@ -412,6 +425,24 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* EmptyState's icon badge (components/ui/empty-state.tsx) - a small pop-in
+   rather than a slide, so a "nothing here yet" moment feels like a
+   deliberate, friendly beat instead of a flat placeholder. */
+@keyframes mou3amla-empty-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

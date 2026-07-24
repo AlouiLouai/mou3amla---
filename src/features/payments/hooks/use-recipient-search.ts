@@ -9,6 +9,13 @@ const SEARCH_DEBOUNCE_MS = 250;
 export function useRecipientSearch(query: string, enabled: boolean) {
   const [results, setResults] = useState<RecipientPreview[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  // The exact query string the most recently *completed* search ran
+  // against - lets the caller tell "a search finished with zero results"
+  // apart from "no search has run for this query yet" (both otherwise look
+  // like `!isSearching && results.length === 0`) via a plain derived
+  // comparison below, with no extra setState call (and so no synchronous
+  // setState-in-effect) needed to "reset" it when `query` changes.
+  const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -32,7 +39,10 @@ export function useRecipientSearch(query: string, enabled: boolean) {
         } catch {
           if (requestIdRef.current === requestId) setResults([]);
         } finally {
-          if (requestIdRef.current === requestId) setIsSearching(false);
+          if (requestIdRef.current === requestId) {
+            setIsSearching(false);
+            setSearchedQuery(query);
+          }
         }
       })();
     }, SEARCH_DEBOUNCE_MS);
@@ -40,5 +50,5 @@ export function useRecipientSearch(query: string, enabled: boolean) {
     return () => clearTimeout(timer);
   }, [query, enabled]);
 
-  return { results, isSearching };
+  return { results, isSearching, hasSearched: searchedQuery === query };
 }

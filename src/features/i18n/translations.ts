@@ -89,6 +89,27 @@ const en = {
   "passkey.continueWithPasskey": "Continue with passkey",
   "passkey.changeIdentity": "Change identity",
   "passkey.noPasswordStored": "No password stored, ever.",
+  "passkey.lockPrefix": "Lock in ",
+  "passkey.lockSuffix": " before someone else claims it.",
+
+  "onboarding.step.device": "Device connected",
+  "onboarding.step.profile": "Build profile",
+  "onboarding.step.passkey": "Secure passkey",
+
+  "onboarding.radar.teaser": "Preview: see who's nearby",
+  "onboarding.radar.disclaimer": "Simulated preview - no real devices are contacted.",
+  "onboarding.radar.peers": "This is what a nearby handoff looks like once you're in.",
+
+  "onboarding.builder.claimedPrefix": "You claimed ",
+  "onboarding.builder.claimedSuffix": ". Nice.",
+  "onboarding.builder.heading": "Make it yours.",
+  "onboarding.builder.subtitle": "Pick a card style for your Mou3amla identity. You can change it later in Profile.",
+  "onboarding.builder.cyan": "Cyan",
+  "onboarding.builder.magenta": "Magenta",
+  "onboarding.builder.amber": "Amber",
+  "onboarding.builder.emerald": "Emerald",
+  "onboarding.builder.continue": "Continue",
+  "onboarding.builder.member": "Mou3amla member",
 } as const;
 
 const fr: Record<keyof typeof en, string> = {
@@ -168,6 +189,27 @@ const fr: Record<keyof typeof en, string> = {
   "passkey.continueWithPasskey": "Continuer avec le passkey",
   "passkey.changeIdentity": "Changer d'identité",
   "passkey.noPasswordStored": "Aucun mot de passe stocké, jamais.",
+  "passkey.lockPrefix": "Verrouillez ",
+  "passkey.lockSuffix": " avant que quelqu'un d'autre ne le prenne.",
+
+  "onboarding.step.device": "Appareil connecté",
+  "onboarding.step.profile": "Créer le profil",
+  "onboarding.step.passkey": "Sécuriser le passkey",
+
+  "onboarding.radar.teaser": "Aperçu : voir qui est à proximité",
+  "onboarding.radar.disclaimer": "Aperçu simulé - aucun appareil réel n'est contacté.",
+  "onboarding.radar.peers": "Voici à quoi ressemble un transfert de proximité une fois connecté.",
+
+  "onboarding.builder.claimedPrefix": "Vous avez réservé ",
+  "onboarding.builder.claimedSuffix": ". Parfait.",
+  "onboarding.builder.heading": "Personnalisez-le.",
+  "onboarding.builder.subtitle": "Choisissez un style de carte pour votre identité Mou3amla. Modifiable plus tard dans Profil.",
+  "onboarding.builder.cyan": "Cyan",
+  "onboarding.builder.magenta": "Magenta",
+  "onboarding.builder.amber": "Ambre",
+  "onboarding.builder.emerald": "Émeraude",
+  "onboarding.builder.continue": "Continuer",
+  "onboarding.builder.member": "Membre Mou3amla",
 };
 
 const tn: Record<keyof typeof en, string> = {
@@ -247,6 +289,27 @@ const tn: Record<keyof typeof en, string> = {
   "passkey.continueWithPasskey": "Kammel bel passkey",
   "passkey.changeIdentity": "Beddel el hawiya",
   "passkey.noPasswordStored": "Mafamech mot de passe mkhazen, 5ater ki 5ater.",
+  "passkey.lockPrefix": "9affel ",
+  "passkey.lockSuffix": "9bal ma ye5ouha 7ad okhor.",
+
+  "onboarding.step.device": "Appareil connecté",
+  "onboarding.step.profile": "3ammar profile",
+  "onboarding.step.passkey": "Sécurisi el passkey",
+
+  "onboarding.radar.teaser": "Chouf: chkoun 9rib menek",
+  "onboarding.radar.disclaimer": "Aperçu simulé - 7ata appareil 7a9i9i mayet3achech.",
+  "onboarding.radar.peers": "Hakka bech ykoun el handoff el 9rib ki tdakhal.",
+
+  "onboarding.builder.claimedPrefix": "5dhit ",
+  "onboarding.builder.claimedSuffix": ". Behi barcha.",
+  "onboarding.builder.heading": "A3mlha 3lik.",
+  "onboarding.builder.subtitle": "E5tar style el carte ta3 el hawiya mte3ek fi Mou3amla. Tnajem tbeddelha mn ba3d fi Profile.",
+  "onboarding.builder.cyan": "Cyan",
+  "onboarding.builder.magenta": "Magenta",
+  "onboarding.builder.amber": "Amber",
+  "onboarding.builder.emerald": "Emerald",
+  "onboarding.builder.continue": "Kammel",
+  "onboarding.builder.member": "Membre Mou3amla",
 };
 
 export const translations = { en, fr, tn } satisfies Record<Language, Record<keyof typeof en, string>>;

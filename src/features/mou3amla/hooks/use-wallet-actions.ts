@@ -1,6 +1,6 @@
 import { useCallback, type RefObject } from "react";
 import type { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
 import { applyDefaultWallet, getPreferredSendWalletId } from "@/features/mou3amla/hooks/utils";

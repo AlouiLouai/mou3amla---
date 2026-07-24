@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityItem } from "@/features/activity/types";
-import type { AppProfileRecord, AuthenticatedAppUser, VerificationStatus } from "@/features/auth/types";
+import type { AppProfileRecord, AuthenticatedAppUser, CardGradient, VerificationStatus } from "@/features/auth/types";
 import { computeStampDuty } from "@/features/invoices/lib/el-fatoora";
 import type { Invoice } from "@/features/invoices/types";
 import type { NotificationItem } from "@/features/notifications/types";
@@ -19,6 +19,7 @@ type ProfileRow = {
   display_name: string;
   verification_status: VerificationStatus;
   kyc_provider_status: string | null;
+  card_gradient: CardGradient;
   created_at: string;
   updated_at: string;
 };
@@ -72,6 +73,7 @@ function toAppProfile(profile: ProfileRow): AppProfileRecord {
     displayName: profile.display_name,
     verificationStatus: profile.verification_status,
     kycProviderStatus: profile.kyc_provider_status,
+    cardGradient: profile.card_gradient,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
   };
@@ -199,7 +201,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("id, phone, username, display_name, verification_status, kyc_provider_status, created_at, updated_at")
+    .select("id, phone, username, display_name, verification_status, kyc_provider_status, card_gradient, created_at, updated_at")
     .eq("id", identity.userId)
     .maybeSingle<ProfileRow>();
 
@@ -267,6 +269,7 @@ async function loadCurrentAppUser(): Promise<AuthenticatedAppUser | null> {
     displayName: profile.displayName,
     verificationStatus: profile.verificationStatus,
     kycProviderStatus: profile.kycProviderStatus,
+    cardGradient: profile.cardGradient,
     wallets,
     sourceWalletId,
     activityLog,

@@ -263,6 +263,12 @@ async function mintSessionForIdentity(phone: string, username: string): Promise<
 type PasskeyOptionsResult<T> = { ok: true; options: T } | { ok: false; message: string };
 
 async function getPasskeyRegistrationOptionsUnsafe(phone: string, username: string): Promise<PasskeyOptionsResult<Awaited<ReturnType<typeof buildRegistrationOptions>>>> {
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`passkey-reg-options:${clientIp}`, { max: 15, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
   const admin = createAdminClient();
   const profile = await resolveExactProfile(admin, phone, username);
 
@@ -291,6 +297,12 @@ export async function getPasskeyRegistrationOptions(
 type VerifyPasskeyOutcome = { ok: false; message: string } | { redirectTo: string };
 
 async function verifyPasskeyRegistrationUnsafe(phone: string, username: string, response: RegistrationResponseJSON): Promise<VerifyPasskeyOutcome> {
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`passkey-reg-verify:${clientIp}`, { max: 15, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
   const admin = createAdminClient();
   const profile = await resolveExactProfile(admin, phone, username);
 
@@ -344,6 +356,12 @@ async function getPasskeyAuthenticationOptionsUnsafe(
   phone: string,
   username: string,
 ): Promise<PasskeyOptionsResult<NonNullable<Awaited<ReturnType<typeof buildAuthenticationOptions>>>>> {
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`passkey-auth-options:${clientIp}`, { max: 20, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
   const admin = createAdminClient();
   const profile = await resolveExactProfile(admin, phone, username);
 
@@ -374,6 +392,12 @@ export async function getPasskeyAuthenticationOptions(
 }
 
 async function verifyPasskeyAuthenticationUnsafe(phone: string, username: string, response: AuthenticationResponseJSON): Promise<VerifyPasskeyOutcome> {
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`passkey-auth-verify:${clientIp}`, { max: 20, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
   const admin = createAdminClient();
   const profile = await resolveExactProfile(admin, phone, username);
 
@@ -428,4 +452,44 @@ export async function verifyPasskeyAuthentication(
  * from the client on failure so a real diagnosis is possible. */
 export async function logPasskeyCeremonyFailure(mode: "register" | "authenticate", detail: string): Promise<void> {
   logger.warn(`Passkey ceremony failed (${mode})`, { detail });
+}
+
+type SetCardGradientResult = { ok: true } | { ok: false; message: string };
+
+/** ProfileBuilderScreen's IKEA-effect step: persists the personal card style
+ * (cyan/magenta) the user picks before the passkey ceremony. Runs pre-session
+ * like the rest of Stage 1, so it's rate-limited per IP rather than per user
+ * (see startPhoneAuthUnsafe) and re-resolves the profile from the exact
+ * (phone, username) pair rather than trusting a client-supplied id, same as
+ * every other passkey-adjacent action here. */
+async function setProfileCardGradientUnsafe(phone: string, username: string, gradient: "cyan" | "magenta" | "amber" | "emerald"): Promise<SetCardGradientResult> {
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`set-card-gradient:${clientIp}`, { max: 20, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
+  const admin = createAdminClient();
+  const profile = await resolveExactProfile(admin, phone, username);
+
+  if (!profile) {
+    return { ok: false, message: "We couldn't find that identity. Please start again." };
+  }
+
+  const { error } = await admin.from("profiles").update({ card_gradient: gradient }).eq("id", profile.id);
+
+  if (error) {
+    return { ok: false, message: "We couldn't save your card style. Please retry." };
+  }
+
+  return { ok: true };
+}
+
+export async function setProfileCardGradient(phone: string, username: string, gradient: "cyan" | "magenta" | "amber" | "emerald"): Promise<SetCardGradientResult> {
+  try {
+    return await setProfileCardGradientUnsafe(phone, username, gradient);
+  } catch (error) {
+    logger.error("Unhandled error in setProfileCardGradient", error);
+    return { ok: false, message: "We couldn't save your card style. Please retry." };
+  }
 }

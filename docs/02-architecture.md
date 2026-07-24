@@ -35,7 +35,9 @@ src/
       logo-lockup.tsx      # the actual "m" + wordmark shown on splash/auth
 
     auth/                 # Stage 1 + Stage 2 auth UX and server logic
-      components/         # auth-screen.tsx, passkey-screen.tsx
+      components/         # auth-screen.tsx, verify-flow.tsx, profile-builder-screen.tsx,
+                           # passkey-screen.tsx, onboarding-stepper.tsx,
+                           # proximity-sandbox-preview.tsx, identity-card-preview.tsx
       lib/                # phone/username normalization and zod schemas
       server/             # server actions + authenticated-user DAL
       types.ts
@@ -63,7 +65,28 @@ src/
     profile/
 
   components/             # Shared cross-feature UI only
-    ui/                   # shadcn primitives
+    ui/                   # shadcn primitives, plus hand-rolled (not
+                           # shadcn-generated) shared widgets used by more
+                           # than one feature:
+                           #   - bottom-sheet.tsx: shared shell for every
+                           #     bottom sheet (backdrop + card + pointer-
+                           #     driven draggable grabber, real swipe-to-
+                           #     dismiss). LanguageSheet, InfoSheet, and
+                           #     WalletRegistrySheet all wrap this instead of
+                           #     each hand-rolling the same fixed-position
+                           #     markup.
+                           #   - empty-state.tsx: the icon-badge "nothing
+                           #     here yet" pattern (icon + title + muted body
+                           #     + optional CTA), used by activity, contacts,
+                           #     accounts, invoices, notifications, wallets,
+                           #     and recipient search's zero-results state.
+                           #   - nearby-radar.tsx: the sweeping-ring "who's
+                           #     nearby" visual shared by the pre-signup
+                           #     ProximitySandboxPreview (fake data) and the
+                           #     real receive/scan nearby screens (real
+                           #     codes as blips) - one shared component so
+                           #     the pre-auth teaser and the real feature
+                           #     actually look like the same feature.
     layout/               # theme-provider and layout helpers
     pwa/                  # install prompt / online-state shared UI, splash screen
 
@@ -92,7 +115,23 @@ supabase/
   `src/features/auth/components/auth-screen.tsx` and
   `src/features/auth/server/actions.ts`.
 - **Stage 2 passkey gate** belongs to `src/app/verify/page.tsx` plus
-  `src/features/auth/components/passkey-screen.tsx`.
+  `src/features/auth/components/passkey-screen.tsx`. For a brand-new
+  identity (`mode === "register"`), `/verify/page.tsx` actually renders
+  `VerifyFlow` (`verify-flow.tsx`), a small client component that inserts one
+  extra beat - `ProfileBuilderScreen` (claim-confirmation + a cyan/magenta
+  personal card-style pick, persisted via `setProfileCardGradient` in
+  `auth/server/actions.ts`) - before handing off to `PasskeyScreen`. This is
+  still the same single `/verify` route and still single-entry auth (see
+  "Auth conventions" in [06-conventions.md](./06-conventions.md)) - it is a
+  client-side step inside the register branch, not a second screen type. A
+  returning identity (`mode === "authenticate"`) skips straight to
+  `PasskeyScreen`, unchanged. `onboarding-stepper.tsx` (a 3-step "Device
+  Connected / Build Profile / Secure Passkey" progress bar, pinned to 33% the
+  instant it renders) appears on `auth-screen.tsx` always and on
+  `passkey-screen.tsx` only in register mode.
+  `proximity-sandbox-preview.tsx` is an expandable, entirely-fake nearby-radar
+  teaser on `auth-screen.tsx` shown before any signup step - it never calls
+  `/api/nearby/**` (which requires a session).
 - **Authenticated user lookup** belongs to
   `src/features/auth/server/dal.ts`, not inside pages.
 - **Supabase client setup** belongs to `src/lib/supabase/**`.

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { Landmark, Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -49,15 +50,12 @@ export function AccountsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
       </div>
 
       {account.wallets.length === 0 ? (
-        <div
-          className="rounded-[24px] border px-4 py-6 text-center"
-          style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
-        >
-          <div className="text-[14px] font-black">No linked destination yet.</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-            Start with a wallet tag or merchant id. After verification approval, you can also attach a 20-digit RIB.
-          </p>
-        </div>
+        <EmptyState
+          icon={<Landmark className="size-5" />}
+          title="No linked destination yet"
+          body="Start with a wallet tag or merchant id. After verification approval, you can also attach a 20-digit RIB."
+          action={{ label: "Link an account", onClick: actions.openLink }}
+        />
       ) : (
         <div className="flex flex-col gap-2.5">
           {account.wallets.map((wallet) => {

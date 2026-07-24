@@ -22,6 +22,7 @@ export default async function HomePage(props: HomePageProps) {
         displayName: user.displayName,
         verificationStatus: user.verificationStatus,
         kycProviderStatus: user.kycProviderStatus,
+        cardGradient: user.cardGradient,
         wallets: user.wallets,
         sourceWalletId: user.sourceWalletId,
         activityLog: user.activityLog,

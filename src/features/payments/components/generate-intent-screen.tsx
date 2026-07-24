@@ -1,6 +1,7 @@
 "use client";
 
-import { Delete, Loader2, ScanLine, Send, ShieldCheck, TriangleAlert, Users, X } from "lucide-react";
+import { Delete, Loader2, ScanLine, Send, ShieldCheck, TriangleAlert, UserSearch, Users, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -15,7 +16,7 @@ const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "bac
 export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { state, derived, actions } = mou3amlaApp;
   const searchEnabled = !state.recipientPreview && state.recipientInput.trim().length >= 2;
-  const { results: recipientResults, isSearching } = useRecipientSearch(state.recipientInput, searchEnabled);
+  const { results: recipientResults, isSearching, hasSearched } = useRecipientSearch(state.recipientInput, searchEnabled);
   const account = derived.account;
   const sourceWallet = derived.sendSourceWallet;
   const amountDisplay = state.amount || "0";
@@ -181,7 +182,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         )}
       </div>
 
-      {searchEnabled && (isSearching || recipientResults.length > 0) ? (
+      {searchEnabled && (isSearching || recipientResults.length > 0 || hasSearched) ? (
         <div
           className="mb-4 overflow-hidden rounded-[20px] border"
           style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
@@ -191,6 +192,13 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
               <Loader2 className="size-3.5 animate-spin" />
               Searching Mou3amla users...
             </div>
+          ) : recipientResults.length === 0 ? (
+            <EmptyState
+              className="rounded-none border-none"
+              icon={<UserSearch className="size-5" />}
+              title="No matching users"
+              body="Double-check the @username, or ask them for their exact handle."
+            />
           ) : (
             recipientResults.map((result) => (
               <button
@@ -295,6 +303,29 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         >
           <ShieldCheck className="size-3" />
           BCT Test Limit: Max {BCT_SANDBOX_TEST_LIMIT_TND} TND / transaction
+        </div>
+
+        {/* Contrast Effect: the 0-fee claim only lands next to something to
+            compare it against - shown side by side rather than in isolation,
+            same "Free P2P Routing" language already used in the mock
+            checkout's order summary (app/dev/mock-checkout/page.tsx). No
+            specific bank commission figure is invented here (see
+            docs/07-agent-guardrails.md #12) - the contrast is qualitative. */}
+        <div className="mt-2 flex items-center gap-2">
+          <div
+            className="flex items-center gap-1.5 rounded-full border px-3 py-1"
+            style={{ background: alpha(mou3amla.accent, 0.12), borderColor: alpha(mou3amla.accent, 0.3) }}
+          >
+            <ShieldCheck className="size-3" style={{ color: mou3amla.accent }} />
+            <span className="text-[10px] font-black" style={{ color: mou3amla.accent }}>
+              Mou3amla: 0.000 TND fee
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1 opacity-50" style={{ borderColor: mou3amla.borderStrong }}>
+            <span className="text-[10px] font-semibold line-through" style={{ color: mou3amla.textFaint }}>
+              Traditional bank transfer: fees apply
+            </span>
+          </div>
         </div>
       </div>
 

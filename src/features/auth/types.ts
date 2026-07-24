@@ -5,6 +5,11 @@ import type { Invoice } from "@/features/invoices/types";
 
 export type VerificationStatus = "unverified" | "pending" | "verified" | "rejected";
 
+// The personal card style picked in ProfileBuilderScreen during onboarding
+// (see identityGradients in src/features/mou3amla/constants.ts) - null until
+// a new user completes that step.
+export type CardGradient = "cyan" | "magenta" | "amber" | "emerald" | null;
+
 export interface AuthFormState {
   errors?: {
     phone?: string[];
@@ -25,6 +30,7 @@ export interface AppProfileRecord {
   displayName: string;
   verificationStatus: VerificationStatus;
   kycProviderStatus: string | null;
+  cardGradient: CardGradient;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +42,7 @@ export interface AuthenticatedAppUser {
   displayName: string;
   verificationStatus: VerificationStatus;
   kycProviderStatus: string | null;
+  cardGradient: CardGradient;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];

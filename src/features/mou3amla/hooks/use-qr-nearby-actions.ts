@@ -1,5 +1,5 @@
 import { useCallback, useRef, type RefObject } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { CoarseLocation } from "@/features/payments/lib/geolocation";
 import { NEARBY_CODE_TTL_MS, QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import type { NearbyHandoff, NearbyMatchStatus, QrToken } from "@/features/payments/types";
@@ -219,6 +219,11 @@ export function useQrNearbyActions({
 
           if (!response.ok || !payload.handoff) {
             toast.error(payload.message ?? "That nearby code is unavailable.");
+            // The code just went stale (rotated, claimed by someone else,
+            // expired) faster than the next scheduled poll - refresh right
+            // away instead of leaving a grid of options the server already
+            // rejected on screen for up to another NEARBY_OPTIONS_REFRESH_MS.
+            loadNearbyOptions();
             return;
           }
 
@@ -240,7 +245,7 @@ export function useQrNearbyActions({
         }
       })();
     },
-    [dispatch, resolveNearbyGeo],
+    [dispatch, resolveNearbyGeo, loadNearbyOptions],
   );
 
   const acceptPayerMatch = useCallback(() => {

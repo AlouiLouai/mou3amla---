@@ -12,6 +12,7 @@ import {
   verifyPasskeyAuthentication,
   verifyPasskeyRegistration,
 } from "@/features/auth/server/actions";
+import { OnboardingStepper } from "@/features/auth/components/onboarding-stepper";
 import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import { LanguageSheet } from "@/features/i18n/components/language-sheet";
 import { useTranslation } from "@/features/i18n/language-store";
@@ -77,26 +78,36 @@ export function PasskeyScreen({ phone, username, mode }: { phone: string; userna
       // toggle - the pre-authentication brand shell stays permanently dark.
     >
       <div className="mx-auto flex w-full max-w-md flex-col">
+        {/* Same row shape as AuthScreen and ProfileBuilderScreen, present in
+            both modes (empty stepper slot when signing in) so the language
+            toggle never jumps position between the three onboarding
+            screens. */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex-1">
+            {mode === "register" ? (
+              <OnboardingStepper currentStep={3} labels={[t("onboarding.step.device"), t("onboarding.step.profile"), t("onboarding.step.passkey")]} />
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setLanguageSheetOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-2 text-[12px] font-semibold text-white/84"
+          >
+            <Globe className="size-4" />
+            <span>{language.toUpperCase()}</span>
+          </button>
+        </div>
+
         <div
           className="relative mb-4 overflow-hidden rounded-[30px] px-5 pt-5 pb-6 text-white"
           style={{ background: mou3amla.hero, boxShadow: "0 26px 70px rgba(0,0,0,0.18)" }}
         >
           <div className="pointer-events-none absolute -top-12 right-[-26px] h-36 w-36 rounded-full opacity-80" style={{ background: igGradient }} />
-          <div className="relative flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">{t("passkey.verification")}</div>
-              <div className="mt-2 text-[1.85rem] font-black leading-none">
-                {mode === "register" ? t("passkey.headingRegister") : t("passkey.headingAuthenticate")}
-              </div>
+          <div className="relative">
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">{t("passkey.verification")}</div>
+            <div className="mt-2 text-[1.85rem] font-black leading-none">
+              {mode === "register" ? t("passkey.headingRegister") : t("passkey.headingAuthenticate")}
             </div>
-            <button
-              type="button"
-              onClick={() => setLanguageSheetOpen(true)}
-              className="flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-2 text-[12px] font-semibold text-white/84"
-            >
-              <Globe className="size-4" />
-              <span>{language.toUpperCase()}</span>
-            </button>
           </div>
 
           <div className="relative mt-5 flex items-center gap-3 rounded-[22px] px-4 py-3" style={{ background: mou3amla.card }}>
@@ -146,7 +157,19 @@ export function PasskeyScreen({ phone, username, mode }: { phone: string; userna
             style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
           >
             <Fingerprint className="size-4" />
-            <span>{pending ? t("passkey.waiting") : mode === "register" ? t("passkey.createPasskey") : t("passkey.continueWithPasskey")}</span>
+            <span>
+              {pending ? (
+                t("passkey.waiting")
+              ) : mode === "register" ? (
+                <>
+                  {t("passkey.lockPrefix")}
+                  {formatUsernameHandle(username)}
+                  {t("passkey.lockSuffix")}
+                </>
+              ) : (
+                t("passkey.continueWithPasskey")
+              )}
+            </span>
           </button>
 
           <div className="mt-5 flex items-center justify-between text-[11px]" style={{ color: mou3amla.textMuted }}>

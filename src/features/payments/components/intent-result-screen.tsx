@@ -23,7 +23,7 @@ export function IntentResultScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaAp
   const footer = renderAppFooter("intent-result", actions);
 
   return (
-    <ScreenFrame header={header} footer={footer} contentClassName="px-6 pb-8">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-8">
       <div className="relative flex min-h-full flex-col items-center justify-center overflow-hidden text-center">
         {state.confetti.map((c, i) => (
           <div

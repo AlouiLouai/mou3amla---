@@ -1,6 +1,6 @@
 # BCT Sandbox Readiness
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 This note is a practical preparation document for presenting **Mou3amla** to
 the **Banque Centrale de Tunisie (BCT)** Sandbox.
@@ -96,10 +96,46 @@ strategy) visible on screen rather than only in this document:
   from the session's real `payment_transactions` row (ref id, provider,
   amount, status) - not a static sample. Useful as a live audit-trail demo
   for BCT reviewers.
+- **Onboarding progress + honest-preview affordances** (added 2026-07-24):
+  `auth-screen.tsx` and `passkey-screen.tsx` (register mode) show a 3-step
+  "Device Connected / Build Profile / Secure Passkey" progress bar
+  (`onboarding-stepper.tsx`) to demonstrate a low-friction, quantifiable
+  time-to-onboard journey - a KPI the sandbox test plan's success metrics
+  section already asks for. `proximity-sandbox-preview.tsx` lets a
+  not-yet-registered visitor try the nearby-handoff radar before any signup
+  step, and is explicitly labeled a simulated preview that contacts no real
+  device or endpoint - same "clear customer benefit before commitment" and
+  "honest mock labeling" principles the KYC demo panel already follows.
+  `generate-intent-screen.tsx` now anchors the 0-fee P2P claim next to a
+  visibly grayed-out "traditional bank transfer: fees apply" chip - no
+  specific commission figure is invented (see guardrail #12), so this stays
+  a qualitative, defensible comparison rather than a claim about any named
+  bank's actual pricing.
 
 None of this replaces the actual written dossier (test plan, risk register,
 volunteer notice, etc.) required below - it makes the product itself
 demonstrate the same commitments the paperwork will describe.
+
+## Auth hardening audit (2026-07-24)
+
+A targeted audit of the passkey auth path against "will BCT find this
+secure, performant, and rate-limited" turned up one real gap, now fixed:
+`getPasskeyRegistrationOptions`, `verifyPasskeyRegistration`,
+`getPasskeyAuthenticationOptions`, and `verifyPasskeyAuthentication` had no
+rate limiting at all, unlike `startPhoneAuth` right next to them - all four
+are now IP-rate-limited the same way (see "Auth conventions" in
+[06-conventions.md](./06-conventions.md)). Everything else checked out:
+`checkRateLimit` is an atomic Postgres-function-backed fixed window (not
+in-memory, so it's correct across multiple server instances - a real
+scalability requirement, not just a correctness one), WebAuthn requires
+`userVerification: "required"` on both registration and authentication (BCT
+circular 2020-11's "authentification forte"), RP ID/origin are strictly
+validated server-side, credentials are stored in Mou3amla's own table (not
+trusting a client-supplied user id), and every phone/handle mismatch message
+is deliberately vague enough to avoid account enumeration. The one accepted
+tradeoff worth stating plainly in the regulatory test plan: rate limiting
+"fails open" if the DB check itself errors, so it's explicitly defense in
+depth on top of WebAuthn's own cryptographic guarantee, not the sole control.
 
 ## What Mou3amla misses right now
 

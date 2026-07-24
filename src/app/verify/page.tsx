@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { PasskeyScreen } from "@/features/auth/components/passkey-screen";
+import { VerifyFlow } from "@/features/auth/components/verify-flow";
 import { readPasskeyModeCookie } from "@/features/auth/server/passkey-bridge";
 import { getCurrentAppUser } from "@/features/auth/server/dal";
 
@@ -27,5 +27,5 @@ export default async function VerifyPage(props: VerifyPageProps) {
     redirect("/");
   }
 
-  return <PasskeyScreen phone={phone} username={username} mode={mode} />;
+  return <VerifyFlow phone={phone} username={username} mode={mode} />;
 }

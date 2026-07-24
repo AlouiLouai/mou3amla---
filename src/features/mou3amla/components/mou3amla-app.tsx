@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ContactsScreen } from "@/features/mou3amla/components/contacts-screen";
 import { HomeScreen } from "@/features/mou3amla/components/home-screen";
 import { alpha, mou3amla } from "@/features/mou3amla/constants";
@@ -8,14 +9,19 @@ import { useMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import type { InitialMou3amlaUser } from "@/features/mou3amla/types";
 import { WalletRegistrySheet } from "@/features/wallets/components/wallet-registry-sheet";
 
+// The `next/dynamic` fallback for every lazy-loaded screen below - was flat,
+// unanimated divs (a shape with no motion doesn't actually read as
+// "loading" to a user, just as an empty box). `Skeleton`
+// (components/ui/skeleton.tsx) already ships with `animate-pulse` and was
+// otherwise unused anywhere in the app until now.
 function ScreenLoading() {
-  const skeletonStyle = { background: alpha(mou3amla.text, 0.06) };
+  const skeletonStyle = { background: alpha(mou3amla.text, 0.08) };
   return (
     <div className="flex flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
-      <div className="mb-4 h-10 w-32 rounded-full" style={skeletonStyle} />
-      <div className="mb-3 h-28 rounded-[28px]" style={skeletonStyle} />
-      <div className="mb-3 h-24 rounded-[24px]" style={skeletonStyle} />
-      <div className="h-24 rounded-[24px]" style={skeletonStyle} />
+      <Skeleton className="mb-4 h-10 w-32 rounded-full" style={skeletonStyle} />
+      <Skeleton className="mb-3 h-28 rounded-[28px]" style={skeletonStyle} />
+      <Skeleton className="mb-3 h-24 rounded-[24px]" style={skeletonStyle} />
+      <Skeleton className="h-24 rounded-[24px]" style={skeletonStyle} />
     </div>
   );
 }

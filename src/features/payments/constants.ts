@@ -16,19 +16,23 @@ export const QR_TOKEN_TTL_MS = 60_000;
  * to browse/pick one, so it trades off against nearby-claim rate limiting as
  * the primary anti-brute-force control. Independent of QR_TOKEN_TTL_MS - the
  * QR image can stay legible on screen longer than a rapid-fire numeric code
- * should stay guessable. */
-export const NEARBY_CODE_TTL_MS = 15_000;
+ * should stay guessable. Tightened from 15s to 5s (2026-07-25) for a more
+ * responsive coffee-shop-density feel - shorter is strictly *more* secure
+ * here (a tighter brute-force window), not less, so this isn't a tradeoff. */
+export const NEARBY_CODE_TTL_MS = 5_000;
 
 /** How often the payer's nearby "choose a code" screen re-fetches its 4
- * options while idle (no match yet). Deliberately a fraction of
- * NEARBY_CODE_TTL_MS, not equal to it: the owner's rotation and this poll are
- * two independent, unsynchronized clocks, so if they ran on the same period
- * the payer's snapshot could lag the owner's actual current code by up to
- * nearly a full cycle - barely noticeable at the old 60s TTL against normal
- * human reaction time, but large enough at 15s to show up on almost every
- * attempt. Polling at ~4x the rotation frequency bounds that staleness to a
- * few seconds instead. */
-export const NEARBY_OPTIONS_REFRESH_MS = 4_000;
+ * options while idle (no match yet). Matches NEARBY_CODE_TTL_MS 1:1
+ * (2026-07-25) rather than polling faster than it - the owner's rotation and
+ * this poll are two independent, unsynchronized clocks, so a stale option
+ * the payer taps can still occasionally lose the race and come back
+ * "unavailable" from the server. That failure path already exists and is
+ * handled gracefully (`submitNearbyOption`'s error toast in
+ * use-qr-nearby-actions.ts) - and now also immediately re-triggers
+ * loadNearbyOptions() on that specific failure, instead of leaving the
+ * stale grid on screen until the next tick, which is what actually keeps
+ * this robust at a 1:1 ratio rather than needing a faster fractional poll. */
+export const NEARBY_OPTIONS_REFRESH_MS = 5_000;
 
 /** Bounded window a matched nearby handoff gets to be mutually accepted, set fresh at claim time so it can't be extended indefinitely by the owner's background publish rotation. */
 export const NEARBY_HANDSHAKE_TTL_MS = 45_000;

@@ -1,4 +1,5 @@
 import { Bell, CheckCheck, CreditCard, ShieldCheck, Sparkles } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -54,18 +55,11 @@ export function NotificationsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
         </div>
 
         {notifications.length === 0 ? (
-          <div className="rounded-[24px] border p-5 text-center" style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}>
-            <div
-              className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl"
-              style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
-            >
-              <Bell className="size-5" />
-            </div>
-            <div className="text-[14px] font-black">No notifications yet.</div>
-            <p className="mt-2 text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-              New payment routing events and verification updates will show up here.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Bell className="size-5" />}
+            title="No notifications yet"
+            body="New payment routing events and verification updates will show up here."
+          />
         ) : (
           <div className="flex flex-col gap-2.5">
             {notifications.map((notification) => {

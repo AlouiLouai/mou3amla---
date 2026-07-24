@@ -1,5 +1,5 @@
 import { useCallback, type RefObject } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { markAllNotificationsRead, markNotificationRead } from "@/features/notifications/server/actions";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";

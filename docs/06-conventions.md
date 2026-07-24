@@ -177,6 +177,36 @@ external API) follows the same `xUnsafe` + wrapper split - see
   `actions.ts` exists purely so a real error ends up somewhere greppable.
   Call it from the client on every `startRegistration`/`startAuthentication`
   catch.
+- **All four passkey ceremony actions are IP-rate-limited** (added
+  2026-07-25 after an audit found they weren't): `getPasskeyRegistrationOptions`
+  (`passkey-reg-options:<ip>`, 15/5min), `verifyPasskeyRegistration`
+  (`passkey-reg-verify:<ip>`, 15/5min), `getPasskeyAuthenticationOptions`
+  (`passkey-auth-options:<ip>`, 20/5min), `verifyPasskeyAuthentication`
+  (`passkey-auth-verify:<ip>`, 20/5min) - same pre-session, IP-keyed pattern
+  as `startPhoneAuth`, since there's no session yet at this point in the
+  flow to key on instead. WebAuthn's own cryptography already makes forging
+  a response computationally infeasible without the private key, but that's
+  not a reason to leave these uncapped - unlimited attempts still enable
+  resource-exhaustion abuse (cheap requests forcing expensive server-side
+  crypto verification) and credential/account enumeration probing, exactly
+  the class of abuse guardrail #19 asks every route like this to close off.
+- **New-user registration gets one extra client-side step, still inside the
+  single `/verify` route.** `VerifyFlow` (`auth/components/verify-flow.tsx`)
+  renders `ProfileBuilderScreen` before `PasskeyScreen` when
+  `mode === "register"` - a claim-confirmation + personal card-style
+  (cyan/magenta) pick, persisted via `setProfileCardGradient` in
+  `actions.ts`. That action follows the same pre-session, re-resolve-by-
+  `(phone, username)`, IP-rate-limited (`set-card-gradient:<ip>`, 20/5min)
+  pattern as every other Stage-1/Stage-2 action here - there is no session
+  yet at this point in the flow, so it cannot be rate-limited per user. This
+  does **not** reintroduce separate sign-in/sign-up screens: `mode ===
+  "authenticate"` still skips straight to `PasskeyScreen` exactly as before,
+  and everything still happens on `/verify`.
+- **"Didit" is not a concept in this codebase and should not be
+  reintroduced in copy or code.** It was a real eKYC provider whose
+  integration was fully removed on purpose (see KYC conventions below) - the
+  passkey step is plain self-hosted WebAuthn, unrelated to any named
+  provider.
 - `startPhoneAuth` never confirms *which* identity a phone or handle belongs
   to beyond "an account already exists" - only that a partial match exists,
   never the other party's actual phone/handle. Revealing more would let an
@@ -357,6 +387,25 @@ external API) follows the same `xUnsafe` + wrapper split - see
   it always re-checks with the provider API before updating
   `payment_transactions.status`.
 
+## Smart scan tab (send vs. receive)
+
+- The bottom nav's single scan tab is inherently ambiguous - a tap could
+  mean "I'm paying" (`ScanQrScreen`) or "I'm getting paid" (`ReceiveQrScreen`).
+  `goScanSmart` (`use-mou3amla-app.ts`) resolves that ambiguity instead of
+  hardcoding one: it first checks for real unfinished business (a live
+  `nearbyHandoff`/`payerMatch` on either side of an in-progress handshake)
+  and jumps straight there; otherwise it falls back to whichever role the
+  user actually used last, read via `getLastScanRole()`
+  (`payments/lib/last-scan-role.ts`, a plain `localStorage` read/write - it's
+  only ever called imperatively inside a click handler, never at render or
+  mount time, so it doesn't need the `useSyncExternalStore` treatment other
+  client-only reads in this codebase require).
+- `goScanQr`/`goReceiveQr` themselves call `setLastScanRole` on every
+  navigation - not just the smart entry point - so Home's own separate
+  Send/Receive quick actions keep the remembered preference accurate too.
+- Both screens render `ScanRoleSwitch` (`payments/components/`) at the top
+  so a wrong guess is one tap to correct, without backing out to Home.
+
 ## Nearby AirDrop-style handoff (mutual accept)
 
 - This is a **choice presented alongside QR code**, not a replacement for it:
@@ -502,6 +551,14 @@ Read this before "fixing" something that looks incomplete:
 - Only the body content pane should scroll.
 - Prefer `src/features/mou3amla/components/screen-frame.tsx` instead of manually
   rebuilding sticky/scroll behavior per screen.
+- **`ScreenFrame`'s `contentClassName` horizontal padding is `px-4`
+  everywhere** (Home is the reference) - `receive-qr-screen.tsx`,
+  `scan-qr-screen.tsx`, and `intent-result-screen.tsx` used to be `px-6`,
+  and `invoices-screen.tsx` used to be `px-5`; normalized 2026-07-25 because
+  the extra padding made those screens' elements read as a different scale
+  than every other screen despite using the same underlying type/spacing
+  tokens. Don't reintroduce a one-off horizontal padding value on a new
+  screen without a specific reason.
 
 ## Environment variables
 

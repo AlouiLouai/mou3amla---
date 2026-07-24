@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { BadgeCheck, Bell, BookOpen, ChevronRight, FileText, Globe, Landmark, LifeBuoy, LogOut, Moon, Share2, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { ThemeToggle } from "@/features/mou3amla/components/theme-toggle";
-import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
+import { alpha, cardShadow, identityGradients, igGradient, mou3amla, raisedShadow } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { statusToneColor } from "@/features/mou3amla/status-tone";
 import { LanguageSheet } from "@/features/i18n/components/language-sheet";
@@ -54,9 +54,25 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
     toast.success("Invite link copied", { description: link });
   };
 
+  // Personal card style (if picked in onboarding) drives the whole header
+  // card's background instead of sitting as a second, redundant card below
+  // it - one card with header info on top and the member/brand strip just
+  // under it, not two stacked cards repeating the same @handle.
+  const cardStyle = account.profile.cardGradient ? identityGradients[account.profile.cardGradient] : null;
+  const headerTextColor = cardStyle ? "#FFFFFF" : mou3amla.text;
+  const headerMutedColor = cardStyle ? "rgba(255,255,255,0.75)" : mou3amla.textMuted;
+  const headerFaintColor = cardStyle ? "rgba(255,255,255,0.6)" : mou3amla.textFaint;
+
   return (
     <ScreenFrame footer={footer} contentClassName="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
-        <div className="mb-4 rounded-[28px] border px-5 py-5" style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}>
+        <div
+          className="mb-4 overflow-hidden rounded-[28px] border px-5 py-5"
+          style={{
+            background: cardStyle ? cardStyle.gradient : mou3amla.card,
+            borderColor: cardStyle ? "transparent" : mou3amla.border,
+            boxShadow: cardStyle ? raisedShadow : cardShadow,
+          }}
+        >
           <div className="mb-4 flex items-center gap-4">
             <div className="flex size-16 shrink-0 items-center justify-center rounded-full p-[2.5px]" style={{ background: igGradient }}>
               <div className="flex size-full items-center justify-center rounded-full text-lg font-black text-white" style={{ background: mou3amla.hero }}>
@@ -65,24 +81,37 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[1.05rem] font-black">{account.profile.fullName || "Mou3amla user"}</div>
-              <div className="mt-1 text-[12px] font-semibold" style={{ color: mou3amla.textMuted }}>
+              <div className="truncate text-[1.05rem] font-black" style={{ color: headerTextColor }}>
+                {account.profile.fullName || "Mou3amla user"}
+              </div>
+              <div className="mt-1 text-[12px] font-semibold" style={{ color: headerMutedColor }}>
                 @{account.profile.username}
               </div>
               {account.profile.phone ? (
-                <div className="mt-1 text-[11px] font-medium" style={{ color: mou3amla.textFaint }}>
+                <div className="mt-1 text-[11px] font-medium" style={{ color: headerFaintColor }}>
                   {account.profile.phone}
                 </div>
               ) : null}
             </div>
           </div>
 
-          <div
-            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black"
-            style={{ background: verification.bg, color: verification.color }}
-          >
-            <BadgeCheck className="size-4" />
-            <span>{verification.label}</span>
+          <div className="flex items-center justify-between gap-3">
+            <div
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black"
+              style={
+                cardStyle
+                  ? { background: "rgba(255,255,255,0.22)", color: "#FFFFFF" }
+                  : { background: verification.bg, color: verification.color }
+              }
+            >
+              <BadgeCheck className="size-4" />
+              <span>{verification.label}</span>
+            </div>
+            {cardStyle ? (
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.6)" }}>
+                {t("onboarding.builder.member")}
+              </span>
+            ) : null}
           </div>
         </div>
 
