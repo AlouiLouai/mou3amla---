@@ -12,9 +12,9 @@ export const PROVIDERS: Provider[] = [
     initials: "FL",
     color: "#2FE6A3",
     network: "Flouci - TUNPAY",
-    subtitle: "Mobile Wallet - Service temporarily unavailable",
+    subtitle: "Mobile Wallet - Awaiting business registration approval",
     acceptedRoutingTypes: ["wallet_tag", "merchant_id"],
-    demoCheckoutStatus: "service_down",
+    demoCheckoutStatus: "pending_approval",
   },
   {
     id: "konnect",
@@ -22,7 +22,7 @@ export const PROVIDERS: Provider[] = [
     initials: "KN",
     color: "#0E7490",
     network: "Konnect - Checkout",
-    subtitle: "Hosted Checkout - Service temporarily unavailable",
+    subtitle: "Hosted Checkout - Temporarily down in this demo",
     acceptedRoutingTypes: ["merchant_id"],
     demoCheckoutStatus: "service_down",
   },
@@ -123,9 +123,18 @@ export function getProviderById(providerId: string) {
 }
 
 export function isProviderServiceDown(providerId: string) {
-  return getProviderById(providerId)?.demoCheckoutStatus === "service_down";
+  const status = getProviderById(providerId)?.demoCheckoutStatus;
+  return status === "service_down" || status === "pending_approval";
+}
+
+export function isProviderPendingApproval(providerId: string) {
+  return getProviderById(providerId)?.demoCheckoutStatus === "pending_approval";
 }
 
 export function canUseMockCheckout(providerId: string) {
   return getProviderById(providerId)?.demoCheckoutStatus === "mock";
+}
+
+export function canUseHostedCheckout(providerId: string) {
+  return getProviderById(providerId)?.demoCheckoutStatus === "hosted";
 }

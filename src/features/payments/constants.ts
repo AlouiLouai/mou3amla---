@@ -1,3 +1,13 @@
+/** BCT Regulatory Sandbox exposure cap for a single volunteer-tester
+ * transaction (TND) - keeps financial exposure quantifiable and bounded for
+ * the regulatory test plan. Enforced both here (display, see
+ * `generate-intent-screen.tsx`) and server-side in `server/actions.ts`, so
+ * the on-screen badge is never just decorative. See
+ * docs/09-bct-sandbox-readiness.md. This is a proposed test-plan figure, not
+ * a value BCT itself has mandated - update it if the actual submitted test
+ * plan uses a different number. */
+export const BCT_SANDBOX_TEST_LIMIT_TND = 500;
+
 export const QR_TOKEN_TTL_MS = 60_000;
 
 /** How long a published (unclaimed) nearby code stays live before rotating -

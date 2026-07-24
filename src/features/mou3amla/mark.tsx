@@ -1,21 +1,29 @@
-import { mou3amla } from "@/features/mou3amla/constants";
+import { igGradient } from "@/features/mou3amla/constants";
 
 /**
- * The Mou3amla brand mark (white rounded square + rotated outline square),
- * matching the logo drawn inline on the auth screen. Shared by the
- * next/og-generated icon routes under src/app/ so the app icon, apple-icon,
- * and manifest icons stay pixel-consistent with the in-app logo.
+ * The Mou3amla brand mark: the same gradient-ring "m" badge drawn inline by
+ * LogoLockup (auth screen / splash screen), reproduced here for the
+ * next/og-generated icon routes under src/app/ so the browser tab icon and
+ * installed-PWA icon stay pixel-consistent with the in-app logo instead of
+ * silently drifting from it.
  *
- * `maskable` shrinks the badge so its corners stay inside the ~40%-radius
- * safe-zone circle Android's adaptive-icon spec masks content to (some
- * launchers - including plain circular masks - crop anything outside it;
- * the default 0.74 badge's corners sit outside that circle).
+ * Deliberately uses fixed hex values, not `mou3amla.*` tokens: this renders
+ * through next/og's Satori engine (a static server-side layout renderer),
+ * which has no DOM/CSSOM and can't resolve `var(--mou3amla-*)` - and an app
+ * icon should look identical regardless of the viewer's light/dark
+ * preference anyway, same reasoning as the pre-auth brand shell staying
+ * fixed-dark (see docs/05-styling-ui.md).
+ *
+ * `maskable` shrinks the badge so it stays inside the ~66%-diameter
+ * safe-zone Android's adaptive-icon spec masks content to (some launchers
+ * crop anything outside it, and mask shapes vary - circle, squircle,
+ * rounded square).
  */
 export function Mou3amlaMark({ size, maskable = false }: { size: number; maskable?: boolean }) {
-  const badgeScale = maskable ? 0.52 : 0.74;
+  const badgeScale = maskable ? 0.6 : 1;
   const badgeSize = size * badgeScale;
-  const innerSize = badgeSize * 0.55;
-  const borderWidth = Math.max(1, badgeSize * 0.1);
+  const ringWidth = Math.max(1, badgeSize * 0.045);
+  const innerSize = badgeSize - ringWidth * 2;
 
   return (
     <div
@@ -25,15 +33,15 @@ export function Mou3amlaMark({ size, maskable = false }: { size: number; maskabl
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: mou3amla.bg,
+        background: "#000000",
       }}
     >
       <div
         style={{
           width: badgeSize,
           height: badgeSize,
-          borderRadius: badgeSize * 0.26,
-          background: mou3amla.accent,
+          borderRadius: badgeSize / 2,
+          background: igGradient,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -43,11 +51,24 @@ export function Mou3amlaMark({ size, maskable = false }: { size: number; maskabl
           style={{
             width: innerSize,
             height: innerSize,
-            transform: "rotate(45deg)",
-            borderRadius: size * 0.03,
-            border: `${borderWidth}px solid ${mou3amla.bg}`,
+            borderRadius: innerSize / 2,
+            background: "#0A0A0A",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-        />
+        >
+          <span
+            style={{
+              fontSize: innerSize * 0.52,
+              fontWeight: 900,
+              color: "#FFFFFF",
+              lineHeight: 1,
+            }}
+          >
+            m
+          </span>
+        </div>
       </div>
     </div>
   );

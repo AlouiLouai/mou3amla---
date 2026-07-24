@@ -1,9 +1,31 @@
 import { redirect } from "next/navigation";
-import { ArrowLeftRight, BadgeCheck, Check, CreditCard, Landmark, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeftRight, BadgeCheck, Check, CreditCard, Fingerprint, Landmark, ShieldCheck, Smartphone } from "lucide-react";
 import { requireCurrentAppUser } from "@/features/auth/server/dal";
+import { DispatchLogButton } from "@/features/payments/components/dispatch-log-button";
 import { MockCheckoutControls } from "@/features/payments/components/mock-checkout-controls";
 import { loadMockCheckoutSession } from "@/features/payments/server/mock-checkout";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
+
+function IdentityBadges() {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em]"
+        style={{ background: alpha(mou3amla.accent, 0.1), color: mou3amla.accent }}
+      >
+        <Fingerprint className="size-2.5" />
+        Passkey Verified
+      </span>
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em]"
+        style={{ background: "#F1F5F9", color: "#334155" }}
+      >
+        <ShieldCheck className="size-2.5" />
+        Non-Custodial
+      </span>
+    </div>
+  );
+}
 
 type MockCheckoutPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -65,11 +87,20 @@ export default async function MockCheckoutPage(props: MockCheckoutPageProps) {
       <div className="mx-auto max-w-5xl">
         <div className="mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "#E2E8F0" }}>
           <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: "#64748B" }}>
-              Mou3amla Secure Checkout
+            <div className="flex items-center gap-2">
+              <div className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: "#64748B" }}>
+                Mou3amla Secure Checkout
+              </div>
+              <span
+                className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em]"
+                style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
+              >
+                TUNPAY Rail
+              </span>
             </div>
             <div className="mt-1 text-[13px] leading-relaxed text-slate-500">
-              Universal payment-page style mock for internal development, stakeholder demos, and BCT presentation walkthroughs.
+              Universal Tunisian payment screen, built on the TUNPAY interoperability rail, for internal development, stakeholder demos, and
+              BCT presentation walkthroughs.
             </div>
           </div>
           <a
@@ -116,12 +147,12 @@ export default async function MockCheckoutPage(props: MockCheckoutPageProps) {
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <div className="mb-2 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: "#64748B" }}>
-                  Hosted payment mock
+                  TUNPAY-style hosted payment mock
                 </div>
                 <h1 className="text-[30px] font-black leading-none text-slate-900">Complete payment</h1>
                 <p className="mt-2 max-w-[520px] text-[13px] leading-relaxed text-slate-500">
-                  Neutral checkout treatment inspired by international payment pages, while staying explicitly inside Mou3amla&apos;s own demo
-                  environment.
+                  Checkout treatment built around Tunisia&apos;s TUNPAY interoperability rail, while staying explicitly inside
+                  Mou3amla&apos;s own demo environment.
                 </p>
               </div>
               <div className="flex size-12 shrink-0 items-center justify-center rounded-[16px]" style={{ background: "#F1F5F9", color: "#0F172A" }}>
@@ -136,6 +167,7 @@ export default async function MockCheckoutPage(props: MockCheckoutPageProps) {
                 </div>
                 <div className="text-[15px] font-black text-slate-900">{session.senderDisplayName}</div>
                 <div className="mt-1 text-[12px] text-slate-500">@{session.senderUsername}</div>
+                <IdentityBadges />
               </div>
               <div className="rounded-[22px] border p-4" style={{ background: "#FFFFFF", borderColor: "#E2E8F0" }}>
                 <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: "#94A3B8" }}>
@@ -143,6 +175,7 @@ export default async function MockCheckoutPage(props: MockCheckoutPageProps) {
                 </div>
                 <div className="text-[15px] font-black text-slate-900">{session.receiverDisplayName}</div>
                 <div className="mt-1 text-[12px] text-slate-500">@{session.receiverUsername}</div>
+                <IdentityBadges />
               </div>
               <div className="rounded-[22px] border p-4" style={{ background: "#F8FAFC", borderColor: "#E2E8F0" }}>
                 <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: "#94A3B8" }}>
@@ -203,8 +236,17 @@ export default async function MockCheckoutPage(props: MockCheckoutPageProps) {
             </div>
 
             <div className="rounded-[24px] border p-4 sm:p-5" style={{ background: "#F8FAFC", borderColor: "#E2E8F0" }}>
-              <div className="mb-3 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: "#64748B" }}>
-                Demo controls
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: "#64748B" }}>
+                  Demo controls
+                </div>
+                <DispatchLogButton
+                  refId={session.refId}
+                  amount={session.amount}
+                  currency={session.currency}
+                  providerName={session.providerName}
+                  status={session.status}
+                />
               </div>
               <MockCheckoutControls refId={session.refId} status={session.status} />
             </div>
@@ -245,6 +287,10 @@ export default async function MockCheckoutPage(props: MockCheckoutPageProps) {
                 <div className="flex items-center justify-between gap-3">
                   <span>Payment reference</span>
                   <span className="font-mono text-[11px] text-white">{session.refId}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Orchestration fee</span>
+                  <span className="font-semibold text-white">0.000 TND (Free P2P Routing)</span>
                 </div>
               </div>
             </div>

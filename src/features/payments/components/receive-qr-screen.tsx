@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, HandCoins, Waves } from "lucide-react";
+import { CheckCircle2, Smartphone, User, Waves } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
+import { NearbyConnecting } from "@/features/payments/components/nearby-connecting";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -52,7 +53,6 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
       profile={derived.account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
-      onScan={() => actions.goScanQr()}
     />
   );
   const footer = renderAppFooter("receive-qr", actions);
@@ -167,35 +167,19 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
               </p>
             </div>
           ) : nearbyHandoff && nearbyHandoff.status === "matched" ? (
-            <div
-              className="w-full rounded-[24px] border p-4 text-left"
-              style={{ background: alpha(mou3amla.accent, 0.06), borderColor: alpha(mou3amla.accent, 0.2) }}
-            >
-              <div className="flex items-center gap-2">
-                <HandCoins className="size-4.5" style={{ color: mou3amla.accent }} />
-                <span className="text-[13px] font-black">A nearby phone wants to pay you</span>
-              </div>
-              <p className="mt-1.5 mb-3 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                Confirm on your side too - both phones need to accept before the code unlocks.
-              </p>
-              <button
-                type="button"
-                onClick={acceptOwnerMatch}
-                disabled={nearbyHandoff.ownerAccepted}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-[13.5px] font-black disabled:opacity-60"
-                style={{ background: mou3amla.accent, color: "#FFFFFF" }}
-              >
-                {nearbyHandoff.ownerAccepted ? "Waiting for the other phone..." : "Accept this match"}
-              </button>
-              <button
-                type="button"
-                onClick={cancelOwnerMatch}
-                className="mt-2 w-full text-center text-[11.5px] font-bold"
-                style={{ color: mou3amla.textMuted }}
-              >
-                Cancel and generate a new code
-              </button>
-            </div>
+            <NearbyConnecting
+              selfAccepted={nearbyHandoff.ownerAccepted}
+              otherAccepted={nearbyHandoff.payerAccepted}
+              selfIcon={<User className="size-5" />}
+              otherIcon={<Smartphone className="size-5" />}
+              title="A nearby phone wants to pay you"
+              subtitle="Confirm on your side too - both phones need to accept before the code unlocks."
+              acceptLabel="Accept this match"
+              waitingLabel="Waiting for the other phone..."
+              cancelLabel="Cancel and generate a new code"
+              onAccept={acceptOwnerMatch}
+              onCancel={cancelOwnerMatch}
+            />
           ) : (
             <>
               <div className="relative mt-6 flex size-[100px] items-center justify-center">

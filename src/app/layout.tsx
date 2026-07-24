@@ -48,7 +48,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: siteConfig.themeColor,
-  colorScheme: "dark",
+  colorScheme: "dark light",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -71,7 +71,7 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <SerwistProvider swUrl="/serwist/sw.js">
-          <ThemeProvider attribute="class" forcedTheme="dark" disableTransitionOnChange>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
             <main className="flex flex-1 flex-col">{children}</main>
             <InstallPrompt />
             <NetworkStatusToast />

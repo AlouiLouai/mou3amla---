@@ -7,18 +7,23 @@ Mou3amla never holds a balance, moves funds itself, or stores banking
 credentials - it maps a public `@username` to a destination-only routing
 identifier (wallet tag / merchant id / RIB) for a real provider (Flouci, D17,
 walletii, BIAT, Amen Pay, etc.), and hands off the actual payment to the
-user's own banking rail. For the current demo build, send-money now creates a
-durable Mou3amla intent first, then opens an internal Mou3amla-branded
-development checkout at `/dev/mock-checkout` so the payment UI can still be
-demonstrated while third-party sandboxes are unstable. Flouci and Konnect stay
-visible in the provider list as explicit **service down** references rather
-than active link/send options; the other rails remain linkable and route into
-that internal mock checkout instead. In practice, that means a user's
-public/default receive route can still be any linked wallet or bank account,
-while the send screen now offers any linked non-disabled rail as the source
-for the in-app demo handoff. Linked destinations can also now be removed from
-the Accounts screen with a deliberate two-step confirmation. QR discovery
-still uses a real rotating-QR-code rail or a
+user's own banking rail. For the current demo build, every send-money flow
+creates a durable Mou3amla intent first, then opens an internal
+Mou3amla-branded, TUNPAY-styled development checkout at `/dev/mock-checkout` -
+there is no live third-party checkout redirect today. Flouci stays visible in
+the provider list as an explicit **waiting for approval** reference (pending
+the business-registration/RNE step - see
+[09-bct-sandbox-readiness.md](./09-bct-sandbox-readiness.md)) and Konnect as a
+**down for the moment** reference; neither is an active link/send option right
+now, though the real Konnect hosted-sandbox integration
+(`payments/server/provider-checkouts.ts`) stays in place, dormant, for when it
+gets re-enabled. The other rails remain linkable and route into the internal
+mock checkout. In practice, that means a user's public/default receive route
+can still be any linked wallet or bank account, while the send screen offers
+any linked non-disabled rail as the source for the in-app demo handoff.
+Linked destinations can also now be removed from the Accounts screen with a
+deliberate two-step confirmation. QR discovery still uses a real
+rotating-QR-code rail or a
 **simulated** BLE proximity indicator (real BLE peripheral advertising isn't
 possible from a browser - see
 [07-agent-guardrails.md](./07-agent-guardrails.md)).

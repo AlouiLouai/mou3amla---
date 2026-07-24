@@ -26,30 +26,43 @@ Installed via the current (`shadcn@latest`) CLI, **not** the legacy
 
 ## Theming
 
-The product (Mou3amla) uses an intentionally **fixed-dark, Instagram-derived**
-visual system built around a compact mobile layout - migrated from an earlier
-fixed-light pink/orange fintech theme. Surfaces are pure black/near-black; a
-single 3-stop gradient supplies every semantic accent color used elsewhere:
+The product (Mou3amla) uses an Instagram-derived visual system built around a
+compact mobile layout, with a **real, user-facing light/dark toggle** (Profile
+> Settings > Dark Mode). Every `mou3amla.*` surface/text token resolves
+through a CSS custom property, so flipping the `.dark` class on `<html>`
+repaints the whole app with no per-component changes needed:
 
-- `mou3amla.bg` / `mou3amla.surface`: pure black `#000000`
-- `mou3amla.card`: `#121212` - the standard elevated surface (cards, rows, chips)
-- `mou3amla.cardAlt`: `#1c1c1e` - alt surface / row dividers
-- `mou3amla.hero`: `#0A0A0A` - reserved for the inner fill of a
-  gradient-bordered card or an avatar's center (see `igGradient` below), not a
-  general-purpose "dark surface" - use `mou3amla.card` for that, since `hero`
-  is close enough to pure black that it reads as invisible directly against
-  the page background without a gradient border or ring around it
-- `mou3amla.accent`: Instagram blue `#0095F6` - primary actions, links,
-  **and** all "positive" semantic states (verified, confirmed, success) - see
-  `status-tone.ts` below
-- `mou3amla.subtle`: `#7A3EF0` (purple) - secondary emphasis, pending states
-- `mou3amla.destructive`: `#ED4956` (Instagram red) - destructive/error/unread states
+- `mou3amla.bg` / `mou3amla.surface`: page background - `var(--mou3amla-bg)`
+  (pure black `#000000` in dark, `#ffffff` in light)
+- `mou3amla.card`: `var(--mou3amla-card)` - the standard elevated surface
+  (cards, rows, chips) - `#121212` dark / `#f7f7f8` light
+- `mou3amla.cardAlt`: `var(--mou3amla-card-alt)` - alt surface / row dividers
+- `mou3amla.text` / `mou3amla.textMuted` / `mou3amla.textFaint`: theme-reactive
+  text tiers
+- `mou3amla.border` / `mou3amla.borderStrong`: theme-reactive border tiers
+- `mou3amla.hero`: **fixed** `#0A0A0A` in both themes - deliberately not
+  reactive. Used for hero banner cards (passkey-screen,
+  verification-flow-screen) that stay dark-branded even in light mode, always
+  paired with hardcoded white text. Not a general-purpose "dark surface" -
+  use `mou3amla.card` for that.
+- `mou3amla.accent`: Instagram blue `#0095F6` - **fixed** in both themes, not
+  a CSS var. Primary actions, links, **and** all "positive" semantic states
+  (verified, confirmed, success) - see `status-tone.ts` below
+- `mou3amla.subtle`: `#7A3EF0` (purple) - **fixed**, secondary emphasis, pending states
+- `mou3amla.destructive`: `#ED4956` (Instagram red) - **fixed**, destructive/error/unread states
 - `igGradient` (exported alongside `mou3amla`): `linear-gradient(135deg, #0095F6, #7A3EF0, #ED4956)`
   - literally `accent`/`subtle`/`destructive` as gradient stops, so the flat
     palette and the gradient can't visually drift apart. Reused for avatar
     "story rings" (see `AppHeader`), the auth/passkey/verification hero logo
     badge, and gradient-bordered highlight cards. Don't hand-roll a second
     blue-purple-red gradient elsewhere - import this one.
+
+`alpha(color, opacity)` accepts either a fixed hex value (accent/subtle/
+destructive/hero) or one of the `var(--mou3amla-*)` tokens above - for a CSS
+var it returns a `color-mix(in srgb, var(...) X%, transparent)` string rather
+than doing hex math, so the resulting translucent color still tracks whichever
+theme is active. Never hand-roll `rgba()` math against a `mou3amla.*` token
+that might be a CSS var - always go through `alpha()`.
 
 These screen-level colors come from `src/features/mou3amla/constants.ts`, not from
 the full shadcn semantic color scale. Wallet/provider brand colors in
@@ -65,16 +78,31 @@ independent, mutually-inconsistent hardcoded greens for "verified" alone
 before this was consolidated - don't reintroduce a fifth.
 
 - `src/components/layout/theme-provider.tsx` wraps `next-themes` with
-  **`forcedTheme="dark"`**. There is no user-facing light/dark toggle - this
-  is still a single fixed theme, just the opposite polarity from before.
-  `src/app/globals.css`'s `:root` and `.dark` blocks are kept identical on
-  purpose so the app looks right regardless of which class next-themes
-  actually applies.
+  `defaultTheme="dark"` and `enableSystem={false}` (predictable, user-driven
+  only - not OS-preference-driven). The toggle itself lives in the profile
+  settings screen via `next-themes`' `useTheme()`.
+- **The pre-authentication brand shell stays permanently dark**, regardless of
+  the toggle: `auth-screen.tsx` and `passkey-screen.tsx` add a literal `dark`
+  class to their own root element. Because `.dark { --mou3amla-*: ... }` is
+  just a normal CSS class rule, nesting it locally overrides those custom
+  properties for that subtree (including `LogoLockup`) no matter what the
+  user later picks - this is a deliberate brand decision (consistent with the
+  always-dark splash screen background in `.mou3amla-splash`), not a bug.
+  Don't remove it while "fixing" light-mode contrast there.
+- Never pair a hardcoded Tailwind color utility (`text-white`, `bg-white`,
+  `text-slate-*`, ...) with a `mou3amla.*` token background outside of
+  `hero`/`accent`/`subtle`/`destructive` (the fixed ones) or a fixed
+  brand/wallet color - it will silently break in one theme. Use
+  `style={{ color: mou3amla.text }}` etc. instead. `src/app/dev/mock-checkout`
+  is the one deliberate exception: it's a standalone neutral payment page,
+  intentionally not built on the Mou3amla palette, and doesn't participate in
+  the toggle either way.
 - The `<html>` tag keeps `suppressHydrationWarning`, which is still required by
   `next-themes`.
 - If you add a screen that should use the normal shadcn theme variables rather
   than the Mou3amla palette, use `--background`, `--foreground`, etc. instead of
-  inventing a parallel token system.
+  inventing a parallel token system - these also now diverge between `:root`
+  and `.dark`.
 
 ## Mou3amla Elevation & Motion
 

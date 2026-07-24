@@ -14,7 +14,6 @@ export function ContactsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
       profile={derived.account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
-      onScan={() => actions.goScanQr()}
       onBack={actions.goHome}
     />
   );

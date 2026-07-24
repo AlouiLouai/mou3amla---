@@ -319,21 +319,28 @@ external API) follows the same `xUnsafe` + wrapper split - see
   via `InitialMou3amlaUser`/`UserProfile`) - if you see the subscription
   silently not firing, check that `id` actually made it into `initialUser` in
   `src/app/home/page.tsx`.
-- **Internal mock checkout is the current demo handoff shape for send-money.**
-  `createPaymentIntent` now creates the durable Mou3amla transaction row
-  first, then creates a Mou3amla-owned `/dev/mock-checkout` session server-side
-  for the selected source rail. Flouci and Konnect are intentionally disabled
-  for new linking with a visible service-down state; the other linked rails can
-  launch the internal mock screen instead. The shell therefore tracks two
-  separate concepts on purpose: `sourceWalletId` remains the user's default
-  *receive* route (`linked_destinations.is_default` in Supabase), while the
-  client-only `sendSourceWalletId` is just the currently chosen source rail for
-  the mock checkout screen.
+- **Send-money now supports two demo handoff shapes.**
+  `createPaymentIntent` still creates the durable Mou3amla transaction row
+  first, then chooses the checkout flow server-side for the selected source
+  rail. Flouci remains intentionally disabled with a visible service-down
+  state; most linked rails launch Mou3amla's own `/dev/mock-checkout`, while a
+  linked Konnect route launches the real Konnect hosted sandbox checkout
+  (`/payments/init-payment`) and verifies completion back through Mou3amla's
+  webhook/finalization path. The shell therefore tracks two separate concepts
+  on purpose: `sourceWalletId` remains the user's default *receive* route
+  (`linked_destinations.is_default` in Supabase), while the client-only
+  `sendSourceWalletId` is just the currently chosen source rail for the active
+  checkout flow.
 - **The mock checkout must stay obviously internal.** `/dev/mock-checkout`
   shows a persistent `DEVELOPMENT MOCK ENVIRONMENT - NO REAL MONEY MOVED`
   banner, Mou3amla-native styling, sender/receiver/amount details, and
   explicit success/failure simulation controls. Do not clone a third-party
   payment brand's exact checkout visuals or wording inside this route.
+- **Konnect is a real sandbox aggregator path, not a cross-wallet settlement
+  switch.** Its hosted checkout proves a real third-party pay-in handoff and
+  server-verified callback flow, but it does not turn Mou3amla into a true
+  SMT-style wallet-to-wallet settlement rail by itself. Keep that distinction
+  clear in code comments, docs, and demo narration.
 - **Linked-destination deletion is an authenticated, rate-limited write path.**
   `deleteDestination` in `src/features/wallets/server/actions.ts` follows the
   same audit bar as linking and send-money: session check, per-user rate limit

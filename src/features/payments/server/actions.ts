@@ -5,11 +5,12 @@ import { z } from "zod";
 import type { ActivityItem } from "@/features/activity/types";
 import { getSessionIdentity } from "@/features/auth/server/dal";
 import type { NotificationItem } from "@/features/notifications/types";
-import { isCheckoutServiceDown, isMockCheckoutProvider } from "@/features/payments/lib/provider-checkout";
+import { canLaunchProviderCheckout, isCheckoutServiceDown } from "@/features/payments/lib/provider-checkout";
 import type { PaymentCheckoutLaunch, PaymentIntent } from "@/features/payments/types";
 import { createProviderCheckout } from "@/features/payments/server/provider-checkouts";
 import type { PaymentTransactionMetadata } from "@/features/payments/server/transaction-metadata";
 import { generateRefId } from "@/features/payments/lib/tunpay";
+import { BCT_SANDBOX_TEST_LIMIT_TND } from "@/features/payments/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -65,7 +66,9 @@ const sendPaymentSchema = z.object({
     .refine((value) => /^[a-z0-9_]{3,24}$/.test(value), {
       message: "Enter a valid Mou3amla username.",
     }),
-  amount: z.number().positive().max(100_000),
+  amount: z.number().positive().max(BCT_SANDBOX_TEST_LIMIT_TND, {
+    message: `Sandbox test transactions are capped at ${BCT_SANDBOX_TEST_LIMIT_TND} TND while Mou3amla is under BCT regulatory testing.`,
+  }),
 });
 
 function formatActivityDate(value: string): string {
@@ -99,9 +102,10 @@ type CreatePaymentIntentResult =
 async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promise<CreatePaymentIntentResult> {
   const parsed = sendPaymentSchema.safeParse(input);
   if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors;
     return {
       ok: false,
-      message: parsed.error.flatten().fieldErrors.recipientUsername?.[0] ?? "Enter a valid amount and recipient.",
+      message: fieldErrors.recipientUsername?.[0] ?? fieldErrors.amount?.[0] ?? "Enter a valid amount and recipient.",
     };
   }
 
@@ -147,10 +151,10 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
     };
   }
 
-  if (!isMockCheckoutProvider(sourceWallet.provider_id)) {
+  if (!canLaunchProviderCheckout(sourceWallet.provider_id)) {
     return {
       ok: false,
-      message: `${sourceWallet.name} isn't available in the internal mock checkout yet.`,
+      message: `${sourceWallet.name} isn't available in Mou3amla's supported checkout flows yet.`,
     };
   }
 
@@ -244,7 +248,7 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       provider_status: checkoutResult.providerStatus,
       provider_return_url: checkoutResult.returnUrl,
       provider_webhook_url: checkoutResult.webhookUrl,
-      demo_checkout_mode: "internal_mock",
+      demo_checkout_mode: checkoutResult.checkoutMode,
     };
 
     const { data: inserted, error: insertError } = await admin
@@ -274,8 +278,14 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
       actor_user_id: recipient.id,
       transaction_id: transaction.id,
       type: "payment_sent" as const,
-      title: `Mock checkout ${sourceWallet.name} pret`,
-      body: `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${sourceWallet.name}.`,
+      title:
+        checkoutResult.checkoutMode === "hosted"
+          ? `${sourceWallet.name} sandbox checkout pret`
+          : `Mock checkout ${sourceWallet.name} pret`,
+      body:
+        checkoutResult.checkoutMode === "hosted"
+          ? `Votre paiement vers @${recipient.username} attend validation dans le checkout sandbox ${sourceWallet.name}.`
+          : `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${sourceWallet.name}.`,
       unread: true,
       metadata: {},
     };
@@ -296,8 +306,14 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   const senderNotification: NotificationItem = {
     id: senderNotificationRow?.id ?? transaction.id,
     type: senderNotificationRow?.type ?? "payment_sent",
-    title: senderNotificationRow?.title ?? `Mock checkout ${checkout.providerName} pret`,
-    body: senderNotificationRow?.body ?? `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${checkout.providerName}.`,
+    title:
+      senderNotificationRow?.title ??
+      (checkout.providerId === "konnect" ? `${checkout.providerName} sandbox checkout pret` : `Mock checkout ${checkout.providerName} pret`),
+    body:
+      senderNotificationRow?.body ??
+      (checkout.providerId === "konnect"
+        ? `Votre paiement vers @${recipient.username} attend validation dans le checkout sandbox ${checkout.providerName}.`
+        : `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${checkout.providerName}.`),
     unread: senderNotificationRow?.unread ?? true,
     createdAt: senderNotificationRow?.created_at ?? transaction.created_at,
   };

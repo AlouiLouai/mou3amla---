@@ -11,7 +11,7 @@ import { initialState, reducer } from "@/features/mou3amla/hooks/reducer";
 import { useNotificationActions } from "@/features/mou3amla/hooks/use-notification-actions";
 import { usePaymentActions } from "@/features/mou3amla/hooks/use-payment-actions";
 import { useQrNearbyActions } from "@/features/mou3amla/hooks/use-qr-nearby-actions";
-import { getMockCheckoutWallets, getPreferredSendWalletId, getRecentContacts } from "@/features/mou3amla/hooks/utils";
+import { getCheckoutEnabledWallets, getPreferredSendWalletId, getRecentContacts } from "@/features/mou3amla/hooks/utils";
 import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
 
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
@@ -110,7 +110,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     );
 
     if (!sendSourceWalletId) {
-      toast.error("Link an available wallet or bank route first to open the internal mock checkout.");
+      toast.error("Link an available wallet or bank route first to open a supported checkout.");
       return;
     }
 
@@ -130,8 +130,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       return;
     }
 
-    if (!getMockCheckoutWallets(stateRef.current.wallets).length) {
-      toast.error("Link an available wallet or bank route first to open the internal mock checkout after scanning.");
+    if (!getCheckoutEnabledWallets(stateRef.current.wallets).length) {
+      toast.error("Link an available wallet or bank route first to open a supported checkout after scanning.");
       return;
     }
 
@@ -139,6 +139,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       screen: "scan-qr",
       scanManualInput: "",
       nearbyOptions: [],
+      hasLiveNearbyMatch: false,
       isLoadingNearbyOptions: false,
       payerMatch: null,
       initialHandoffMode: mode,
@@ -167,7 +168,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       account,
       sourceWallet: state.wallets.find((wallet) => wallet.id === state.sourceWalletId) ?? null,
       sendSourceWallet: state.wallets.find((wallet) => wallet.id === state.sendSourceWalletId) ?? null,
-      supportedSendWallets: getMockCheckoutWallets(state.wallets),
+      supportedSendWallets: getCheckoutEnabledWallets(state.wallets),
       hasAnyWallets: state.wallets.length > 0,
       unreadNotifications: state.notifications.filter((item) => item.unread).length,
       availableProviders: PROVIDERS.filter((provider) => !state.wallets.some((wallet) => wallet.providerId === provider.id)),

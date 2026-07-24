@@ -42,7 +42,6 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
       profile={account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
-      onScan={() => actions.goScanQr()}
       onBack={actions.goHome}
     />
   );

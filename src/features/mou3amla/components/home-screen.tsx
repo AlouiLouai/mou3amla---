@@ -6,19 +6,20 @@ import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, igGradient, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { WalletStack } from "@/features/wallets/components/wallet-stack";
+import { useTranslation } from "@/features/i18n/language-store";
 
 const RECENT_ACTIVITY_PREVIEW_COUNT = 3;
 
 export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { derived, actions } = mou3amlaApp;
   const account = derived.account;
+  const { t } = useTranslation();
   const footer = renderAppFooter("home", actions);
   const header = (
     <AppHeader
       profile={account.profile}
       unreadNotifications={derived.unreadNotifications}
       onNotifications={actions.goNotifications}
-      onScan={() => actions.goScanQr()}
     />
   );
 
@@ -30,7 +31,7 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-3">
       <div className="mb-6">
-        <SectionHeader title="Quick send" onSeeAll={actions.goContacts} />
+        <SectionHeader title={t("home.quickSend")} onSeeAll={actions.goContacts} seeAllLabel={t("home.seeAll")} />
         <div className="flex items-center gap-4 overflow-x-auto pb-1">
           <button type="button" onClick={actions.goGenerateIntent} className="flex shrink-0 flex-col items-center gap-1.5">
             <div
@@ -40,7 +41,7 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
               <Plus className="size-5" />
             </div>
             <span className="text-[10px] font-semibold" style={{ color: mou3amla.textMuted }}>
-              New
+              {t("home.new")}
             </span>
           </button>
 
@@ -76,20 +77,20 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
       />
 
       <div className="mt-5 grid grid-cols-4 gap-2">
-        <QuickAction label="Send" icon={<Send className="size-4.5" />} onClick={actions.goGenerateIntent} />
-        <QuickAction label="Receive" icon={<QrCode className="size-4.5" />} onClick={() => actions.goReceiveQr()} />
-        <QuickAction label="Scan" icon={<ScanLine className="size-4.5" />} onClick={() => actions.goScanQr()} />
-        <QuickAction label="Invoices" icon={<Receipt className="size-4.5" />} onClick={actions.goInvoices} />
+        <QuickAction label={t("home.action.send")} icon={<Send className="size-4.5" />} onClick={actions.goGenerateIntent} />
+        <QuickAction label={t("home.action.receive")} icon={<QrCode className="size-4.5" />} onClick={() => actions.goReceiveQr()} />
+        <QuickAction label={t("home.action.scan")} icon={<ScanLine className="size-4.5" />} onClick={() => actions.goScanQr()} />
+        <QuickAction label={t("home.action.invoices")} icon={<Receipt className="size-4.5" />} onClick={actions.goInvoices} />
       </div>
 
       <div className="mt-6">
-        <SectionHeader title="Recent" onSeeAll={actions.goActivity} />
+        <SectionHeader title={t("home.recent")} onSeeAll={actions.goActivity} seeAllLabel={t("home.seeAll")} />
         {account.activityLog.length === 0 ? (
           <div
             className="rounded-[22px] border p-4 text-[12px]"
             style={{ background: mou3amla.card, borderColor: mou3amla.border, color: mou3amla.textMuted }}
           >
-            No activity yet. Your first routed payment will appear here.
+            {t("home.noActivity")}
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -134,13 +135,14 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
       >
         <div className="rounded-[22.5px] p-4" style={{ background: mou3amla.card }}>
           <Quote className="size-5" style={{ color: mou3amla.accent }} />
-          <p className="mt-2 text-[14px] leading-snug font-black text-white">Sending money should feel like sending a text.</p>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-white/60">
-            Your @username is a TUNPAY routing address - no IBAN, no branch visit, no waiting. Pick a contact, confirm the
-            amount, done.
+          <p className="mt-2 text-[14px] leading-snug font-black" style={{ color: mou3amla.text }}>
+            {t("home.quote.title")}
+          </p>
+          <p className="mt-1.5 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
+            {t("home.quote.body")}
           </p>
           <span className="mt-3 inline-block rounded-full bg-white px-4 py-2 text-[11.5px] font-black text-black">
-            Try it now
+            {t("home.quote.cta")}
           </span>
         </div>
       </button>
@@ -148,12 +150,12 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   );
 }
 
-function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll: () => void }) {
+function SectionHeader({ title, onSeeAll, seeAllLabel }: { title: string; onSeeAll: () => void; seeAllLabel: string }) {
   return (
     <div className="mb-2.5 flex items-center justify-between">
       <div className="text-[13.5px] font-black tracking-tight">{title}</div>
       <button type="button" onClick={onSeeAll} className="flex items-center gap-0.5 text-[11px] font-bold" style={{ color: mou3amla.accent }}>
-        See all
+        {seeAllLabel}
         <ChevronRight className="size-3.5" />
       </button>
     </div>
