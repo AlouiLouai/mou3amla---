@@ -42,30 +42,32 @@ function buildBridgeEmail(phone: string, username: string) {
   return `bridge-${digits}-${handle}@mou3amla.local`;
 }
 
-async function findAuthUser(admin: AdminClient, phone: string, email: string) {
-  for (let page = 1; page <= 5; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+type FindAuthUserRow = {
+  id: string;
+  phone: string | null;
+  email: string | null;
+  raw_user_meta_data: { preferred_username?: string } | null;
+};
 
-    if (error) {
-      return { user: null, error };
-    }
+/** O(1) indexed lookup via the find_auth_user_id RPC (see the migration
+ * alongside this file) instead of paginating admin.auth.admin.listUsers() -
+ * that used to cap out at 1000 total Supabase Auth users, silently failing
+ * to recover a legitimate race-condition retry past that point. */
+async function findAuthUser(admin: AdminClient, phone: string, email: string): Promise<{ user: AuthUserSummary | null; error: unknown }> {
+  const { data, error } = await admin.rpc("find_auth_user_id", { target_email: email, target_phone: phone }).maybeSingle<FindAuthUserRow>();
 
-    const user =
-      ((data.users as AuthUserSummary[]).find((entry) => {
-        const candidate = entry.phone ? `+${entry.phone.replace(/^\+/, "")}` : null;
-        return candidate === phone || entry.email === email;
-      }) as AuthUserSummary | undefined) ?? null;
-
-    if (user) {
-      return { user, error: null };
-    }
-
-    if (data.users.length < 200) {
-      break;
-    }
+  if (error) {
+    return { user: null, error };
   }
 
-  return { user: null, error: null };
+  if (!data) {
+    return { user: null, error: null };
+  }
+
+  return {
+    user: { id: data.id, phone: data.phone, email: data.email, user_metadata: data.raw_user_meta_data },
+    error: null,
+  };
 }
 
 /** Creates the auth user + profile row for a phone/username never seen before. Recovers cleanly if a prior attempt already created the auth user but failed before the profile row landed. */
@@ -451,7 +453,14 @@ export async function verifyPasskeyAuthentication(
  * entirely client-side and never otherwise reaches our own logs. Call this
  * from the client on failure so a real diagnosis is possible. */
 export async function logPasskeyCeremonyFailure(mode: "register" | "authenticate", detail: string): Promise<void> {
-  logger.warn(`Passkey ceremony failed (${mode})`, { detail });
+  try {
+    logger.warn(`Passkey ceremony failed (${mode})`, { detail });
+  } catch {
+    // The one server action in this file with nothing to fall back to if
+    // logging itself throws - swallow rather than let a diagnostic-only
+    // call become the thing that breaks the passkey ceremony's own error
+    // path (this is already inside a client-side catch block's `void` call).
+  }
 }
 
 type SetCardGradientResult = { ok: true } | { ok: false; message: string };
@@ -491,5 +500,45 @@ export async function setProfileCardGradient(phone: string, username: string, gr
   } catch (error) {
     logger.error("Unhandled error in setProfileCardGradient", error);
     return { ok: false, message: "We couldn't save your card style. Please retry." };
+  }
+}
+
+type SetAccountTypeResult = { ok: true } | { ok: false; message: string };
+
+/** ProfileBuilderScreen's resident/tourist choice - a visiting tourist has
+ * no Tunisian bank/wallet destination to ever receive into, so this is what
+ * the rest of the app (home quick actions, the smart scan tab, goReceiveQr)
+ * gates the receive side on. Same pre-session, IP-rate-limited,
+ * resolveExactProfile pattern as setProfileCardGradient - there is no
+ * session yet at this point in the registration flow. */
+async function setAccountTypeUnsafe(phone: string, username: string, accountType: "resident" | "tourist"): Promise<SetAccountTypeResult> {
+  const clientIp = await getClientIp();
+  const withinLimit = await checkRateLimit(`set-account-type:${clientIp}`, { max: 20, windowSeconds: 300 });
+  if (!withinLimit) {
+    return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
+  const admin = createAdminClient();
+  const profile = await resolveExactProfile(admin, phone, username);
+
+  if (!profile) {
+    return { ok: false, message: "We couldn't find that identity. Please start again." };
+  }
+
+  const { error } = await admin.from("profiles").update({ account_type: accountType }).eq("id", profile.id);
+
+  if (error) {
+    return { ok: false, message: "We couldn't save that. Please retry." };
+  }
+
+  return { ok: true };
+}
+
+export async function setAccountType(phone: string, username: string, accountType: "resident" | "tourist"): Promise<SetAccountTypeResult> {
+  try {
+    return await setAccountTypeUnsafe(phone, username, accountType);
+  } catch (error) {
+    logger.error("Unhandled error in setAccountType", error);
+    return { ok: false, message: "We couldn't save that. Please retry." };
   }
 }

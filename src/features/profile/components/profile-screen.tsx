@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BadgeCheck, Bell, BookOpen, ChevronRight, FileText, Globe, Landmark, LifeBuoy, LogOut, Moon, Share2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bell, BookOpen, ChevronRight, FileText, Globe, Landmark, LifeBuoy, LogOut, Moon, Plane, Share2, ShieldCheck } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -96,16 +96,27 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <div
-              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black"
-              style={
-                cardStyle
-                  ? { background: "rgba(255,255,255,0.22)", color: "#FFFFFF" }
-                  : { background: verification.bg, color: verification.color }
-              }
-            >
-              <BadgeCheck className="size-4" />
-              <span>{verification.label}</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black"
+                style={
+                  cardStyle
+                    ? { background: "rgba(255,255,255,0.22)", color: "#FFFFFF" }
+                    : { background: verification.bg, color: verification.color }
+                }
+              >
+                <BadgeCheck className="size-4" />
+                <span>{verification.label}</span>
+              </div>
+              {account.profile.accountType === "tourist" ? (
+                <div
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-black"
+                  style={cardStyle ? { background: "rgba(255,255,255,0.22)", color: "#FFFFFF" } : { background: alpha(mou3amla.subtle, 0.14), color: mou3amla.subtle }}
+                >
+                  <Plane className="size-3.5" />
+                  <span>{t("profile.touristBadge")}</span>
+                </div>
+              ) : null}
             </div>
             {cardStyle ? (
               <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.6)" }}>

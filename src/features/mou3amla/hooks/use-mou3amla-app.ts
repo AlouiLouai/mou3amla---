@@ -118,6 +118,15 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null, sendSourceWalletId });
   }, []);
   const goReceiveQr = useCallback((mode: HandoffMode = "qr") => {
+    // Defense in depth, not just a UI hide: a visiting tourist has no
+    // Tunisian bank/wallet destination to ever receive into (see
+    // AccountType in auth/types.ts), so this stays blocked here even if
+    // some future entry point forgets to hide the Receive affordance.
+    if (stateRef.current.profile.accountType === "tourist") {
+      toast.error("Visitor accounts can only send money in this demo - receiving needs a Tunisian bank/wallet destination.");
+      return;
+    }
+
     if (!stateRef.current.wallets.length) {
       toast.error("Link an account first so Mou3amla knows where to route incoming payments.");
       return;

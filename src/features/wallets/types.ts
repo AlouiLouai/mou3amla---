@@ -17,6 +17,11 @@ export interface Provider {
    * onboarding can open (Flouci) - see docs/09-bct-sandbox-readiness.md. Both
    * are unavailable for linking/checkout, only the reason shown differs. */
   demoCheckoutStatus?: "mock" | "hosted" | "service_down" | "pending_approval";
+  /** Overrides WalletRegistrySheet's default routing-type placeholder for
+   * this one provider (e.g. "international" isn't a real wallet_tag/
+   * merchant_id/rib provider, just reuses wallet_tag's validation shape) -
+   * leave unset to use the routing-type default every other provider shares. */
+  routingPlaceholder?: string;
 }
 
 /** A linked destination — Mou3amla never sees or stores a balance for this. */

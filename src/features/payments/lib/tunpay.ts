@@ -12,19 +12,9 @@ function buildQuery(intent: PaymentIntent): string {
   return params.toString();
 }
 
-/** The universal interoperable intent rail — handed to a native banking app. */
-export function buildTunpayUri(intent: PaymentIntent): string {
-  return `tunpay://pay?${buildQuery(intent)}`;
-}
-
-/** Web fallback when no local handler accepts the tunpay:// intent structure. */
+/** Web fallback / gateway link shown on the intent-result screen. */
 export function buildGatewayUrl(intent: PaymentIntent): string {
   return `${GATEWAY_BASE_URL}/pay?${buildQuery(intent)}`;
-}
-
-/** This app's own callback scheme for a completed hand-off (see docs/06-conventions.md). */
-export function buildSuccessCallbackUrl(refId: string): string {
-  return `mou3amla://payment-success?ref=${encodeURIComponent(refId)}`;
 }
 
 /** `crypto.randomUUID()` (Web Crypto, not `node:crypto`) so this stays

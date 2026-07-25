@@ -31,6 +31,7 @@ const en = {
   "home.action.receive": "Receive",
   "home.action.scan": "Scan",
   "home.action.invoices": "Invoices",
+  "home.action.contacts": "Contacts",
   "home.recent": "Recent",
   "home.noActivity": "No activity yet. Your first routed payment will appear here.",
   "home.quote.title": "Sending money should feel like sending a text.",
@@ -40,6 +41,7 @@ const en = {
   "profile.stat.destinations": "Destinations",
   "profile.stat.payments": "Payments",
   "profile.stat.unread": "Unread",
+  "profile.touristBadge": "Visiting - Send only",
   "profile.section.preferences": "Preferences",
   "profile.section.account": "Account",
   "profile.section.others": "Others",
@@ -110,6 +112,10 @@ const en = {
   "onboarding.builder.emerald": "Emerald",
   "onboarding.builder.continue": "Continue",
   "onboarding.builder.member": "Mou3amla member",
+  "onboarding.builder.usageHeading": "How will you use Mou3amla?",
+  "onboarding.builder.resident": "I live in Tunisia",
+  "onboarding.builder.tourist": "I'm visiting Tunisia",
+  "onboarding.builder.touristNote": "Visitor accounts can send money to any @username but can't receive - you won't have a Tunisian bank or wallet destination.",
 } as const;
 
 const fr: Record<keyof typeof en, string> = {
@@ -131,6 +137,7 @@ const fr: Record<keyof typeof en, string> = {
   "home.action.receive": "Recevoir",
   "home.action.scan": "Scanner",
   "home.action.invoices": "Factures",
+  "home.action.contacts": "Contacts",
   "home.recent": "Récent",
   "home.noActivity": "Aucune activité pour l'instant. Votre premier paiement routé apparaîtra ici.",
   "home.quote.title": "Envoyer de l'argent devrait ressembler à envoyer un texto.",
@@ -140,6 +147,7 @@ const fr: Record<keyof typeof en, string> = {
   "profile.stat.destinations": "Destinations",
   "profile.stat.payments": "Paiements",
   "profile.stat.unread": "Non lus",
+  "profile.touristBadge": "Visiteur - Envoi seulement",
   "profile.section.preferences": "Préférences",
   "profile.section.account": "Compte",
   "profile.section.others": "Autres",
@@ -210,6 +218,10 @@ const fr: Record<keyof typeof en, string> = {
   "onboarding.builder.emerald": "Émeraude",
   "onboarding.builder.continue": "Continuer",
   "onboarding.builder.member": "Membre Mou3amla",
+  "onboarding.builder.usageHeading": "Comment allez-vous utiliser Mou3amla ?",
+  "onboarding.builder.resident": "Je vis en Tunisie",
+  "onboarding.builder.tourist": "Je visite la Tunisie",
+  "onboarding.builder.touristNote": "Les comptes visiteurs peuvent envoyer de l'argent à n'importe quel @username mais ne peuvent pas recevoir - vous n'aurez pas de destination bancaire ou de portefeuille tunisien.",
 };
 
 const tn: Record<keyof typeof en, string> = {
@@ -231,6 +243,7 @@ const tn: Record<keyof typeof en, string> = {
   "home.action.receive": "Es3tebel",
   "home.action.scan": "Scan",
   "home.action.invoices": "Fawatir",
+  "home.action.contacts": "Contacts",
   "home.recent": "Akher 7ajet",
   "home.noActivity": "Mafamech 7atta 7aja lyoum. Awel paiement mte3ek ybien hna.",
   "home.quote.title": "Tab3ath flous kima tab3ath message.",
@@ -240,6 +253,7 @@ const tn: Record<keyof typeof en, string> = {
   "profile.stat.destinations": "Destinations",
   "profile.stat.payments": "Paiements",
   "profile.stat.unread": "Ma9rich",
+  "profile.touristBadge": "Zayer - Ba3th bark",
   "profile.section.preferences": "Préférences",
   "profile.section.account": "Compte",
   "profile.section.others": "Okhrin",
@@ -310,6 +324,10 @@ const tn: Record<keyof typeof en, string> = {
   "onboarding.builder.emerald": "Emerald",
   "onboarding.builder.continue": "Kammel",
   "onboarding.builder.member": "Membre Mou3amla",
+  "onboarding.builder.usageHeading": "Kifech bech test3mel Mou3amla?",
+  "onboarding.builder.resident": "N3ich fi Tounes",
+  "onboarding.builder.tourist": "Jit nzour Tounes",
+  "onboarding.builder.touristNote": "El comptes ta3 zowar y9adrou yba3thou floues l ay @username ama ma y9adrouch ye5dhou - mafamech destination bancaire wala portefeuille tounsi 3andkom.",
 };
 
 export const translations = { en, fr, tn } satisfies Record<Language, Record<keyof typeof en, string>>;

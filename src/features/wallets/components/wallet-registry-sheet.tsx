@@ -124,7 +124,8 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
           <div>
             {(() => {
               const routingType = derived.linkProvider.acceptedRoutingTypes[0];
-              const { label, placeholder } = ROUTING_LABELS[routingType];
+              const { label, placeholder: defaultPlaceholder } = ROUTING_LABELS[routingType];
+              const placeholder = derived.linkProvider.routingPlaceholder ?? defaultPlaceholder;
               const connecting = state.linkConnectingId === derived.linkProvider.id;
 
               return (

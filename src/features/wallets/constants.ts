@@ -116,6 +116,22 @@ export const PROVIDERS: Provider[] = [
     acceptedRoutingTypes: ["rib"],
     demoCheckoutStatus: "mock",
   },
+  {
+    // Not a Tunisian TUNPAY-interoperable provider like everything else in
+    // this list - a foreign Visa/Mastercard or e-wallet a visiting tourist
+    // already holds, used purely as a *send* source. Reuses wallet_tag's
+    // existing validation shape (alphanumeric label, e.g. "visa-1044") since
+    // there's no real routing to a Tunisian rail here, just a demo label.
+    id: "intlcard",
+    name: "International Card",
+    initials: "IC",
+    color: "#6366F1",
+    network: "Visa / Mastercard - International",
+    subtitle: "Foreign card or e-wallet - for visitors sending from abroad",
+    acceptedRoutingTypes: ["wallet_tag"],
+    demoCheckoutStatus: "mock",
+    routingPlaceholder: "e.g. visa-1044",
+  },
 ];
 
 export function getProviderById(providerId: string) {

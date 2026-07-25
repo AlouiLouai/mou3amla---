@@ -68,6 +68,40 @@ rules most likely to be broken by stale training data or over-eager refactors.
     `{ redirectTo: string }` instead of calling `redirect()` itself, and
     call `redirect()` in the exported wrapper after the `try/catch` has
     already run - don't reach for `unstable_rethrow` as a first instinct.
+21. **Every new `public.*` table needs its `anon`/`authenticated` write
+    grants explicitly revoked unless the table genuinely has correctly-scoped
+    self-service RLS policies for every command it grants.** Supabase grants
+    table-wide INSERT/UPDATE/DELETE to those roles by default on every new
+    table - "there's no RLS policy for that command, so it's fine" is not a
+    permanent safe state, it's an accident of omission (a live audit found
+    exactly this let any authenticated user forge `payment_transactions`
+    rows against any recipient - see "Security hardening" in
+    [06-conventions.md](./06-conventions.md)). Add the `revoke insert,
+    update, delete on public.<table> from anon, authenticated;` line in the
+    same migration that creates the table, the same way you'd add an index.
+    `linked_destinations` is the one deliberate exception with real,
+    correctly-scoped self-service policies.
+22. **Every client-side call to a Server Action from a fire-and-forget
+    `void (async () => {...})()` block needs its own try/catch, not just
+    the server action's internal `xUnsafe` wrapper.** The server-side
+    wrapper only catches errors that happen *inside* the action; it can't
+    catch a dropped connection between browser and server. A 2026-07-26
+    audit found 7 sites missing this (see "Exception handling..." in
+    [06-conventions.md](./06-conventions.md)) where a thrown error left a
+    manually-managed loading flag (`isSendingPayment`, `linkConnectingId`,
+    etc.) stuck `true` forever - a button spinning with no error message,
+    easily mistaken for the whole app being down during a live demo. In the
+    catch block: reset whatever loading state was set, and show a generic
+    `toast.error(...)` - never leave a pending state unresolved on failure.
+23. **When applying a migration via the Supabase MCP `apply_migration` tool,
+    its assigned `version` will not match the local file's embedded
+    timestamp** - it stamps the actual apply-time, not the filename. Don't
+    let this drift accumulate silently; either reconcile
+    `supabase_migrations.schema_migrations` (via `execute_sql`, matching
+    local filenames exactly - see the 2026-07-25 repair) after applying, or
+    treat local filenames as documentation-only and never assume
+    `supabase migration list`/`db push` will line up with them without
+    checking first.
 
 ## Before you finish a change
 

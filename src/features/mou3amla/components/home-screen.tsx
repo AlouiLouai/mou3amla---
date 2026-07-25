@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, Plus, QrCode, Quote, Receipt, ScanLine, Send } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Plus, QrCode, Quote, Receipt, ScanLine, Send, Users } from "lucide-react";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -78,7 +78,15 @@ export function HomeScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
 
       <div className="mt-5 grid grid-cols-4 gap-2">
         <QuickAction label={t("home.action.send")} icon={<Send className="size-4.5" />} onClick={actions.goGenerateIntent} />
-        <QuickAction label={t("home.action.receive")} icon={<QrCode className="size-4.5" />} onClick={() => actions.goReceiveQr()} />
+        {/* A visiting tourist has no Tunisian bank/wallet destination to
+            ever receive into (see AccountType in auth/types.ts) - Contacts
+            fills the slot instead of a Receive action that would just
+            toast-block on tap. */}
+        {account.profile.accountType === "tourist" ? (
+          <QuickAction label={t("home.action.contacts")} icon={<Users className="size-4.5" />} onClick={actions.goContacts} />
+        ) : (
+          <QuickAction label={t("home.action.receive")} icon={<QrCode className="size-4.5" />} onClick={() => actions.goReceiveQr()} />
+        )}
         <QuickAction label={t("home.action.scan")} icon={<ScanLine className="size-4.5" />} onClick={() => actions.goScanQr()} />
         <QuickAction label={t("home.action.invoices")} icon={<Receipt className="size-4.5" />} onClick={actions.goInvoices} />
       </div>

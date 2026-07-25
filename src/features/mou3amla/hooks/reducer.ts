@@ -39,6 +39,7 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
       verificationStatus: initialUser?.verificationStatus ?? "unverified",
       kycProviderStatus: initialUser?.kycProviderStatus ?? null,
       cardGradient: initialUser?.cardGradient ?? null,
+      accountType: initialUser?.accountType ?? "resident",
       passkeyCount: initialUser?.passkeyCount ?? 0,
     },
     wallets: initialUser?.wallets ?? [],

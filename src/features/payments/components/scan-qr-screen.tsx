@@ -75,7 +75,11 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
 
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-8">
-      <ScanRoleSwitch role="send" onSelect={(role) => (role === "receive" ? actions.goReceiveQr() : undefined)} />
+      <ScanRoleSwitch
+        role="send"
+        hideReceive={state.profile.accountType === "tourist"}
+        onSelect={(role) => (role === "receive" ? actions.goReceiveQr() : undefined)}
+      />
       <div className="mb-3">
         <div className="text-[15px] font-black tracking-tight">Find the recipient</div>
         <div className="text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>

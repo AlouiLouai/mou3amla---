@@ -1,6 +1,6 @@
 # BCT Sandbox Readiness
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 This note is a practical preparation document for presenting **Mou3amla** to
 the **Banque Centrale de Tunisie (BCT)** Sandbox.
@@ -64,6 +64,17 @@ The BCT also asks for:
 - Durable transaction history and notification trail.
 - Honest mock labeling for KYC and payment checkout.
 - Serious product framing for routing, auditability, and user protection.
+- **Foreign visitor (tourist) support, send-only by design** (2026-07-25):
+  a visiting tourist has no Tunisian bank/wallet destination to ever receive
+  into, so `account_type = "tourist"` accounts are structurally restricted
+  to sending only - `goReceiveQr` blocks them server-state-side, not just in
+  the UI (see "Account type: residents vs. visitors" in
+  [06-conventions.md](./06-conventions.md)). This is a real customer-benefit
+  and inclusion story worth its own line in the product note: Mou3amla can
+  demonstrably serve Tunisia's tourism-driven cash-to-digital use case
+  (paying a merchant or splitting a bill without opening a local account)
+  without ever pretending a foreign visitor could receive into a Tunisian
+  rail they don't have.
 
 ## On-screen demo affordances already implemented
 
@@ -136,6 +147,75 @@ is deliberately vague enough to avoid account enumeration. The one accepted
 tradeoff worth stating plainly in the regulatory test plan: rate limiting
 "fails open" if the DB check itself errors, so it's explicitly defense in
 depth on top of WebAuthn's own cryptographic guarantee, not the sole control.
+
+## Dependency and scalability audit (2026-07-25)
+
+A broader audit (`pnpm audit`, `pnpm dlx knip` for dead code/unused
+files/deps, plus a manual DB/index review) found and fixed:
+
+- **`next@16.2.10` had a high-severity Proxy/Middleware bypass** in exactly
+  this app's configuration (Turbopack + `proxy.ts` + no i18n routing), plus
+  Server Actions DoS/SSRF issues - bumped to `16.2.11`. Also pinned
+  `postcss` to a patched version via a `pnpm.overrides` entry (build-time
+  only, but cheap to close).
+- **7 files and 2 packages of genuine dead code removed** (6 never-wired-in
+  shadcn UI primitives, an abandoned native-app-deep-link attempt and its
+  two orphaned helper functions, two unused DAL functions, two unused test
+  dependencies) - verified with zero real usage before deletion, not just
+  trusted from the tool output.
+- **`createIdentity`'s race-condition recovery path no longer scales
+  linearly with total users** - see "Auth conventions" in
+  [06-conventions.md](./06-conventions.md) for the `find_auth_user_id` RPC
+  that replaced a capped `listUsers()` scan.
+- Indexes across `payment_transactions`, `notifications`, `linked_destinations`,
+  and `profiles` were already thorough (composite indexes, FK-covering
+  indexes added after running Supabase's own performance advisor, unique
+  btree indexes on `profiles.phone`/`username`) - confirmed, not changed.
+
+## Postgres/RLS audit (2026-07-25)
+
+Direct audit of the live database via the Supabase MCP tools
+(`get_advisors`, plus manual `pg_policies`/`role_table_grants` review) found
+and fixed one real, exploitable gap and closed several dormant ones -
+migrations `20260725110000_rls_grants_hardening.sql` and
+`20260725120000_move_extensions_out_of_public.sql`:
+
+- **Critical, confirmed exploitable**: `payment_transactions` had a
+  client-writable INSERT policy (`payment_transactions_insert_sender`) that
+  only checked `auth.uid() = sender_user_id` - nothing validated amount,
+  status, recipient verification, duplicate submission, or the sandbox cap,
+  all of which `createPaymentIntent` enforces. Verified zero app code ever
+  writes to this table client-side (every real write goes through the
+  service-role admin client) before revoking INSERT/UPDATE/DELETE from
+  `anon`/`authenticated`. This is exactly the class of finding a BCT
+  reviewer evaluating "regulatory testing including protections" would be
+  expected to probe for - worth being able to say it was found and closed
+  before submission, not after.
+- **Dormant**: `accept_nearby_handoff()` had no internal `auth.uid()`
+  ownership check and was directly `EXECUTE`-grantable by `anon`/
+  `authenticated` - safe only by accident (no UPDATE policy existed on
+  `nearby_handoffs` to let the mutation through). Locked to `service_role`,
+  matching `check_rate_limit`'s already-correct pattern.
+- **Defense in depth**: the same "table GRANT exists, only RLS's
+  default-deny for a missing policy is stopping it" pattern existed on
+  `profiles`, `nearby_handoffs`, `notifications`, `passkeys`,
+  `verification_events`, and `rate_limits`. Explicitly revoked write grants
+  from `anon`/`authenticated` on all of them - `linked_destinations` is the
+  one deliberate exception, since it has genuine, correctly-scoped
+  self-service RLS policies.
+- **Hygiene**: moved `citext`/`pg_trgm` extensions out of the `public`
+  schema (Supabase advisor WARN) - confirmed safe (default `search_path`
+  already includes `extensions`) and re-verified `profiles.username`
+  queries and the trigram index still work post-move.
+- **Not fixed, needs a Dashboard toggle, not SQL**: leaked-password
+  protection is disabled at the project level. Not applicable to this app's
+  actual auth flow (passkey-only, no user-set passwords anywhere), but
+  harmless to enable regardless - do it in Auth settings if you want the
+  advisor fully clean.
+- **Left alone on purpose**: the 6 "unused index" INFO advisories are all
+  deliberately-added indexes on an 11-58 row demo dataset - Postgres hasn't
+  needed them yet purely because the tables are tiny, not because they're
+  unnecessary. Don't drop these based on this signal alone.
 
 ## What Mou3amla misses right now
 

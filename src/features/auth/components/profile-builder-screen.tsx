@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Globe } from "lucide-react";
+import { Check, Globe, Home, Plane } from "lucide-react";
 import { formatUsernameHandle } from "@/features/auth/lib/identity";
-import { setProfileCardGradient } from "@/features/auth/server/actions";
+import { setAccountType, setProfileCardGradient } from "@/features/auth/server/actions";
+import type { AccountType } from "@/features/auth/types";
 import { OnboardingStepper } from "@/features/auth/components/onboarding-stepper";
 import { IdentityCardPreview } from "@/features/auth/components/identity-card-preview";
 import { LanguageSheet } from "@/features/i18n/components/language-sheet";
@@ -18,6 +19,7 @@ import { alpha, cardShadow, identityGradients, mou3amla, type IdentityGradientId
 // only; a returning user signing in again doesn't get this step.
 export function ProfileBuilderScreen({ phone, username, onContinue }: { phone: string; username: string; onContinue: () => void }) {
   const [gradient, setGradient] = useState<IdentityGradientId>("cyan");
+  const [accountType, setAccountTypeChoice] = useState<AccountType>("resident");
   const [pending, startSaving] = useTransition();
   const [languageSheetOpen, setLanguageSheetOpen] = useState(false);
   const { t, language } = useTranslation();
@@ -31,7 +33,7 @@ export function ProfileBuilderScreen({ phone, username, onContinue }: { phone: s
 
   const handleContinue = () => {
     startSaving(async () => {
-      await setProfileCardGradient(phone, username, gradient);
+      await Promise.all([setProfileCardGradient(phone, username, gradient), setAccountType(phone, username, accountType)]);
       onContinue();
     });
   };
@@ -102,11 +104,50 @@ export function ProfileBuilderScreen({ phone, username, onContinue }: { phone: s
             })}
           </div>
 
+          <div className="mt-5 mb-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: mou3amla.textFaint }}>
+            {t("onboarding.builder.usageHeading")}
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setAccountTypeChoice("resident")}
+              className="flex flex-col items-center gap-1.5 rounded-[16px] border px-3 py-3 text-center transition-colors"
+              style={{
+                borderColor: accountType === "resident" ? mou3amla.accent : mou3amla.border,
+                background: accountType === "resident" ? alpha(mou3amla.accent, 0.1) : "transparent",
+              }}
+            >
+              <Home className="size-4.5" style={{ color: accountType === "resident" ? mou3amla.accent : mou3amla.textMuted }} />
+              <span className="text-[11.5px] font-black" style={{ color: mou3amla.text }}>
+                {t("onboarding.builder.resident")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountTypeChoice("tourist")}
+              className="flex flex-col items-center gap-1.5 rounded-[16px] border px-3 py-3 text-center transition-colors"
+              style={{
+                borderColor: accountType === "tourist" ? mou3amla.accent : mou3amla.border,
+                background: accountType === "tourist" ? alpha(mou3amla.accent, 0.1) : "transparent",
+              }}
+            >
+              <Plane className="size-4.5" style={{ color: accountType === "tourist" ? mou3amla.accent : mou3amla.textMuted }} />
+              <span className="text-[11.5px] font-black" style={{ color: mou3amla.text }}>
+                {t("onboarding.builder.tourist")}
+              </span>
+            </button>
+          </div>
+          {accountType === "tourist" ? (
+            <p className="mt-2 text-[10.5px] leading-relaxed" style={{ color: mou3amla.textFaint }}>
+              {t("onboarding.builder.touristNote")}
+            </p>
+          ) : null}
+
           <button
             type="button"
             onClick={handleContinue}
             disabled={pending}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[15px] font-black transition-opacity disabled:opacity-60"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-[15px] font-black transition-opacity disabled:opacity-60"
             style={{ background: mou3amla.accent, color: "#FFFFFF", boxShadow: cardShadow }}
           >
             {t("onboarding.builder.continue")}

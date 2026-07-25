@@ -84,6 +84,17 @@ export function WalletIcon({ id, className, initials }: { id: string; className?
             </svg>
         );
     }
+    if (id === "intlcard") {
+        // International Card: a card with a globe motif to read as "foreign"
+        return (
+            <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2.5" y="6" width="13" height="10" rx="2" />
+                <path d="M2.5 9.5h13" />
+                <circle cx="18" cy="16" r="4" />
+                <path d="M18 12.4a5.2 5.2 0 0 1 0 7.2M18 12.4a5.2 5.2 0 0 0 0 7.2M14.3 16h7.4" strokeWidth="1.4" />
+            </svg>
+        );
+    }
     if (id === "clictopay") {
         // ClicToPay / SMT: card mark
         return (

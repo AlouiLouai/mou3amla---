@@ -74,15 +74,18 @@ function makeFrom(queue: unknown[]) {
 function makeFakeAdmin(options: {
   fromQueue?: unknown[];
   createUser?: unknown;
-  listUsers?: unknown;
+  rpc?: unknown;
   generateLink?: unknown;
 } = {}) {
   return {
     from: makeFrom(options.fromQueue ?? []),
+    // find_auth_user_id (the createIdentity race-condition recovery path) -
+    // a single RPC call returning at most one row via .maybeSingle(), not a
+    // paginated admin.auth.admin.listUsers() scan.
+    rpc: vi.fn(() => ({ maybeSingle: () => Promise.resolve(options.rpc ?? { data: null, error: null }) })),
     auth: {
       admin: {
         createUser: vi.fn().mockResolvedValue(options.createUser ?? { data: { user: { id: USER_ID } }, error: null }),
-        listUsers: vi.fn().mockResolvedValue(options.listUsers ?? { data: { users: [] }, error: null }),
         generateLink: vi.fn().mockResolvedValue(options.generateLink ?? { data: { properties: { hashed_token: "token-hash-abc" } }, error: null }),
       },
     },
@@ -157,6 +160,46 @@ describe("startPhoneAuth", () => {
     expect(setPasskeyModeCookie).toHaveBeenCalledWith(
       expect.objectContaining({ phone: NORMALIZED_PHONE, username: USERNAME, mode: "register" }),
     );
+  });
+
+  it("recovers via find_auth_user_id when a prior attempt already created the auth user but not the profile row", async () => {
+    const admin = makeFakeAdmin({
+      fromQueue: [
+        { data: [], error: null }, // initial lookup: no existing profile
+        { error: null }, // profile insert succeeds
+      ],
+      createUser: { data: { user: null }, error: { code: "email_exists", message: "Email already registered" } },
+      rpc: {
+        data: { id: USER_ID, phone: NORMALIZED_PHONE, email: "bridge-x@mou3amla.local", raw_user_meta_data: { preferred_username: USERNAME } },
+        error: null,
+      },
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(hasPasskey).mockResolvedValue(false);
+
+    await expect(startPhoneAuth(undefined, landingFormData())).rejects.toThrow(
+      `REDIRECT:/verify?${new URLSearchParams({ phone: NORMALIZED_PHONE, username: USERNAME })}`,
+    );
+
+    expect(admin.rpc).toHaveBeenCalledWith("find_auth_user_id", expect.objectContaining({ target_phone: NORMALIZED_PHONE }));
+    expect(setPasskeyModeCookie).toHaveBeenCalledWith(expect.objectContaining({ mode: "register" }));
+  });
+
+  it("rejects recovery when the colliding auth user belongs to a different handle", async () => {
+    const admin = makeFakeAdmin({
+      fromQueue: [{ data: [], error: null }],
+      createUser: { data: { user: null }, error: { code: "email_exists", message: "Email already registered" } },
+      rpc: {
+        data: { id: USER_ID, phone: NORMALIZED_PHONE, email: "bridge-x@mou3amla.local", raw_user_meta_data: { preferred_username: "someoneelse" } },
+        error: null,
+      },
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(hasPasskey).mockResolvedValue(false);
+
+    const result = await startPhoneAuth(undefined, landingFormData());
+
+    expect(result).toEqual({ message: expect.any(String) });
   });
 
   it("signs an existing identity straight in when it already has a registered passkey", async () => {

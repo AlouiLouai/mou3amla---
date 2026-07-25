@@ -67,51 +67,60 @@ export function usePaymentActions({
     const loadingToast = toast.loading("Saving the payment route...");
 
     void (async () => {
-      const result = await createPaymentIntent({
-        sourceWalletId: stateRef.current.sendSourceWalletId,
-        recipientUsername: recipient,
-        amount,
-      });
+      try {
+        const result = await createPaymentIntent({
+          sourceWalletId: stateRef.current.sendSourceWalletId,
+          recipientUsername: recipient,
+          amount,
+        });
 
-      toast.dismiss(loadingToast);
+        toast.dismiss(loadingToast);
 
-      if (!result.ok) {
+        if (!result.ok) {
+          dispatch({ isSendingPayment: false });
+          toast.error(result.message);
+          return;
+        }
+
+        dispatch({
+          isSendingPayment: false,
+          currentIntent: result.intent,
+          screen: "home",
+          confetti: makeConfetti(),
+          amount: "",
+          recipientInput: "",
+          recipientPreview: null,
+          activityLog: [result.activity, ...stateRef.current.activityLog],
+          notifications: [result.senderNotification, ...stateRef.current.notifications],
+          invoices: stateRef.current.profile.isProfessional
+            ? [buildInvoice(result.intent, result.intent.recipient), ...stateRef.current.invoices]
+            : stateRef.current.invoices,
+        });
+
+        // Both sides of this transfer are guaranteed identity-verified by
+        // construction - the recipient check already ran server-side in
+        // createPaymentIntent, and sending itself was only reachable because
+        // linking a source destination requires the sender's own
+        // verification_status === "verified" (see wallets/server/actions.ts).
+        // Surfacing that here is reporting a real, enforced guarantee, not a
+        // trust claim invented for the toast.
+        const isKonnectHostedCheckout = result.checkout.providerId === "konnect";
+
+        toast.success(`Opening the ${result.checkout.providerName} checkout...`, {
+          description: isKonnectHostedCheckout
+            ? "Mou3amla saved the route first, then opened the real Konnect sandbox checkout."
+            : "Mou3amla saved the route first, then opened the in-app development payment demo.",
+        });
+
+        window.location.assign(result.checkout.url);
+      } catch {
+        // Without this, a dropped connection mid-request left the send
+        // button spinning forever (isSendingPayment never reset) with no
+        // error shown - the worst possible failure mode for a live demo.
+        toast.dismiss(loadingToast);
         dispatch({ isSendingPayment: false });
-        toast.error(result.message);
-        return;
+        toast.error("We couldn't reach Mou3amla right now. Check your connection and try again.");
       }
-
-      dispatch({
-        isSendingPayment: false,
-        currentIntent: result.intent,
-        screen: "home",
-        confetti: makeConfetti(),
-        amount: "",
-        recipientInput: "",
-        recipientPreview: null,
-        activityLog: [result.activity, ...stateRef.current.activityLog],
-        notifications: [result.senderNotification, ...stateRef.current.notifications],
-        invoices: stateRef.current.profile.isProfessional
-          ? [buildInvoice(result.intent, result.intent.recipient), ...stateRef.current.invoices]
-          : stateRef.current.invoices,
-      });
-
-      // Both sides of this transfer are guaranteed identity-verified by
-      // construction - the recipient check already ran server-side in
-      // createPaymentIntent, and sending itself was only reachable because
-      // linking a source destination requires the sender's own
-      // verification_status === "verified" (see wallets/server/actions.ts).
-      // Surfacing that here is reporting a real, enforced guarantee, not a
-      // trust claim invented for the toast.
-      const isKonnectHostedCheckout = result.checkout.providerId === "konnect";
-
-      toast.success(`Opening the ${result.checkout.providerName} checkout...`, {
-        description: isKonnectHostedCheckout
-          ? "Mou3amla saved the route first, then opened the real Konnect sandbox checkout."
-          : "Mou3amla saved the route first, then opened the in-app development payment demo.",
-      });
-
-      window.location.assign(result.checkout.url);
     })();
   }, [dispatch, stateRef]);
 
