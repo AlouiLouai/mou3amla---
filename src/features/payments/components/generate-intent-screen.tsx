@@ -1,24 +1,80 @@
 "use client";
 
-import { Delete, Loader2, ScanLine, Send, ShieldCheck, TriangleAlert, Users, X } from "lucide-react";
+import { useState } from "react";
+import { Delete, Loader2, ScanLine, Send, ShieldCheck, TriangleAlert, UserSearch, Users, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
-import { BCT_SANDBOX_TEST_LIMIT_TND } from "@/features/payments/constants";
+import { BCT_SANDBOX_TEST_LIMIT_TND, TOURIST_CURRENCIES, type TouristCurrencyCode } from "@/features/payments/constants";
 import { useRecipientSearch } from "@/features/payments/hooks/use-recipient-search";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "backspace"];
+const TOURIST_QUICK_AMOUNTS = [20, 50, 100];
 
 export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { state, derived, actions } = mou3amlaApp;
   const searchEnabled = !state.recipientPreview && state.recipientInput.trim().length >= 2;
-  const { results: recipientResults, isSearching } = useRecipientSearch(state.recipientInput, searchEnabled);
+  const { results: recipientResults, isSearching, hasSearched } = useRecipientSearch(state.recipientInput, searchEnabled);
   const account = derived.account;
   const sourceWallet = derived.sendSourceWallet;
-  const amountDisplay = state.amount || "0";
+  const isTourist = account.profile.accountType === "tourist";
+
+  // A visiting tourist thinks in their own currency, not TND - the keypad
+  // still only ever drives `state.amount` (the real TND value everything
+  // downstream - the BCT cap check, createPaymentIntent, activity log -
+  // already assumes), but for a tourist it's *derived* from this local
+  // foreign-currency input instead of being typed directly. Residents never
+  // see this: `currency` stays "TND" and the keypad behaves exactly as
+  // before, untouched.
+  const [currency, setCurrency] = useState<TouristCurrencyCode>(isTourist ? "EUR" : "TND");
+  const [foreignAmountRaw, setForeignAmountRaw] = useState("");
+  const isForeignInput = currency !== "TND";
+
+  const applyForeignAmount = (rawValue: string, forCurrency: TouristCurrencyCode) => {
+    const rate = TOURIST_CURRENCIES[forCurrency].rateToTnd;
+    const tnd = Number(((Number.parseFloat(rawValue) || 0) * rate).toFixed(3));
+    actions.setQuickAmount(tnd);
+  };
+
+  // Switching currency mid-entry resets the amount rather than reconverting
+  // it - "50" typed as EUR and "50" typed as TND are two different amounts
+  // typed with different intent, not the same number carried across a unit
+  // change.
+  const handleCurrencyChange = (nextCurrency: TouristCurrencyCode) => {
+    setCurrency(nextCurrency);
+    setForeignAmountRaw("");
+    actions.clearAmount();
+  };
+
+  const handleForeignKeypadPress = (digit: string) => {
+    if (digit === "." && foreignAmountRaw.includes(".")) return;
+    if (foreignAmountRaw.length >= 6) return;
+    const next = foreignAmountRaw + digit;
+    setForeignAmountRaw(next);
+    applyForeignAmount(next, currency);
+  };
+
+  const handleForeignBackspace = () => {
+    const next = foreignAmountRaw.slice(0, -1);
+    setForeignAmountRaw(next);
+    applyForeignAmount(next, currency);
+  };
+
+  const handleForeignQuickAmount = (amount: number) => {
+    setForeignAmountRaw(String(amount));
+    applyForeignAmount(String(amount), currency);
+  };
+
+  const handleForeignClear = () => {
+    setForeignAmountRaw("");
+    actions.clearAmount();
+  };
+
+  const amountDisplay = isForeignInput ? foreignAmountRaw || "0" : state.amount || "0";
   const recipientVerified = !state.recipientPreview || state.recipientPreview.verificationStatus === "verified";
   const parsedAmount = Number.parseFloat(state.amount);
   const exceedsSandboxCap = parsedAmount > BCT_SANDBOX_TEST_LIMIT_TND;
@@ -181,7 +237,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
         )}
       </div>
 
-      {searchEnabled && (isSearching || recipientResults.length > 0) ? (
+      {searchEnabled && (isSearching || recipientResults.length > 0 || hasSearched) ? (
         <div
           className="mb-4 overflow-hidden rounded-[20px] border"
           style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
@@ -191,6 +247,13 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
               <Loader2 className="size-3.5 animate-spin" />
               Searching Mou3amla users...
             </div>
+          ) : recipientResults.length === 0 ? (
+            <EmptyState
+              className="rounded-none border-none"
+              icon={<UserSearch className="size-5" />}
+              title="No matching users"
+              body="Double-check the @username, or ask them for their exact handle."
+            />
           ) : (
             recipientResults.map((result) => (
               <button
@@ -253,17 +316,36 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
       ) : null}
 
       <div className="flex flex-1 flex-col items-center justify-center text-center">
+        {isTourist ? (
+          <div className="mb-3 flex items-center gap-1.5 rounded-full border p-1" style={{ background: mou3amla.card, borderColor: mou3amla.border }}>
+            {(Object.keys(TOURIST_CURRENCIES) as TouristCurrencyCode[]).map((code) => {
+              const selected = currency === code;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => handleCurrencyChange(code)}
+                  className="rounded-full px-3 py-1.5 text-[11px] font-black transition-colors"
+                  style={{ background: selected ? mou3amla.accent : "transparent", color: selected ? "#FFFFFF" : mou3amla.textMuted }}
+                >
+                  {TOURIST_CURRENCIES[code].symbol} {code}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         <div className="flex items-center gap-2">
           <div className="font-mono text-[42px] font-semibold tracking-tight">
             {amountDisplay}{" "}
             <span className="text-xl" style={{ color: mou3amla.accent }}>
-              DT
+              {TOURIST_CURRENCIES[currency].symbol}
             </span>
           </div>
-          {state.amount ? (
+          {(isForeignInput ? foreignAmountRaw : state.amount) ? (
             <button
               type="button"
-              onClick={actions.clearAmount}
+              onClick={isForeignInput ? handleForeignClear : actions.clearAmount}
               aria-label="Clear amount"
               className="flex size-7 items-center justify-center rounded-full"
               style={{ background: alpha(mou3amla.text, 0.08), color: mou3amla.textMuted }}
@@ -272,16 +354,31 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             </button>
           ) : null}
         </div>
+
+        {isForeignInput ? (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: mou3amla.textMuted }}>
+            <span>
+              ≈ {state.amount || "0"} DT
+            </span>
+            <span
+              className="rounded-full px-2 py-0.5 text-[8.5px] font-black uppercase tracking-[0.1em]"
+              style={{ background: alpha(mou3amla.subtle, 0.14), color: mou3amla.subtle }}
+            >
+              Demo rate
+            </span>
+          </div>
+        ) : null}
+
         <div className="mt-3 flex items-center gap-2">
-          {[5, 10, 20].map((quick) => (
+          {(isForeignInput ? TOURIST_QUICK_AMOUNTS : [5, 10, 20]).map((quick) => (
             <button
               key={quick}
               type="button"
-              onClick={() => actions.setQuickAmount(quick)}
+              onClick={() => (isForeignInput ? handleForeignQuickAmount(quick) : actions.setQuickAmount(quick))}
               className="rounded-full border px-3.5 py-1.5 text-xs font-bold"
               style={{ color: mou3amla.accent, background: alpha(mou3amla.accent, 0.1), borderColor: alpha(mou3amla.accent, 0.3) }}
             >
-              +{quick} DT
+              +{quick} {TOURIST_CURRENCIES[currency].symbol}
             </button>
           ))}
         </div>
@@ -294,7 +391,34 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
           }}
         >
           <ShieldCheck className="size-3" />
-          BCT Test Limit: Max {BCT_SANDBOX_TEST_LIMIT_TND} TND / transaction
+          BCT Test Limit: Max {BCT_SANDBOX_TEST_LIMIT_TND} TND
+          {isForeignInput
+            ? ` (~${Math.floor(BCT_SANDBOX_TEST_LIMIT_TND / TOURIST_CURRENCIES[currency].rateToTnd)} ${currency})`
+            : ""}{" "}
+          / transaction
+        </div>
+
+        {/* Contrast Effect: the 0-fee claim only lands next to something to
+            compare it against - shown side by side rather than in isolation,
+            same "Free P2P Routing" language already used in the mock
+            checkout's order summary (app/dev/mock-checkout/page.tsx). No
+            specific bank commission figure is invented here (see
+            docs/07-agent-guardrails.md #12) - the contrast is qualitative. */}
+        <div className="mt-2 flex items-center gap-2">
+          <div
+            className="flex items-center gap-1.5 rounded-full border px-3 py-1"
+            style={{ background: alpha(mou3amla.accent, 0.12), borderColor: alpha(mou3amla.accent, 0.3) }}
+          >
+            <ShieldCheck className="size-3" style={{ color: mou3amla.accent }} />
+            <span className="text-[10px] font-black" style={{ color: mou3amla.accent }}>
+              Mou3amla: 0.000 TND fee
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1 opacity-50" style={{ borderColor: mou3amla.borderStrong }}>
+            <span className="text-[10px] font-semibold line-through" style={{ color: mou3amla.textFaint }}>
+              Traditional bank transfer: fees apply
+            </span>
+          </div>
         </div>
       </div>
 
@@ -303,7 +427,15 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
           <button
             key={key}
             type="button"
-            onClick={() => (key === "backspace" ? actions.keypadBackspace() : actions.keypadPress(key))}
+            onClick={() => {
+              if (key === "backspace") {
+                if (isForeignInput) handleForeignBackspace();
+                else actions.keypadBackspace();
+                return;
+              }
+              if (isForeignInput) handleForeignKeypadPress(key);
+              else actions.keypadPress(key);
+            }}
             className="flex items-center justify-center rounded-2xl border py-3.5 text-lg font-semibold transition-transform active:scale-95"
             style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
           >

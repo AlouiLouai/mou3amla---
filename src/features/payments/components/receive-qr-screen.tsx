@@ -6,6 +6,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
 import { NearbyConnecting } from "@/features/payments/components/nearby-connecting";
+import { ScanRoleSwitch } from "@/features/payments/components/scan-role-switch";
+import { NearbyRadar } from "@/components/ui/nearby-radar";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -65,7 +67,8 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
   }, [mode, startNearbyRealtime]);
 
   return (
-    <ScreenFrame header={header} footer={footer} contentClassName="px-6 pb-8">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-8">
+      <ScanRoleSwitch role="receive" onSelect={(role) => (role === "send" ? actions.goScanQr() : undefined)} />
       <div className="mb-3 text-center">
         <div className="text-[15px] font-black tracking-tight">Request a payment</div>
         <div className="mx-auto max-w-[280px] text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
@@ -182,24 +185,12 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
             />
           ) : (
             <>
-              <div className="relative mt-6 flex size-[100px] items-center justify-center">
-                {[0, 0.6, 1.2].map((delay) => (
-                  <div
-                    key={delay}
-                    className="absolute size-full animate-[mou3amla-pulse-ring_1.8s_ease-out_infinite] rounded-full border-2"
-                    style={{ borderColor: mou3amla.subtle, animationDelay: `${delay}s` }}
-                  />
-                ))}
-                <div
-                  className="z-10 flex size-11 items-center justify-center rounded-full border"
-                  style={{ background: mou3amla.card, borderColor: mou3amla.border }}
-                >
-                  <div className="size-3.5 rounded-full border-[2.2px]" style={{ borderColor: mou3amla.subtle }} />
-                </div>
+              <div className="mt-4">
+                <NearbyRadar centerIcon={<User className="size-4" />} size={140} />
               </div>
               <div className="mt-3 max-w-[290px] text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                This is still a web-safe nearby simulation, not real BLE broadcasting. Both phones vibrate and must
-                accept once a payer picks your code.
+                You&apos;re broadcasting - this is still a web-safe nearby simulation, not real BLE broadcasting. Both
+                phones vibrate and must accept once a payer picks your code.
               </div>
             </>
           )}

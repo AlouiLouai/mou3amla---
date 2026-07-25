@@ -2,7 +2,7 @@ import type { LinkedWallet } from "@/features/wallets/types";
 import type { PaymentIntent, QrToken, NearbyHandoff, NearbyMatchState, ConfettiPiece, RecipientPreview } from "@/features/payments/types";
 import type { Invoice } from "@/features/invoices/types";
 import type { ActivityItem } from "@/features/activity/types";
-import type { VerificationStatus } from "@/features/auth/types";
+import type { AccountType, CardGradient, VerificationStatus } from "@/features/auth/types";
 import type { NotificationItem } from "@/features/notifications/types";
 
 export type { ConfettiPiece };
@@ -29,6 +29,8 @@ export interface UserProfile {
   isProfessional: boolean;
   verificationStatus: VerificationStatus;
   kycProviderStatus?: string | null;
+  cardGradient: CardGradient;
+  accountType: AccountType;
   matriculeFiscal?: string;
   passkeyCount: number;
 }
@@ -40,6 +42,8 @@ export interface InitialMou3amlaUser {
   displayName: string;
   verificationStatus: VerificationStatus;
   kycProviderStatus: string | null;
+  cardGradient: CardGradient;
+  accountType: AccountType;
   wallets: LinkedWallet[];
   sourceWalletId: string;
   activityLog: ActivityItem[];

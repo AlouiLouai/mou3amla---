@@ -113,6 +113,28 @@ external API) follows the same `xUnsafe` + wrapper split - see
   friendly retry/home UI, so they don't need to change when you add a new
   feature - just make sure your feature's own actions don't rely on them
   as the primary error path.
+- **The server action being wrapped in `xUnsafe`+try/catch is necessary but
+  not sufficient - the client call site awaiting it needs its own
+  try/catch too.** A 2026-07-26 audit found 7 client call sites (fire-and-
+  forget `void (async () => { const result = await someAction(...); ...
+  })()` blocks in `use-payment-actions.ts`'s `generateIntent`,
+  `use-wallet-actions.ts`'s `confirmLinkWallet`/`selectSource`/
+  `deleteLinkedDestination`, `use-notification-actions.ts`'s
+  `readNotification`/`readAllNotifications`, and
+  `mock-checkout-controls.tsx`'s `run()`) with no try/catch at all - the
+  server action's own `xUnsafe` wrapper only catches errors *inside* that
+  action; it can't catch a dropped connection or any other failure between
+  the browser and the server. Every one of those sites had manually-managed
+  loading state (`isSendingPayment`, `linkConnectingId`, `pendingOutcome`)
+  that would never reset on a thrown error - the worst failure mode for a
+  live demo: a button stuck spinning forever with no error shown, easily
+  mistaken for the whole app being down. The fix is the same pattern
+  `submitScannedToken` (`use-payment-actions.ts`) and every action in
+  `use-qr-nearby-actions.ts` already used correctly: wrap the whole body in
+  try/catch, and in the catch block, reset whatever loading flag was set
+  *and* show a generic `toast.error(...)` - never leave a pending state
+  unresolved. Any new fire-and-forget client call to a Server Action needs
+  this from the start, not added after the fact.
 
 ## Auth conventions
 
@@ -152,6 +174,16 @@ external API) follows the same `xUnsafe` + wrapper split - see
   cookie (`setChallengeCookie`, `passkey-bridge.ts`), then
   `verifyPasskeyRegistration`/`verifyPasskeyAuthentication` reads that same
   cookie back to verify the browser's response.
+- **`createIdentity`'s race-condition recovery is an O(1) indexed RPC, not a
+  paginated scan.** If `admin.auth.admin.createUser()` reports
+  `phone_exists`/`email_exists` (a prior attempt already created the
+  Supabase Auth user but crashed before the `public.profiles` row landed),
+  `findAuthUser` calls the `find_auth_user_id` Postgres function (migration
+  `20260725100000_find_auth_user_rpc.sql`, `security definer`, `auth.users`
+  read directly, `service_role`-only) instead of paginating
+  `admin.auth.admin.listUsers()`. The old approach capped out at 5 pages x
+  200 = 1000 total Supabase Auth users - past that, a legitimate recovery
+  could silently fail and ask a real user to "retry once" for no reason.
 - Every passkey action **re-resolves the profile from the exact
   (phone, username) pair** (`resolveExactProfile` in `actions.ts`) rather
   than trusting a client-supplied id - this is also what scopes
@@ -177,6 +209,36 @@ external API) follows the same `xUnsafe` + wrapper split - see
   `actions.ts` exists purely so a real error ends up somewhere greppable.
   Call it from the client on every `startRegistration`/`startAuthentication`
   catch.
+- **All four passkey ceremony actions are IP-rate-limited** (added
+  2026-07-25 after an audit found they weren't): `getPasskeyRegistrationOptions`
+  (`passkey-reg-options:<ip>`, 15/5min), `verifyPasskeyRegistration`
+  (`passkey-reg-verify:<ip>`, 15/5min), `getPasskeyAuthenticationOptions`
+  (`passkey-auth-options:<ip>`, 20/5min), `verifyPasskeyAuthentication`
+  (`passkey-auth-verify:<ip>`, 20/5min) - same pre-session, IP-keyed pattern
+  as `startPhoneAuth`, since there's no session yet at this point in the
+  flow to key on instead. WebAuthn's own cryptography already makes forging
+  a response computationally infeasible without the private key, but that's
+  not a reason to leave these uncapped - unlimited attempts still enable
+  resource-exhaustion abuse (cheap requests forcing expensive server-side
+  crypto verification) and credential/account enumeration probing, exactly
+  the class of abuse guardrail #19 asks every route like this to close off.
+- **New-user registration gets one extra client-side step, still inside the
+  single `/verify` route.** `VerifyFlow` (`auth/components/verify-flow.tsx`)
+  renders `ProfileBuilderScreen` before `PasskeyScreen` when
+  `mode === "register"` - a claim-confirmation + personal card-style
+  (cyan/magenta) pick, persisted via `setProfileCardGradient` in
+  `actions.ts`. That action follows the same pre-session, re-resolve-by-
+  `(phone, username)`, IP-rate-limited (`set-card-gradient:<ip>`, 20/5min)
+  pattern as every other Stage-1/Stage-2 action here - there is no session
+  yet at this point in the flow, so it cannot be rate-limited per user. This
+  does **not** reintroduce separate sign-in/sign-up screens: `mode ===
+  "authenticate"` still skips straight to `PasskeyScreen` exactly as before,
+  and everything still happens on `/verify`.
+- **"Didit" is not a concept in this codebase and should not be
+  reintroduced in copy or code.** It was a real eKYC provider whose
+  integration was fully removed on purpose (see KYC conventions below) - the
+  passkey step is plain self-hosted WebAuthn, unrelated to any named
+  provider.
 - `startPhoneAuth` never confirms *which* identity a phone or handle belongs
   to beyond "an account already exists" - only that a partial match exists,
   never the other party's actual phone/handle. Revealing more would let an
@@ -357,6 +419,66 @@ external API) follows the same `xUnsafe` + wrapper split - see
   it always re-checks with the provider API before updating
   `payment_transactions.status`.
 
+## Smart scan tab (send vs. receive)
+
+- The bottom nav's single scan tab is inherently ambiguous - a tap could
+  mean "I'm paying" (`ScanQrScreen`) or "I'm getting paid" (`ReceiveQrScreen`).
+  `goScanSmart` (`use-mou3amla-app.ts`) resolves that ambiguity instead of
+  hardcoding one: it first checks for real unfinished business (a live
+  `nearbyHandoff`/`payerMatch` on either side of an in-progress handshake)
+  and jumps straight there; otherwise it falls back to whichever role the
+  user actually used last, read via `getLastScanRole()`
+  (`payments/lib/last-scan-role.ts`, a plain `localStorage` read/write - it's
+  only ever called imperatively inside a click handler, never at render or
+  mount time, so it doesn't need the `useSyncExternalStore` treatment other
+  client-only reads in this codebase require).
+- `goScanQr`/`goReceiveQr` themselves call `setLastScanRole` on every
+  navigation - not just the smart entry point - so Home's own separate
+  Send/Receive quick actions keep the remembered preference accurate too.
+- Both screens render `ScanRoleSwitch` (`payments/components/`) at the top
+  so a wrong guess is one tap to correct, without backing out to Home.
+
+## Account type: residents vs. visitors
+
+- `profiles.account_type` (`"resident" | "tourist"`, default `"resident"`)
+  distinguishes a Tunisian resident from a foreign visitor - chosen once in
+  `ProfileBuilderScreen` (register mode only, alongside the card-gradient
+  picker) via `setAccountType` (`auth/server/actions.ts`), same pre-session
+  IP-rate-limited pattern as `setProfileCardGradient`.
+- **A visiting tourist has no Tunisian bank/wallet destination to ever
+  receive into** - Mou3amla's whole receive model routes to a real
+  provider (Flouci, D17, a RIB, etc.), which a tourist won't have. The app
+  restricts the receive side accordingly, not just cosmetically:
+  `goReceiveQr` (`use-mou3amla-app.ts`) blocks tourist accounts with a
+  toast **before** touching any state - this is the actual enforcement
+  point, not just a UI hide. `home-screen.tsx` swaps the Receive quick
+  action for Contacts, and `ScanRoleSwitch` hides the Receive option
+  (`hideReceive` prop) for tourist accounts so they don't hit a dead end.
+- **Tourists still need something to send *from*.** `wallets/constants.ts`
+  adds an `"intlcard"` ("International Card") provider - not a real
+  TUNPAY-interoperable Tunisian rail like everything else in `PROVIDERS`,
+  just a foreign Visa/Mastercard/e-wallet label a tourist already holds,
+  reusing `wallet_tag`'s existing validation shape (`Provider.routingPlaceholder`
+  overrides the linking sheet's default placeholder for this one provider
+  only, e.g. "visa-1044" instead of "@yourname").
+- Profile screen shows a small "Visiting - Send only" badge
+  (`profile.touristBadge`) next to the verification badge for tourist
+  accounts - demo clarity, not enforcement.
+- **Tourist accounts can type the send amount in their own currency**
+  (`generate-intent-screen.tsx`, `TOURIST_CURRENCIES` in
+  `payments/constants.ts`: EUR/USD/GBP, default EUR). This is purely a
+  client-side input-layer convenience - `state.amount` (what the BCT
+  sandbox cap check, `createPaymentIntent`, activity log, and invoices all
+  read) stays the real TND value the whole time; the keypad just derives it
+  from the local foreign-currency digits instead of being typed directly.
+  Residents never see the currency picker and their keypad path is
+  byte-for-byte unchanged. The conversion rate is explicitly labeled "Demo
+  rate" wherever shown - it's an illustrative constant, not a live feed, per
+  guardrail #12 (never invent regulated financial figures) - and switching
+  currency mid-entry resets the amount rather than reconverting it, since
+  "50" typed as EUR and "50" typed as TND are different amounts typed with
+  different intent, not the same number carried across a unit change.
+
 ## Nearby AirDrop-style handoff (mutual accept)
 
 - This is a **choice presented alongside QR code**, not a replacement for it:
@@ -471,6 +593,41 @@ Read this before "fixing" something that looks incomplete:
   self-service profile edit that needs a new column writable by the user
   directly, extend the column grant explicitly rather than reverting to a
   blanket `grant update on public.profiles`.
+- **The `profiles` column-grant lesson above generalizes to every table, not
+  just `profiles`.** A live Postgres audit (2026-07-25, migration
+  `20260725110000_rls_grants_hardening.sql`) found `payment_transactions`
+  had a client-writable INSERT RLS policy
+  (`payment_transactions_insert_sender`) that only checked
+  `auth.uid() = sender_user_id` - nothing validated amount, status,
+  recipient verification, duplicate submission, or the sandbox cap, all of
+  which `createPaymentIntent` enforces. Any authenticated user could have
+  inserted a fabricated "confirmed" transaction against any
+  `recipient_user_id` directly via the Supabase client SDK, bypassing the
+  app entirely - and it would have shown up in the *victim's own* Activity
+  screen too, since `payment_transactions_select_participant` shows rows by
+  either side. The same migration also found `accept_nearby_handoff()` had
+  no internal `auth.uid()` ownership check and was `EXECUTE`-grantable by
+  `anon`/`authenticated` (safe only because `nearby_handoffs` had no UPDATE
+  policy to let the mutation through - an accident of omission, not a
+  designed control), and revoked the same class of unused write grant on
+  `nearby_handoffs`, `notifications`, `passkeys`, `verification_events`, and
+  `rate_limits`. **Every table that's written exclusively by the
+  service-role admin client should have its `anon`/`authenticated` write
+  grants explicitly revoked**, not left to whatever Supabase's default
+  project privileges happened to grant - don't assume "no policy exists for
+  that command" is a safe permanent state; make the revoke explicit.
+  `linked_destinations` is the one deliberate exception, with genuine,
+  correctly-scoped self-service RLS policies on every command. A follow-up
+  pass also revoked `anon`'s leftover table-wide UPDATE on `profiles`
+  (`authenticated`'s was already handled by the migration above) - same
+  already-neutralized-by-RLS-but-explicit-anyway reasoning.
+- **Migration history was reconciled 2026-07-25** after discovering the
+  Supabase MCP `apply_migration` tool stamps its own apply-time as the
+  version, not the local file's embedded timestamp - `supabase_migrations.schema_migrations`
+  now matches every local filename in `supabase/migrations/` exactly,
+  version for version. See guardrail #22 in
+  [07-agent-guardrails.md](./07-agent-guardrails.md) before applying a
+  migration via that tool again.
 - **`src/lib/logger.ts` redacts by key, not by value.** Any context key
   matching phone/routing_value/rib/credential/public_key/challenge/token/
   secret/password (case-insensitive substring) gets replaced with
@@ -502,6 +659,14 @@ Read this before "fixing" something that looks incomplete:
 - Only the body content pane should scroll.
 - Prefer `src/features/mou3amla/components/screen-frame.tsx` instead of manually
   rebuilding sticky/scroll behavior per screen.
+- **`ScreenFrame`'s `contentClassName` horizontal padding is `px-4`
+  everywhere** (Home is the reference) - `receive-qr-screen.tsx`,
+  `scan-qr-screen.tsx`, and `intent-result-screen.tsx` used to be `px-6`,
+  and `invoices-screen.tsx` used to be `px-5`; normalized 2026-07-25 because
+  the extra padding made those screens' elements read as a different scale
+  than every other screen despite using the same underlying type/spacing
+  tokens. Don't reintroduce a one-off horizontal padding value on a new
+  screen without a specific reason.
 
 ## Environment variables
 

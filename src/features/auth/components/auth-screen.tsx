@@ -8,6 +8,8 @@ import { LogoLockup } from "@/features/mou3amla/components/logo-lockup";
 import { alpha, mou3amla } from "@/features/mou3amla/constants";
 import { LanguageSheet } from "@/features/i18n/components/language-sheet";
 import { useTranslation } from "@/features/i18n/language-store";
+import { OnboardingStepper } from "@/features/auth/components/onboarding-stepper";
+import { ProximitySandboxPreview } from "@/features/auth/components/proximity-sandbox-preview";
 
 const initialState: AuthFormState = {};
 
@@ -28,18 +30,33 @@ export function AuthScreen() {
       style={{ background: mou3amla.bg, color: mou3amla.text }}
     >
       <div className="mx-auto flex w-full max-w-sm flex-col">
-        <button
-          type="button"
-          onClick={() => setLanguageSheetOpen(true)}
-          className="mb-2 flex items-center gap-1.5 self-end rounded-full border border-white/14 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/84"
-        >
-          <Globe className="size-3.5" />
-          {language.toUpperCase()}
-        </button>
+        {/* Same stepper + language row shape as ProfileBuilderScreen and
+            PasskeyScreen, in the same position relative to the top of the
+            screen, so the 3-step flow reads as one continuous journey
+            instead of three differently-composed screens. */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex-1">
+            <OnboardingStepper currentStep={1} labels={[t("onboarding.step.device"), t("onboarding.step.profile"), t("onboarding.step.passkey")]} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setLanguageSheetOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-2 text-[12px] font-semibold text-white/84"
+          >
+            <Globe className="size-4" />
+            <span>{language.toUpperCase()}</span>
+          </button>
+        </div>
 
-        <div className="mb-8 flex justify-center">
+        <div className="mb-6 flex justify-center">
           <LogoLockup tagline={t("auth.tagline")} />
         </div>
+
+        <ProximitySandboxPreview
+          teaserLabel={t("onboarding.radar.teaser")}
+          disclaimerLabel={t("onboarding.radar.disclaimer")}
+          peerLabel={t("onboarding.radar.peers")}
+        />
 
         <form action={formAction} className="space-y-3">
           <div>

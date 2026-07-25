@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 
 export function NetworkStatusToast() {

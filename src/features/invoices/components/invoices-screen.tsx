@@ -1,4 +1,5 @@
-import { Download } from "lucide-react";
+import { Download, Receipt } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { invoicesToCsv } from "@/features/invoices/lib/el-fatoora";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
@@ -29,7 +30,7 @@ export function InvoicesScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
   const footer = renderAppFooter("invoices", actions);
 
   return (
-    <ScreenFrame header={header} footer={footer} contentClassName="px-5 pb-8">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-8">
       <div className="mb-1 flex items-center justify-between gap-3">
         <div className="text-[15px] font-black tracking-tight">Invoices (El Fatoora)</div>
         <button
@@ -48,12 +49,7 @@ export function InvoicesScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
       </p>
 
       {account.invoices.length === 0 ? (
-        <div
-          className="rounded-2xl border p-5 text-center text-[12.5px]"
-          style={{ background: mou3amla.card, borderColor: mou3amla.border, color: mou3amla.textMuted }}
-        >
-          Invoices appear automatically after a confirmed payment intent.
-        </div>
+        <EmptyState icon={<Receipt className="size-5" />} title="No invoices yet" body="Invoices appear automatically after a confirmed payment intent." />
       ) : (
         <div className="flex flex-col gap-2.5">
           {account.invoices.map((invoice) => (

@@ -70,6 +70,20 @@ the full shadcn semantic color scale. Wallet/provider brand colors in
 real fintech brand colors (Flouci green, Konnect teal, etc.), never touched
 by a Mou3amla palette change.
 
+`identityGradients` (also in `mou3amla/constants.ts`) is a second, narrowly
+scoped exception: cyan, magenta, amber, and emerald - the only four colors in
+the app outside the Instagram-derived system above. They exist solely as the
+four personal card-style choices in onboarding's `ProfileBuilderScreen`/
+`IdentityCardPreview` (persisted as `profiles.card_gradient`) - never use
+them for a button, status, or any general surface; `mou3amla.accent`/
+`subtle`/`destructive` still own those. Amber/emerald were chosen because
+they don't collide with `accent` (blue), `subtle` (purple), or
+`destructive` (red), and `statusToneColor`'s "positive" state is blue, not
+green, so emerald can't be mistaken for a verified/success badge. Do not add
+a fifth color to this set without a real product reason, and do not let it
+leak into `WalletStack`/`BankCard`, which stay reserved for real
+linked-destination provider brand colors.
+
 **Status-tone colors are centralized**, not hand-rolled per screen: import
 `statusToneColor` from `src/features/mou3amla/status-tone.ts` (`"positive" |
 "pending" | "negative" | "neutral"`) rather than hardcoding a green/orange/red
@@ -129,7 +143,14 @@ blur and oversized shadow stacks make low-end mobile devices feel slow.
 ## Toasts
 
 App events use `sonner` through the shadcn wrapper in
-`src/components/ui/sonner.tsx`.
+`src/components/ui/sonner.tsx` - but **import `toast` from `@/lib/toast`,
+never `"sonner"` directly** (added 2026-07-25). That wrapper is a thin,
+callable `Object.assign` over sonner's own `toast` that overrides
+`success`/`error`/`warning`/`info` with type-specific default durations
+(success/info ~3.2s, warning 4.5s, error 6s - an error deserves more reading
+time than a quick confirmation) so no call site has to think about duration
+itself. `sonner.tsx`'s own `<Toaster duration={3200}>` is only the fallback
+for an untyped `toast("...")`/`toast.message(...)` call.
 
 - Toasts render `top-center` with a safe-area-aware offset
   (`max(1rem, env(safe-area-inset-top))`) rather than sonner's default
@@ -138,10 +159,52 @@ App events use `sonner` through the shadcn wrapper in
   [03-pwa.md](./03-pwa.md#mobile-shell-behavior)), so a bottom-anchored toast
   would visually collide with it. Don't move toasts back to the bottom
   without also accounting for that.
-- Keep toast visuals aligned with the Mou3amla palette.
+- Keep toast visuals aligned with the Mou3amla palette. Each semantic type
+  (success/error/warning/info) gets both a colored icon badge and a matching
+  left accent bar (`sonner.tsx`'s `icons`/`classNames.success` etc.) so the
+  category reads before the copy does.
 - Prefer concise operational copy: linked, routed, verified, failed.
 - Use success/error/loading states for payment, link, passkey, and
   notification events instead of custom ad hoc banners.
+
+## Bottom sheets
+
+Every bottom sheet (`LanguageSheet`, `InfoSheet`, `WalletRegistrySheet`)
+wraps the shared `BottomSheet` primitive
+(`src/components/ui/bottom-sheet.tsx`) instead of hand-rolling its own
+backdrop/card/grabber markup - added 2026-07-25 after three near-identical
+copies existed with a purely decorative grabber pill (no actual drag
+behavior). `BottomSheet` tracks real pointer drag on the grabber/header
+strip only (not the full body, so it never fights a scrollable content area
+a caller nests inside `children`) and dismisses on a large-enough downward
+drag distance or flick velocity, springing back otherwise. If you add a new
+bottom sheet, wrap this rather than reintroducing the old fixed-position
+pattern.
+
+## Empty states
+
+Every "nothing here yet" moment (activity, contacts, accounts, invoices,
+notifications, wallets, recipient search with zero matches) uses
+`EmptyState` (`src/components/ui/empty-state.tsx`) - added 2026-07-25 after
+an audit found the same icon-badge pattern hand-duplicated in one screen
+(notifications) while every other screen either had no icon at all or used
+a different dashed-vs-solid treatment inconsistently. `EmptyState` takes an
+`icon`, `title`, optional `body` and `action`, and a `variant` (`"card"` -
+the default, a solid `mou3amla.card` surface; `"dashed"` for a spot already
+nested inside another card, like `WalletStack`'s home-screen preview, where
+a second solid card would look heavy). The icon badge pops in via the
+`mou3amla-empty-pop` keyframe rather than a static render - don't hand-roll
+a new "empty" card outside this component.
+
+## Skeletons
+
+`src/components/ui/skeleton.tsx` is the standard shadcn `Skeleton` primitive
+(`animate-pulse`) - it existed unused until 2026-07-25, when
+`ScreenLoading()` in `mou3amla-app.tsx` (the shared `next/dynamic` loading
+fallback for every lazy-loaded screen) was switched to wrap it instead of
+plain static divs. A shape with no motion doesn't read as "loading" to a
+user, just as an empty box - use `<Skeleton>` (not a bare styled `<div>`)
+for any future loading placeholder.
 
 ## Fonts
 

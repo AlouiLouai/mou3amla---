@@ -1,3 +1,5 @@
+import { Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -29,12 +31,7 @@ export function ContactsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
       </div>
 
       {derived.allContacts.length === 0 ? (
-        <div
-          className="rounded-[24px] border p-5 text-center text-[12.5px]"
-          style={{ background: mou3amla.card, borderColor: mou3amla.border, color: mou3amla.textMuted, boxShadow: cardShadow }}
-        >
-          No contacts yet. Send your first payment to see people here.
-        </div>
+        <EmptyState icon={<Users className="size-5" />} title="No contacts yet" body="Send your first payment to see people here for quick pick." />
       ) : (
         <div className="flex flex-col gap-2">
           {derived.allContacts.map((contact) => (

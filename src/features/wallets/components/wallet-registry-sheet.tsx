@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
-import { alpha, raisedShadow, mou3amla } from "@/features/mou3amla/constants";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { alpha, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 import { canUseHostedCheckout, isProviderPendingApproval, isProviderServiceDown } from "@/features/wallets/constants";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
@@ -19,47 +20,34 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
   const { state, derived, actions } = mou3amlaApp;
   const account = derived.account;
 
-  if (!state.linkOpen) return null;
-
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={actions.closeLink}
-        className="fixed inset-0 z-40 backdrop-blur-sm"
-        style={{ background: "rgba(5,6,8,0.65)" }}
-      />
-      <div
-        className="animate-[mou3amla-fadeup_0.25s_ease_both] fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[80vh] max-w-md overflow-auto rounded-t-[28px] border border-b-0 px-5 pt-4.5 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
-        style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong, boxShadow: raisedShadow }}
-      >
-        <div className="mx-auto mb-4 h-1 w-9 rounded-full" style={{ background: alpha(mou3amla.accent, 0.18) }} />
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {state.linkStep === "identifier" ? (
-              <button
-                type="button"
-                onClick={actions.backToProviderPick}
-                aria-label="Back"
-                className="flex size-7 items-center justify-center rounded-full"
-                style={{ background: mou3amla.cardAlt }}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-            ) : null}
-            <div className="text-[15px] font-bold">{state.linkStep === "provider" ? "Link an Account" : derived.linkProvider?.name}</div>
-          </div>
-          <button
-            type="button"
-            onClick={actions.closeLink}
-            className="flex size-[26px] items-center justify-center rounded-full"
-            style={{ background: mou3amla.cardAlt, color: mou3amla.textMuted }}
-          >
-            <X className="size-3.5" />
-          </button>
+    <BottomSheet open={state.linkOpen} onClose={actions.closeLink}>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {state.linkStep === "identifier" ? (
+            <button
+              type="button"
+              onClick={actions.backToProviderPick}
+              aria-label="Back"
+              className="flex size-7 items-center justify-center rounded-full"
+              style={{ background: mou3amla.cardAlt }}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+          ) : null}
+          <div className="text-[15px] font-bold">{state.linkStep === "provider" ? "Link an Account" : derived.linkProvider?.name}</div>
         </div>
+        <button
+          type="button"
+          onClick={actions.closeLink}
+          className="flex size-[26px] items-center justify-center rounded-full"
+          style={{ background: mou3amla.cardAlt, color: mou3amla.textMuted }}
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
 
+      <div className="max-h-[65vh] overflow-auto">
         {state.linkStep === "provider" ? (
           <div className="flex flex-col gap-2">
             {account.profile.verificationStatus !== "verified" ? (
@@ -136,7 +124,8 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
           <div>
             {(() => {
               const routingType = derived.linkProvider.acceptedRoutingTypes[0];
-              const { label, placeholder } = ROUTING_LABELS[routingType];
+              const { label, placeholder: defaultPlaceholder } = ROUTING_LABELS[routingType];
+              const placeholder = derived.linkProvider.routingPlaceholder ?? defaultPlaceholder;
               const connecting = state.linkConnectingId === derived.linkProvider.id;
 
               return (
@@ -189,6 +178,6 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
           </div>
         ) : null}
       </div>
-    </>
+    </BottomSheet>
   );
 }

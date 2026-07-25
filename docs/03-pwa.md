@@ -149,6 +149,20 @@ already covered by the global `prefers-reduced-motion: reduce` override.
 Pass `animate={false}` to render it statically if a future placement needs
 that (none currently do).
 
+## Theme color (installed vs. browser)
+
+`siteConfig.themeColor` (`src/config/site.ts`) drives both the browser's
+`viewport.themeColor` meta tag and the manifest's `theme_color` - the
+installed/standalone PWA's Android status bar and task-switcher card
+background. It's set to `#000000`, matching `backgroundColor` (the same
+value used for the manifest's splash `background_color`) and the app's
+actual default dark background, not the accent blue - a color mismatch here
+is far more visible once installed standalone (a solid status-bar block
+sitting directly above the app's own black UI, no browser chrome to buffer
+it) than as a thin address-bar tint in a browser tab. If you ever change the
+app's default/pre-auth background away from black, update this alongside it
+rather than letting it drift back out of sync.
+
 ## Install prompt
 
 `src/components/pwa/install-prompt.tsx` handles the `beforeinstallprompt`

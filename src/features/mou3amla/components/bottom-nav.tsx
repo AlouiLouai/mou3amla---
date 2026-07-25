@@ -76,7 +76,7 @@ export function BottomNav({ active, onHome, onSend, onScan, onActivity, onProfil
   );
 }
 
-type FooterActions = Pick<UseMou3amlaApp["actions"], "goHome" | "goGenerateIntent" | "goScanQr" | "goActivity" | "goProfile">;
+type FooterActions = Pick<UseMou3amlaApp["actions"], "goHome" | "goGenerateIntent" | "goScanSmart" | "goActivity" | "goProfile">;
 
 // Every full-page screen in the authenticated shell shows the same bottom
 // nav, not just the five screens it can directly navigate to - this builds
@@ -88,7 +88,7 @@ export function renderAppFooter(active: Screen, actions: FooterActions) {
       active={active}
       onHome={actions.goHome}
       onSend={actions.goGenerateIntent}
-      onScan={() => actions.goScanQr()}
+      onScan={actions.goScanSmart}
       onActivity={actions.goActivity}
       onProfile={actions.goProfile}
     />

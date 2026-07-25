@@ -23,14 +23,31 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       position="top-center"
       closeButton
+      duration={3200}
       offset={{ top: "max(1rem, env(safe-area-inset-top))" }}
       mobileOffset={{ top: "max(1rem, env(safe-area-inset-top))" }}
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
+        success: (
+          <span className="flex size-6 items-center justify-center rounded-full" style={{ background: alpha(mou3amla.accent, 0.16), color: mou3amla.accent }}>
+            <CircleCheckIcon className="size-3.5" />
+          </span>
+        ),
+        info: (
+          <span className="flex size-6 items-center justify-center rounded-full" style={{ background: alpha(mou3amla.text, 0.1), color: mou3amla.text }}>
+            <InfoIcon className="size-3.5" />
+          </span>
+        ),
+        warning: (
+          <span className="flex size-6 items-center justify-center rounded-full" style={{ background: alpha(mou3amla.subtle, 0.16), color: mou3amla.subtle }}>
+            <TriangleAlertIcon className="size-3.5" />
+          </span>
+        ),
+        error: (
+          <span className="flex size-6 items-center justify-center rounded-full" style={{ background: alpha(mou3amla.destructive, 0.16), color: mou3amla.destructive }}>
+            <OctagonXIcon className="size-3.5" />
+          </span>
+        ),
+        loading: <Loader2Icon className="size-4 animate-spin" style={{ color: mou3amla.textMuted }} />,
       }}
       style={
         {
@@ -56,13 +73,24 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as CSSProperties
       }
       toastOptions={{
-        // Every un-typed toast (a plain `toast("...")` call, no built-in
-        // 4000ms auto-dismiss is enough time to read a short line, but
-        // don't make users wait it out to move on - the explicit close
-        // button (styled here, not left to Sonner's own theme heuristics)
-        // and swipe-to-dismiss are both always available immediately.
+        // `duration` above (3200ms) is only the fallback for an untyped
+        // `toast("...")`/`toast.message(...)` call - `src/lib/toast.ts`'s
+        // wrapper passes a longer-for-error, shorter-for-success duration
+        // per type for every typed call (success/error/warning/info), which
+        // is what every real call site in this app actually uses. The
+        // explicit close button (styled here, not left to Sonner's own
+        // theme heuristics) and drag-to-dismiss are both always available
+        // immediately regardless of duration.
         classNames: {
-          toast: "cn-toast relative overflow-hidden border shadow-[0_18px_44px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.4)]",
+          // A left accent bar per semantic type (in addition to the icon
+          // badge above) makes the toast's category readable at a glance,
+          // even before reading the copy - closer to how a native
+          // notification center distinguishes alert kinds.
+          toast: "cn-toast relative overflow-hidden border border-l-[3px] shadow-[0_18px_44px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.4)]",
+          success: "border-l-(--success-border)",
+          error: "border-l-(--error-border)",
+          warning: "border-l-(--warning-border)",
+          info: "border-l-(--info-border)",
           title: "font-semibold",
           description: "text-[0.8rem] text-(--mou3amla-toast-muted)",
           actionButton: "bg-[#0095F6] text-white hover:bg-[#0077C7] rounded-full px-3 font-semibold",

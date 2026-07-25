@@ -45,15 +45,23 @@ export function MockCheckoutControls({ refId, status }: MockCheckoutControlsProp
 
     startTransition(() => {
       void (async () => {
-        const result = await completeMockCheckout({ refId, outcome });
+        try {
+          const result = await completeMockCheckout({ refId, outcome });
 
-        if (!result.ok) {
+          if (!result.ok) {
+            setPendingOutcome(null);
+            setMessage(result.message);
+            return;
+          }
+
+          window.location.assign(result.redirectTo);
+        } catch {
+          // Without this, a dropped connection left both Simulate buttons
+          // looking stuck with no feedback - the single worst place for
+          // that to happen live in front of a BCT reviewer.
           setPendingOutcome(null);
-          setMessage(result.message);
-          return;
+          setMessage("We couldn't reach Mou3amla right now. Please try again.");
         }
-
-        window.location.assign(result.redirectTo);
       })();
     });
   }

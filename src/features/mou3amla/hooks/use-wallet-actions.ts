@@ -1,6 +1,6 @@
 import { useCallback, type RefObject } from "react";
 import type { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
 import { applyDefaultWallet, getPreferredSendWalletId } from "@/features/mou3amla/hooks/utils";
@@ -65,32 +65,39 @@ export function useWalletActions({
     dispatch({ linkConnectingId: provider.id });
 
     void (async () => {
-      const result = await linkDestination({
-        providerId: provider.id,
-        routingValue: stateRef.current.linkIdentifierInput,
-      });
+      try {
+        const result = await linkDestination({
+          providerId: provider.id,
+          routingValue: stateRef.current.linkIdentifierInput,
+        });
 
-      if (!result.ok) {
+        if (!result.ok) {
+          dispatch({ linkConnectingId: null });
+          toast.error(result.message);
+          return;
+        }
+
+        dispatch((s) => ({
+          wallets: [...s.wallets, result.wallet],
+          sourceWalletId: result.sourceWalletId || s.sourceWalletId || result.wallet.id,
+          sendSourceWalletId: getPreferredSendWalletId(
+            [...s.wallets, result.wallet],
+            s.sendSourceWalletId || result.sourceWalletId || s.sourceWalletId || result.wallet.id,
+          ),
+          linkConnectingId: null,
+          linkOpen: false,
+          linkIdentifierInput: "",
+          linkProviderId: null,
+          linkStep: "provider",
+        }));
+
+        toast.success(`${result.wallet.name} linked successfully.`);
+      } catch {
+        // Without this, a dropped connection left the "Link Account" button
+        // spinning forever (linkConnectingId never reset) with no error shown.
         dispatch({ linkConnectingId: null });
-        toast.error(result.message);
-        return;
+        toast.error("We couldn't reach Mou3amla right now. Check your connection and try again.");
       }
-
-      dispatch((s) => ({
-        wallets: [...s.wallets, result.wallet],
-        sourceWalletId: result.sourceWalletId || s.sourceWalletId || result.wallet.id,
-        sendSourceWalletId: getPreferredSendWalletId(
-          [...s.wallets, result.wallet],
-          s.sendSourceWalletId || result.sourceWalletId || s.sourceWalletId || result.wallet.id,
-        ),
-        linkConnectingId: null,
-        linkOpen: false,
-        linkIdentifierInput: "",
-        linkProviderId: null,
-        linkStep: "provider",
-      }));
-
-      toast.success(`${result.wallet.name} linked successfully.`);
     })();
   }, [dispatch, stateRef]);
 
@@ -103,14 +110,21 @@ export function useWalletActions({
       }));
 
       void (async () => {
-        const result = await setPrimaryDestination({ destinationId: id });
-        if (!result.ok) {
+        try {
+          const result = await setPrimaryDestination({ destinationId: id });
+          if (!result.ok) {
+            dispatch((s) => ({
+              sourceWalletId: previousId,
+              wallets: applyDefaultWallet(s.wallets, previousId),
+            }));
+            toast.error(result.message);
+          }
+        } catch {
           dispatch((s) => ({
             sourceWalletId: previousId,
             wallets: applyDefaultWallet(s.wallets, previousId),
           }));
-          toast.error(result.message);
-          return;
+          toast.error("We couldn't reach Mou3amla right now. Please try again.");
         }
       })();
     },
@@ -131,25 +145,35 @@ export function useWalletActions({
         return { ok: false, message: "That destination no longer exists." };
       }
 
-      const result = await deleteDestination({ destinationId: id });
-      if (!result.ok) {
-        toast.error(result.message);
+      try {
+        const result = await deleteDestination({ destinationId: id });
+        if (!result.ok) {
+          toast.error(result.message);
+          return result;
+        }
+
+        dispatch((s) => {
+          const wallets = s.wallets.filter((entry) => entry.id !== id);
+          const sourceWalletId = result.nextSourceWalletId || (s.sourceWalletId === id ? "" : s.sourceWalletId);
+
+          return {
+            wallets: applyDefaultWallet(wallets, sourceWalletId),
+            sourceWalletId,
+            sendSourceWalletId: getPreferredSendWalletId(wallets, s.sendSourceWalletId === id ? sourceWalletId : s.sendSourceWalletId),
+          };
+        });
+
+        toast.success(`${wallet.name} removed from linked accounts.`);
         return result;
+      } catch {
+        // Without this, a dropped connection surfaced as an unhandled
+        // promise rejection with no user-facing feedback - the caller's
+        // .finally() still resets its own local "deleting" state either way,
+        // but the user deserves to know the delete didn't actually happen.
+        const message = "We couldn't reach Mou3amla right now. Please try again.";
+        toast.error(message);
+        return { ok: false, message };
       }
-
-      dispatch((s) => {
-        const wallets = s.wallets.filter((entry) => entry.id !== id);
-        const sourceWalletId = result.nextSourceWalletId || (s.sourceWalletId === id ? "" : s.sourceWalletId);
-
-        return {
-          wallets: applyDefaultWallet(wallets, sourceWalletId),
-          sourceWalletId,
-          sendSourceWalletId: getPreferredSendWalletId(wallets, s.sendSourceWalletId === id ? sourceWalletId : s.sendSourceWalletId),
-        };
-      });
-
-      toast.success(`${wallet.name} removed from linked accounts.`);
-      return result;
     },
     [dispatch, stateRef],
   );

@@ -43,3 +43,8 @@ next-env.d.ts
 # serwist generated service worker
 /public/sw*
 /public/swe-worker*
+
+
+.mcp.json
+skills-lock.json
+.claude

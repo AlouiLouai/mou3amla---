@@ -52,3 +52,42 @@ export function alpha(color: string, opacity: number): string {
 // border-driven cards do.
 export const cardShadow = "0 8px 20px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)";
 export const raisedShadow = "0 16px 36px rgba(0,0,0,0.5), 0 6px 16px rgba(0,0,0,0.35)";
+
+// Deliberately separate from the Instagram-derived `mou3amla` palette above -
+// these four are the only non-Instagram colors in the app and exist solely
+// as personal card-style choices in onboarding's profile builder
+// (`ProfileBuilderScreen`/`IdentityCardPreview`), not a general accent
+// replacement. Never use these for buttons, status, or any surface the rest
+// of `mou3amla.*` already owns - see docs/05-styling-ui.md. Amber/emerald
+// were picked specifically because they don't collide with `accent` (blue),
+// `subtle` (purple), or `destructive` (red) - and `statusToneColor`
+// (status-tone.ts) never maps "positive" to green, so emerald here can't be
+// mistaken for a verified/success state either.
+export const identityGradients = {
+  cyan: {
+    id: "cyan",
+    label: "Cyan",
+    gradient: "linear-gradient(135deg, #22D3EE, #0891B2)",
+    solid: "#22D3EE",
+  },
+  magenta: {
+    id: "magenta",
+    label: "Magenta",
+    gradient: "linear-gradient(135deg, #F472B6, #C026D3)",
+    solid: "#F472B6",
+  },
+  amber: {
+    id: "amber",
+    label: "Amber",
+    gradient: "linear-gradient(135deg, #FBBF24, #D97706)",
+    solid: "#FBBF24",
+  },
+  emerald: {
+    id: "emerald",
+    label: "Emerald",
+    gradient: "linear-gradient(135deg, #34D399, #059669)",
+    solid: "#34D399",
+  },
+} as const;
+
+export type IdentityGradientId = keyof typeof identityGradients;

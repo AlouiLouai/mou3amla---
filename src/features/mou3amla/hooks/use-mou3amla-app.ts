@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { type CoarseLocation, getCoarseLocation } from "@/features/payments/lib/geolocation";
+import { getLastScanRole, setLastScanRole } from "@/features/payments/lib/last-scan-role";
 import type { HandoffMode, InitialMou3amlaUser } from "@/features/mou3amla/types";
 import { PROVIDERS } from "@/features/wallets/constants";
 import { useRealtimeNotifications } from "@/features/notifications/hooks/use-realtime-notifications";
@@ -117,11 +118,21 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null, sendSourceWalletId });
   }, []);
   const goReceiveQr = useCallback((mode: HandoffMode = "qr") => {
+    // Defense in depth, not just a UI hide: a visiting tourist has no
+    // Tunisian bank/wallet destination to ever receive into (see
+    // AccountType in auth/types.ts), so this stays blocked here even if
+    // some future entry point forgets to hide the Receive affordance.
+    if (stateRef.current.profile.accountType === "tourist") {
+      toast.error("Visitor accounts can only send money in this demo - receiving needs a Tunisian bank/wallet destination.");
+      return;
+    }
+
     if (!stateRef.current.wallets.length) {
       toast.error("Link an account first so Mou3amla knows where to route incoming payments.");
       return;
     }
 
+    setLastScanRole("receive");
     dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null, initialHandoffMode: mode });
   }, []);
   const goScanQr = useCallback((mode: HandoffMode = "qr") => {
@@ -135,6 +146,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       return;
     }
 
+    setLastScanRole("send");
     dispatch({
       screen: "scan-qr",
       scanManualInput: "",
@@ -145,6 +157,33 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       initialHandoffMode: mode,
     });
   }, []);
+  // The bottom nav's single "scan" tab is ambiguous between "I'm paying"
+  // and "I'm getting paid" - this is what makes it smart rather than a
+  // coin flip: first, prefer whichever role has real unfinished business
+  // (a live nearby match on either side of the handshake), then fall back
+  // to whichever role the user actually used last time (persisted by
+  // goScanQr/goReceiveQr themselves, so every entry point keeps it
+  // accurate - home's own Send/Receive quick actions included), defaulting
+  // to "send" (scan-to-pay) only for a user who has never used either yet.
+  const goScanSmart = useCallback(() => {
+    const current = stateRef.current;
+
+    if (current.nearbyHandoff && (current.nearbyHandoff.status === "matched" || current.nearbyHandoff.status === "confirmed")) {
+      goReceiveQr("nearby");
+      return;
+    }
+
+    if (current.payerMatch) {
+      goScanQr("nearby");
+      return;
+    }
+
+    if (getLastScanRole() === "receive") {
+      goReceiveQr();
+    } else {
+      goScanQr();
+    }
+  }, [goReceiveQr, goScanQr]);
 
   const qrNearbyActions = useQrNearbyActions({ dispatch, stateRef, timers, resolveNearbyGeo, goHome });
   const walletActions = useWalletActions({ dispatch, stateRef, router });
@@ -188,6 +227,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       goGenerateIntent,
       goReceiveQr,
       goScanQr,
+      goScanSmart,
       ...qrNearbyActions,
       ...walletActions,
       ...paymentActions,

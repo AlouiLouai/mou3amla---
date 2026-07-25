@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { List, Plus } from "lucide-react";
+import { List, Plus, Wallet } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { alpha, raisedShadow, mou3amla } from "@/features/mou3amla/constants";
 import { WalletIcon } from "@/features/wallets/components/wallet-icon";
 import { maskRoutingValue, ROUTING_LABELS } from "@/features/wallets/lib/routing";
@@ -154,20 +155,13 @@ export function WalletStack({
       </div>
 
       {wallets.length === 0 ? (
-        <div className="rounded-[22px] border border-dashed px-4 py-6 text-center" style={{ borderColor: mou3amla.borderStrong }}>
-          <div className="text-[13px] font-black">No linked destination yet</div>
-          <p className="mx-auto mt-1.5 max-w-[240px] text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-            Add a wallet tag, merchant id, or RIB to start sending and receiving.
-          </p>
-          <button
-            type="button"
-            onClick={onAddMore}
-            className="mt-3 rounded-full px-4 py-2 text-[11.5px] font-black text-white"
-            style={{ background: mou3amla.accent }}
-          >
-            Link an account
-          </button>
-        </div>
+        <EmptyState
+          variant="dashed"
+          icon={<Wallet className="size-5" />}
+          title="No linked destination yet"
+          body="Add a wallet tag, merchant id, or RIB to start sending and receiving."
+          action={{ label: "Link an account", onClick: onAddMore }}
+        />
       ) : (
         <>
           <div
@@ -180,23 +174,26 @@ export function WalletStack({
             ))}
           </div>
 
-          {wallets.length > 1 ? (
-            <div className="flex items-center justify-center gap-1.5">
-              {wallets.map((wallet, index) => (
-                <button
-                  key={wallet.id}
-                  type="button"
-                  onClick={() => scrollToIndex(index)}
-                  aria-label={`Show ${wallet.name}`}
-                  className="h-1.5 rounded-full transition-all"
-                  style={{
-                    width: index === activeIndex ? 16 : 6,
-                    background: index === activeIndex ? mou3amla.accent : alpha(mou3amla.text, 0.16),
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
+          {/* Always rendered, even for a single card - a lone dot still
+              communicates "1 of 1" and keeps the carousel's footprint
+              consistent as soon as a second account gets linked, rather
+              than the dot row popping in/out of existence. */}
+          <div className="flex items-center justify-center gap-1.5">
+            {wallets.map((wallet, index) => (
+              <button
+                key={wallet.id}
+                type="button"
+                onClick={() => scrollToIndex(index)}
+                aria-label={`Show ${wallet.name}`}
+                disabled={wallets.length === 1}
+                className="h-1.5 rounded-full transition-all disabled:pointer-events-none"
+                style={{
+                  width: index === activeIndex ? 16 : 6,
+                  background: index === activeIndex ? mou3amla.accent : alpha(mou3amla.text, 0.16),
+                }}
+              />
+            ))}
+          </div>
         </>
       )}
     </div>

@@ -6,8 +6,11 @@
   recommend for this App Router setup. Turbopack still bundles the app
   itself; Vitest uses its own Vite pipeline purely to run tests, which is
   normal and does not conflict with the Turbopack dev/build pipeline.
-- **jsdom** is the default `test.environment` so future component tests
-  (`@testing-library/react` is already installed) work out of the box.
+- **jsdom** is the default `test.environment`. Every current test is a
+  plain logic/server-action test (no component rendering) - `@testing-library/react`/
+  `@testing-library/dom` were removed 2026-07-25 after confirming zero test
+  imported them. If you add a real component-render test, `pnpm add -D
+  @testing-library/react @testing-library/dom` first.
 - `pnpm test` runs once and exits (CI/verification-gate friendly). `pnpm
   test:watch` runs Vitest's interactive watch mode for local development.
 

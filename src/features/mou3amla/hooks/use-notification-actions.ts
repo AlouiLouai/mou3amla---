@@ -1,5 +1,5 @@
 import { useCallback, type RefObject } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { markAllNotificationsRead, markNotificationRead } from "@/features/notifications/server/actions";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
@@ -23,12 +23,19 @@ export function useNotificationActions({
       }));
 
       void (async () => {
-        const result = await markNotificationRead({ notificationId });
-        if (!result.ok) {
+        try {
+          const result = await markNotificationRead({ notificationId });
+          if (!result.ok) {
+            dispatch((s) => ({
+              notifications: s.notifications.map((item) => (item.id === notificationId ? { ...item, unread: true } : item)),
+            }));
+            toast.error(result.message);
+          }
+        } catch {
           dispatch((s) => ({
             notifications: s.notifications.map((item) => (item.id === notificationId ? { ...item, unread: true } : item)),
           }));
-          toast.error(result.message);
+          toast.error("We couldn't reach Mou3amla right now. Please try again.");
         }
       })();
     },
@@ -46,14 +53,19 @@ export function useNotificationActions({
     }));
 
     void (async () => {
-      const result = await markAllNotificationsRead();
-      if (!result.ok) {
-        dispatch({ notifications: previous });
-        toast.error(result.message);
-        return;
-      }
+      try {
+        const result = await markAllNotificationsRead();
+        if (!result.ok) {
+          dispatch({ notifications: previous });
+          toast.error(result.message);
+          return;
+        }
 
-      toast.success("Notifications updated.");
+        toast.success("Notifications updated.");
+      } catch {
+        dispatch({ notifications: previous });
+        toast.error("We couldn't reach Mou3amla right now. Please try again.");
+      }
     })();
   }, [dispatch, stateRef]);
 

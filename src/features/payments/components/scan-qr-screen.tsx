@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { HandCoins, RefreshCw, Smartphone, User, Waves } from "lucide-react";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
 import { NearbyConnecting } from "@/features/payments/components/nearby-connecting";
+import { ScanRoleSwitch } from "@/features/payments/components/scan-role-switch";
+import { hashToPolarPosition, NearbyRadar } from "@/components/ui/nearby-radar";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -72,7 +74,12 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   } = useQrCameraScanner({ enabled: mode === "qr", onDetect: submitScannedToken });
 
   return (
-    <ScreenFrame header={header} footer={footer} contentClassName="px-6 pb-8">
+    <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-8">
+      <ScanRoleSwitch
+        role="send"
+        hideReceive={state.profile.accountType === "tourist"}
+        onSelect={(role) => (role === "receive" ? actions.goReceiveQr() : undefined)}
+      />
       <div className="mb-3">
         <div className="text-[15px] font-black tracking-tight">Find the recipient</div>
         <div className="text-[12px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
@@ -198,33 +205,39 @@ export function ScanQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
               />
             </div>
           ) : state.hasLiveNearbyMatch ? (
-            <div className="grid grid-cols-2 gap-2.5">
-              {state.nearbyOptions.map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => submitNearbyOption(code)}
-                  className="rounded-[20px] border px-2 py-4 text-center font-mono text-[1.15rem] font-black tracking-[0.1em] transition-transform active:scale-[0.98]"
-                  style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong, color: mou3amla.accent }}
-                >
-                  {code}
-                </button>
-              ))}
+            <div className="flex flex-col items-center gap-4">
+              <NearbyRadar
+                centerIcon={<User className="size-4" />}
+                size={132}
+                sweeping={false}
+                blips={state.nearbyOptions.map((code) => ({ id: code, label: code, ...hashToPolarPosition(code) }))}
+              />
+              <div className="grid w-full grid-cols-2 gap-2.5">
+                {state.nearbyOptions.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => submitNearbyOption(code)}
+                    className="rounded-[20px] border px-2 py-4 text-center font-mono text-[1.15rem] font-black tracking-[0.1em] transition-transform active:scale-[0.98]"
+                    style={{ background: mou3amla.card, borderColor: mou3amla.borderStrong, color: mou3amla.accent }}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             // No real code is currently published anywhere near this
-            // request - the 4-code grid above only ever renders when at
+            // request - the tappable grid above only ever renders when at
             // least one option is real (see hasLiveNearbyMatch). Showing
             // placeholder/decoy digits here instead would be indistinguishable
             // from a real choice and guaranteed to fail every tap.
-            <div
-              className="rounded-[20px] border border-dashed px-4 py-6 text-center"
-              style={{ borderColor: mou3amla.borderStrong, color: mou3amla.textMuted }}
-            >
-              <div className="text-[12.5px] font-bold" style={{ color: mou3amla.text }}>
+            <div className="rounded-[20px] border border-dashed px-4 py-6 text-center" style={{ borderColor: mou3amla.borderStrong }}>
+              <NearbyRadar centerIcon={<User className="size-4" />} size={120} />
+              <div className="mt-3 text-[12.5px] font-bold" style={{ color: mou3amla.text }}>
                 {state.isLoadingNearbyOptions ? "Looking for nearby codes..." : "No one's broadcasting a nearby code right now"}
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed">
+              <p className="mt-1 text-[11px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
                 Ask the recipient to open their receive screen, then tap Refresh.
               </p>
             </div>

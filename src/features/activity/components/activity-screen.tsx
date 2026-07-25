@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { History } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -87,12 +89,15 @@ export function ActivityScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp })
         </div>
 
         {filteredActivity.length === 0 ? (
-          <div
-            className="rounded-[24px] border p-5 text-center text-[12.5px]"
-            style={{ background: mou3amla.card, borderColor: mou3amla.border, color: mou3amla.textMuted, boxShadow: cardShadow }}
-          >
-            {account.activityLog.length === 0 ? "No activity yet. Your first routed payment will appear here." : "Nothing here yet."}
-          </div>
+          <EmptyState
+            icon={<History className="size-5" />}
+            title={account.activityLog.length === 0 ? "No activity yet" : "Nothing here yet"}
+            body={
+              account.activityLog.length === 0
+                ? "Your first routed payment will appear here."
+                : "No payments match this filter - try a different tab."
+            }
+          />
         ) : (
           <div className="flex flex-col gap-2.5">
             {filteredActivity.map((item) => {
