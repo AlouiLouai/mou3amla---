@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { NEARBY_CODE_TTL_MS } from "@/features/payments/constants";
+import { BCT_SANDBOX_TEST_LIMIT_TND, NEARBY_CODE_TTL_MS } from "@/features/payments/constants";
 import { roundCoord } from "@/features/payments/lib/geolocation";
 import { generateNearbyCode } from "@/features/payments/lib/nearby-code";
 import { withRouteErrorHandling } from "@/lib/api-handler";
@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 const publishSchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
+  amount: z.number().positive().max(BCT_SANDBOX_TEST_LIMIT_TND).optional(),
 });
 
 type ProfileRow = {
@@ -26,6 +27,7 @@ type ExistingHandoffRow = {
   owner_accepted_at: string | null;
   payer_accepted_at: string | null;
   expires_at: string;
+  amount: number | null;
 };
 
 export const POST = withRouteErrorHandling(async (request: Request) => {
@@ -43,10 +45,17 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
 
   const body = await request.json().catch(() => null);
   const parsed = publishSchema.safeParse(body ?? {});
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.error.issues[0]?.message ?? "Invalid request." }, { status: 400 });
+  }
+
   const geo =
-    parsed.success && parsed.data.lat !== undefined && parsed.data.lng !== undefined
+    parsed.data.lat !== undefined && parsed.data.lng !== undefined
       ? { geo_lat: roundCoord(parsed.data.lat), geo_lng: roundCoord(parsed.data.lng) }
       : { geo_lat: null, geo_lng: null };
+
+  const amount = parsed.data.amount ?? null;
 
   const admin = createAdminClient();
   const userId = authData.claims.sub;
@@ -71,7 +80,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
   // or an abandoned handshake would never free up its code while this screen stays open.
   const { data: existing } = await admin
     .from("nearby_handoffs")
-    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at, expires_at")
+    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at, expires_at, amount")
     .eq("owner_user_id", userId)
     .gt("expires_at", nowIso)
     .maybeSingle<ExistingHandoffRow>();
@@ -84,6 +93,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
         status: existing.status,
         ownerAccepted: !!existing.owner_accepted_at,
         payerAccepted: !!existing.payer_accepted_at,
+        amount: existing.amount,
       },
     });
   }
@@ -124,6 +134,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
           owner_accepted_at: null,
           payer_accepted_at: null,
           expires_at: new Date(Date.now() + NEARBY_CODE_TTL_MS).toISOString(),
+          amount,
           ...geo,
         },
         { onConflict: "owner_user_id" },
@@ -157,6 +168,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
       status: "published",
       ownerAccepted: false,
       payerAccepted: false,
+      amount,
     },
   });
 });

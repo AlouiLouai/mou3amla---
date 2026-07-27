@@ -133,7 +133,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     }
 
     setLastScanRole("receive");
-    dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null, initialHandoffMode: mode });
+    dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null, nearbyHostAmount: "", initialHandoffMode: mode });
   }, []);
   const goScanQr = useCallback((mode: HandoffMode = "qr") => {
     if (!stateRef.current.wallets.length) {

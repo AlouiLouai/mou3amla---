@@ -28,6 +28,7 @@ export function initialState(initialUser?: InitialMou3amlaUser): Mou3amlaState {
     hasLiveNearbyMatch: false,
     isLoadingNearbyOptions: false,
     scanManualInput: "",
+    nearbyHostAmount: "",
     confetti: makeConfetti(),
     isSendingPayment: false,
     profile: {

@@ -16,7 +16,9 @@ const claimSchema = z.object({
 
 type NearbyRow = {
   id: string;
+  status: "published" | "matched" | "confirmed";
   expires_at: string;
+  amount: number | null;
 };
 
 // Proposes a match on a published nearby code. This does not reveal the
@@ -53,11 +55,16 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
   const lat = hasLocation ? roundCoord(parsed.data.lat!) : null;
   const lng = hasLocation ? roundCoord(parsed.data.lng!) : null;
 
+  // Deliberately no `.eq("status", "published")` here - that used to live in
+  // this same lookup, which meant a code that's legitimately busy (someone
+  // else mid-handshake with its owner) returned the exact same "not found"
+  // 404 as a code that's genuinely gone (expired/wrong code/out of range).
+  // Checking status separately below lets the two cases give the payer a
+  // different, honest message instead of an identical dead end.
   let lookup = admin
     .from("nearby_handoffs")
-    .select("id, expires_at")
+    .select("id, status, expires_at, amount")
     .eq("challenge_code", parsed.data.code)
-    .eq("status", "published")
     .neq("owner_user_id", userId)
     .gt("expires_at", nowIso);
 
@@ -76,7 +83,16 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
   const { data: row, error } = await lookup.order("created_at", { ascending: false }).limit(1).maybeSingle<NearbyRow>();
 
   if (error || !row) {
-    return NextResponse.json({ message: "That nearby code is no longer available." }, { status: 404 });
+    return NextResponse.json({ message: "That nearby code is no longer available.", reason: "not_found" }, { status: 404 });
+  }
+
+  const busyResponse = NextResponse.json(
+    { message: "That person is already finishing another nearby payment. Please wait a few seconds and try again.", reason: "busy" },
+    { status: 409 },
+  );
+
+  if (row.status !== "published") {
+    return busyResponse;
   }
 
   const handshakeExpiresAt = new Date(Date.now() + NEARBY_HANDSHAKE_TTL_MS).toISOString();
@@ -90,7 +106,10 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     .maybeSingle<{ expires_at: string }>();
 
   if (updateError || !updated) {
-    return NextResponse.json({ message: "Someone else just grabbed that code. Try another one." }, { status: 409 });
+    // Lost the atomic race between the status check above and this write -
+    // someone else's claim landed first. Same "busy" framing, since from the
+    // payer's perspective it's the identical situation.
+    return busyResponse;
   }
 
   return NextResponse.json({
@@ -100,6 +119,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
       status: "matched",
       ownerAccepted: false,
       payerAccepted: false,
+      amount: row.amount,
     },
   });
 });

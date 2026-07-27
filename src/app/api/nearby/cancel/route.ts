@@ -27,6 +27,9 @@ export const POST = withRouteErrorHandling(async () => {
 
   await admin.from("nearby_handoffs").delete().eq("owner_user_id", userId);
 
+  // The host's own amount (if any) is untouched by a payer releasing their
+  // claim - it stays exactly as the host set it for the next guest who
+  // claims this still-open code.
   await admin
     .from("nearby_handoffs")
     .update({ status: "published", payer_user_id: null, payer_accepted_at: null })

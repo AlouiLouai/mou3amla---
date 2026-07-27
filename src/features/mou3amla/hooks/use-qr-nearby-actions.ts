@@ -18,6 +18,7 @@ type NearbyHandoffRealtimeRow = {
   owner_accepted_at: string | null;
   payer_accepted_at: string | null;
   expires_at: string;
+  amount: number | null;
 };
 
 export function useQrNearbyActions({
@@ -97,30 +98,43 @@ export function useQrNearbyActions({
     };
   }, [dispatch, timers]);
 
+  // Shared by the automatic 10s rotation below and commitNearbyHostAmount's
+  // "I just changed the amount, push it now" call - both go through the same
+  // in-flight-coalescing ref so a manual push racing an in-progress rotation
+  // tick can't produce two concurrent publish requests. Reads the host's
+  // current amount input fresh from stateRef every call, so whichever one
+  // fires next (rotation tick or manual commit) always sends the latest
+  // value - there's no separate "pending amount to send" to fall out of sync.
+  const publishNearby = useCallback(async (): Promise<NearbyHandoff | null> => {
+    const geo = await resolveNearbyGeo();
+    const rawAmount = stateRef.current.nearbyHostAmount.trim();
+    const parsedAmount = rawAmount ? Number.parseFloat(rawAmount) : NaN;
+    const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined;
+
+    if (!nearbyRotationInFlightRef.current) {
+      nearbyRotationInFlightRef.current = (async () => {
+        const response = await fetchWithTimeout("/api/nearby/publish", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...(geo ?? {}), ...(amount !== undefined ? { amount } : {}) }),
+        });
+        const payload = (await response.json()) as { message?: string; handoff?: NearbyHandoff };
+        return response.ok && payload.handoff ? payload.handoff : null;
+      })().finally(() => {
+        nearbyRotationInFlightRef.current = null;
+      });
+    }
+
+    return nearbyRotationInFlightRef.current;
+  }, [resolveNearbyGeo, stateRef]);
+
   const startNearbyPublishRotation = useCallback(() => {
     let cancelled = false;
     let didShowError = false;
 
-    const performPublish = async (): Promise<NearbyHandoff | null> => {
-      const geo = await resolveNearbyGeo();
-      const response = await fetchWithTimeout("/api/nearby/publish", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geo ?? {}),
-      });
-      const payload = (await response.json()) as { message?: string; handoff?: NearbyHandoff };
-      return response.ok && payload.handoff ? payload.handoff : null;
-    };
-
     const refresh = async () => {
-      if (!nearbyRotationInFlightRef.current) {
-        nearbyRotationInFlightRef.current = performPublish().finally(() => {
-          nearbyRotationInFlightRef.current = null;
-        });
-      }
-
-      const nearbyHandoff = await nearbyRotationInFlightRef.current;
+      const nearbyHandoff = await publishNearby();
 
       if (!cancelled) {
         dispatch({ nearbyHandoff });
@@ -144,7 +158,29 @@ export function useQrNearbyActions({
       clearInterval(interval);
       timers.current.delete(interval);
     };
-  }, [dispatch, resolveNearbyGeo, timers]);
+  }, [dispatch, publishNearby, timers]);
+
+  const setNearbyHostAmount = useCallback(
+    (value: string) => {
+      dispatch({ nearbyHostAmount: value });
+    },
+    [dispatch],
+  );
+
+  // Pushes the host's just-typed amount immediately instead of waiting for
+  // the next scheduled rotation tick (up to NEARBY_CODE_TTL_MS later) -
+  // /api/nearby/publish itself already no-ops once a payer has claimed the
+  // code (its "existing.status !== 'published'" early return just reports
+  // the current state back unchanged), so this is safe to call any time the
+  // host is still just broadcasting, and a no-op otherwise.
+  const commitNearbyHostAmount = useCallback(async () => {
+    const nearbyHandoff = await publishNearby();
+    if (nearbyHandoff) {
+      dispatch({ nearbyHandoff });
+    } else {
+      toast.error("We couldn't update the amount right now.");
+    }
+  }, [dispatch, publishNearby]);
 
   // Same coalescing as the rotations above - the auto-refresh interval, a
   // manual "Refresh" tap, and React Strict Mode's dev-only double-invoke can
@@ -212,18 +248,26 @@ export function useQrNearbyActions({
 
           const payload = (await response.json()) as {
             message?: string;
-            handoff?: { code: string; expiresAt: number };
+            reason?: "not_found" | "busy";
+            handoff?: { code: string; expiresAt: number; amount: number | null };
           };
 
           toast.dismiss(loadingToast);
 
           if (!response.ok || !payload.handoff) {
             toast.error(payload.message ?? "That nearby code is unavailable.");
-            // The code just went stale (rotated, claimed by someone else,
-            // expired) faster than the next scheduled poll - refresh right
-            // away instead of leaving a grid of options the server already
-            // rejected on screen for up to another NEARBY_OPTIONS_REFRESH_MS.
-            loadNearbyOptions();
+            // "busy" means the code is still legitimately live - its owner is
+            // just mid-handshake with someone else right now - so refetching
+            // immediately would show the exact same option back. Let the
+            // next scheduled poll (NEARBY_OPTIONS_REFRESH_MS) pick up the
+            // change once that handshake actually resolves. Any other
+            // reason (not_found: rotated, expired, out of range) means the
+            // grid the payer is looking at is already stale, so refresh now
+            // instead of leaving it stuck showing options the server just
+            // rejected.
+            if (payload.reason !== "busy") {
+              loadNearbyOptions();
+            }
             return;
           }
 
@@ -235,6 +279,7 @@ export function useQrNearbyActions({
               ownerAccepted: false,
               payerAccepted: false,
               expiresAt: payload.handoff.expiresAt,
+              amount: payload.handoff.amount,
             },
             nearbyOptions: [],
             hasLiveNearbyMatch: false,
@@ -442,6 +487,7 @@ export function useQrNearbyActions({
                     status: row.status,
                     ownerAccepted: !!row.owner_accepted_at,
                     payerAccepted: !!row.payer_accepted_at,
+                    amount: row.amount,
                   },
                 }
               : null,
@@ -465,7 +511,9 @@ export function useQrNearbyActions({
         }
 
         dispatch((s) =>
-          s.payerMatch ? { payerMatch: { ...s.payerMatch, ownerAccepted: !!row.owner_accepted_at, payerAccepted: !!row.payer_accepted_at } } : null,
+          s.payerMatch
+            ? { payerMatch: { ...s.payerMatch, ownerAccepted: !!row.owner_accepted_at, payerAccepted: !!row.payer_accepted_at, amount: row.amount } }
+            : null,
         );
       };
 
@@ -502,6 +550,8 @@ export function useQrNearbyActions({
   return {
     startQrRotation,
     startNearbyPublishRotation,
+    setNearbyHostAmount,
+    commitNearbyHostAmount,
     loadNearbyOptions,
     submitNearbyOption,
     acceptPayerMatch,

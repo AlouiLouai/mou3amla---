@@ -39,6 +39,7 @@ export interface NearbyHandoff {
   status: NearbyMatchStatus;
   ownerAccepted: boolean;
   payerAccepted: boolean;
+  amount: number | null;
 }
 
 export interface NearbyMatchState {
@@ -47,6 +48,7 @@ export interface NearbyMatchState {
   ownerAccepted: boolean;
   payerAccepted: boolean;
   expiresAt: number;
+  amount: number | null;
 }
 
 export interface ConfettiPiece {

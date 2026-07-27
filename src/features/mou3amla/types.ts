@@ -79,6 +79,11 @@ export interface Mou3amlaState {
   hasLiveNearbyMatch: boolean;
   isLoadingNearbyOptions: boolean;
   scanManualInput: string;
+  /** Raw text input for the host's optional amount, published alongside the
+   * rotating code (see receive-qr-screen.tsx) - blank means "open payment".
+   * A guest who claims an open code enters the actual amount later on
+   * generate-intent-screen, same as every other nearby match. */
+  nearbyHostAmount: string;
   confetti: ConfettiPiece[];
   isSendingPayment: boolean;
   profile: UserProfile;

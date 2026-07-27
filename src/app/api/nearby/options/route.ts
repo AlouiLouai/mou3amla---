@@ -44,8 +44,8 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
 
   const userId = authData.claims.sub;
 
-  // Polled every NEARBY_OPTIONS_REFRESH_MS (4s) while idle - max here needs
-  // headroom above the ~15 legitimate calls/min that implies.
+  // Polled every NEARBY_OPTIONS_REFRESH_MS (3s) while idle - max here needs
+  // headroom above the ~20 legitimate calls/min that implies.
   const withinLimit = await checkRateLimit(`nearby-options:${userId}`, { max: 40, windowSeconds: 60 });
   if (!withinLimit) {
     return NextResponse.json({ message: "Too many requests. Please wait a moment and try again." }, { status: 429 });
@@ -86,20 +86,26 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
   let rows: NearbyRow[] | null = null;
   let error: { message: string } | null = null;
 
+  // Fetch well beyond the 4 slots actually shown (see the shuffle below) -
+  // with more than 4 codes live at once, `order by expires_at desc limit 4`
+  // alone would deterministically return the *same* top-4 to every payer
+  // polling at that moment, starving every other live host of visibility for
+  // as long as 4 others stayed fresher. 24 is a cheap, bounded overfetch that
+  // gives the shuffle a real pool to pick a fair 4 from.
   if (hasLocation) {
     const geoQuery = baseQuery()
       .gte("geo_lat", lat - NEARBY_GEO_MATCH_RADIUS_DEG)
       .lte("geo_lat", lat + NEARBY_GEO_MATCH_RADIUS_DEG)
       .gte("geo_lng", lng - NEARBY_GEO_MATCH_RADIUS_DEG)
       .lte("geo_lng", lng + NEARBY_GEO_MATCH_RADIUS_DEG)
-      .limit(4);
+      .limit(24);
     const geoResult = await geoQuery;
     rows = geoResult.data as NearbyRow[] | null;
     error = geoResult.error;
   }
 
   if (!error && (!rows || rows.length === 0)) {
-    const fallback = await baseQuery().limit(4);
+    const fallback = await baseQuery().limit(24);
     rows = fallback.data as NearbyRow[] | null;
     error = fallback.error;
   }
@@ -108,7 +114,10 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
     return NextResponse.json({ message: "We couldn't load nearby codes right now." }, { status: 500 });
   }
 
-  const realCodes = Array.from(new Set(((rows ?? []) as NearbyRow[]).map((row) => row.challenge_code))).slice(0, 4);
+  // Shuffled *before* slicing to 4 - see the overfetch comment above. Slicing
+  // straight off the deterministic expires_at ordering is exactly what
+  // reintroduces the starvation bug this replaced.
+  const realCodes = shuffle(Array.from(new Set(((rows ?? []) as NearbyRow[]).map((row) => row.challenge_code)))).slice(0, 4);
   const excluded = new Set(realCodes);
   const options = [...realCodes];
 

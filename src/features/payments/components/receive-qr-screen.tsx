@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Smartphone, User, Waves } from "lucide-react";
+import { Waves } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { QR_TOKEN_TTL_MS } from "@/features/payments/constants";
 import { HandoffModeToggle, type HandoffMode } from "@/features/payments/components/handoff-mode-toggle";
-import { NearbyConnecting } from "@/features/payments/components/nearby-connecting";
+import { NearbyHostPanel } from "@/features/payments/components/nearby-host-panel";
 import { ScanRoleSwitch } from "@/features/payments/components/scan-role-switch";
-import { NearbyRadar } from "@/components/ui/nearby-radar";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
 import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
-import { statusToneColor } from "@/features/mou3amla/status-tone";
 import { useNow } from "@/hooks/use-now";
 
 function CountdownBadge({ expiresAt, totalMs }: { expiresAt: number; totalMs: number }) {
@@ -33,23 +31,11 @@ function CountdownBadge({ expiresAt, totalMs }: { expiresAt: number; totalMs: nu
   );
 }
 
-function NearbyCountdown({ expiresAt }: { expiresAt: number }) {
-  const now = useNow(1000);
-  const secondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
-
-  return (
-    <div className="font-mono text-[13px] font-bold" style={{ color: mou3amla.accent }}>
-      {secondsLeft}s
-    </div>
-  );
-}
-
 export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { state, derived, actions } = mou3amlaApp;
-  const { startQrRotation, startNearbyPublishRotation, startNearbyRealtime, acceptOwnerMatch, cancelOwnerMatch } = actions;
+  const { startQrRotation } = actions;
   const [mode, setMode] = useState<HandoffMode>(state.initialHandoffMode);
   const qrToken = state.qrToken;
-  const nearbyHandoff = state.nearbyHandoff;
   const header = (
     <AppHeader
       profile={derived.account.profile}
@@ -60,11 +46,6 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
   const footer = renderAppFooter("receive-qr", actions);
 
   useEffect(() => startQrRotation(), [startQrRotation]);
-  useEffect(() => startNearbyPublishRotation(), [startNearbyPublishRotation]);
-  useEffect(() => {
-    if (mode !== "nearby") return;
-    return startNearbyRealtime("owner");
-  }, [mode, startNearbyRealtime]);
 
   return (
     <ScreenFrame header={header} footer={footer} contentClassName="px-4 pb-8">
@@ -115,86 +96,15 @@ export function ReceiveQrScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center text-center">
-          <div
-            className="mb-4 w-full rounded-[28px] border p-4 text-left"
-            style={{ background: mou3amla.cardAlt, borderColor: alpha(mou3amla.accent, 0.22), boxShadow: cardShadow }}
-          >
-            <div className="mb-2 flex items-center gap-2">
-              <div
-                className="flex size-9 items-center justify-center rounded-2xl"
-                style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
-              >
-                <Waves className="size-4.5" />
-              </div>
-              <div>
-                <div className="text-[12px] font-black">Nearby handoff code</div>
-                <div className="text-[10.5px] font-medium" style={{ color: mou3amla.textMuted }}>
-                  Ask the payer to choose this code from 4 nearby options. Uses your approximate
-                  location, if allowed, to only match with codes actually nearby.
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <div className="font-mono text-[1.85rem] font-black tracking-[0.16em]" style={{ color: mou3amla.accent }}>
-                {nearbyHandoff?.code ?? "-----"}
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: mou3amla.textFaint }}>
-                  Expires
-                </div>
-                {nearbyHandoff ? (
-                  <NearbyCountdown expiresAt={nearbyHandoff.expiresAt} />
-                ) : (
-                  <div className="font-mono text-[13px] font-bold" style={{ color: mou3amla.accent }}>
-                    --
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {nearbyHandoff && nearbyHandoff.status === "confirmed" ? (
-            <div
-              className="w-full rounded-[24px] border p-4 text-left"
-              style={{ background: alpha(statusToneColor("positive"), 0.08), borderColor: alpha(statusToneColor("positive"), 0.24) }}
-            >
-              <div className="flex items-center gap-2" style={{ color: statusToneColor("positive") }}>
-                <CheckCircle2 className="size-5" />
-                <span className="text-[13px] font-black">Matched!</span>
-              </div>
-              <p className="mt-1.5 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                The payer is now finishing the payment on their phone. You&apos;ll get a notification once it&apos;s
-                routed.
-              </p>
-            </div>
-          ) : nearbyHandoff && nearbyHandoff.status === "matched" ? (
-            <NearbyConnecting
-              selfAccepted={nearbyHandoff.ownerAccepted}
-              otherAccepted={nearbyHandoff.payerAccepted}
-              selfIcon={<User className="size-5" />}
-              otherIcon={<Smartphone className="size-5" />}
-              title="A nearby phone wants to pay you"
-              subtitle="Confirm on your side too - both phones need to accept before the code unlocks."
-              acceptLabel="Accept this match"
-              waitingLabel="Waiting for the other phone..."
-              cancelLabel="Cancel and generate a new code"
-              onAccept={acceptOwnerMatch}
-              onCancel={cancelOwnerMatch}
-            />
-          ) : (
-            <>
-              <div className="mt-4">
-                <NearbyRadar centerIcon={<User className="size-4" />} size={140} />
-              </div>
-              <div className="mt-3 max-w-[290px] text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-                You&apos;re broadcasting - this is still a web-safe nearby simulation, not real BLE broadcasting. Both
-                phones vibrate and must accept once a payer picks your code.
-              </div>
-            </>
-          )}
-        </div>
+        <NearbyHostPanel
+          mou3amlaApp={mou3amlaApp}
+          icon={<Waves className="size-4.5" />}
+          title="Nearby handoff code"
+          subtitle="Ask the payer to choose this code from 4 nearby options. Uses your approximate location, if allowed, to only match with codes actually nearby."
+          broadcastingCopy="You're broadcasting - this is still a web-safe nearby simulation, not real BLE broadcasting. Both phones vibrate and must accept once a payer picks your code."
+          waitingTitle="A nearby phone wants to pay you"
+          waitingSubtitle="The payer is now finishing the payment on their phone. You'll get a notification once it's routed."
+        />
       )}
     </ScreenFrame>
   );

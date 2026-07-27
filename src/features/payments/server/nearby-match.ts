@@ -13,6 +13,7 @@ export type NearbyHandoffRow = {
   owner_accepted_at: string | null;
   payer_accepted_at: string | null;
   expires_at: string;
+  amount: number | null;
 };
 
 export interface NearbyMatchLookup {
@@ -26,7 +27,7 @@ export async function loadNearbyMatchByCode(code: string, userId: string): Promi
 
   const { data: row, error } = await admin
     .from("nearby_handoffs")
-    .select("id, owner_user_id, payer_user_id, challenge_code, status, owner_accepted_at, payer_accepted_at, expires_at")
+    .select("id, owner_user_id, payer_user_id, challenge_code, status, owner_accepted_at, payer_accepted_at, expires_at, amount")
     .eq("challenge_code", code)
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
@@ -58,6 +59,7 @@ export async function buildNearbyMatchPayload(row: NearbyHandoffRow, role: "owne
   return {
     code: row.challenge_code,
     status: row.status,
+    amount: row.amount,
     ownerAccepted: !!row.owner_accepted_at,
     payerAccepted: !!row.payer_accepted_at,
     isOwner: role === "owner",
