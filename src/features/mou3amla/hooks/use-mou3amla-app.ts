@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { toast } from "@/lib/toast";
 import { type CoarseLocation, getCoarseLocation } from "@/features/payments/lib/geolocation";
 import { getLastScanRole, setLastScanRole } from "@/features/payments/lib/last-scan-role";
@@ -21,6 +22,16 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const stateRef = useRef(state);
   const nearbyGeoRef = useRef<CoarseLocation | null | undefined>(undefined);
+  const posthog = usePostHog();
+
+  // Ties analytics events to the actual account instead of leaving every
+  // event anonymous - safe to call unconditionally: usePostHog() falls back
+  // to a safe no-op default instance when analytics is disabled entirely
+  // (see analytics-provider.tsx).
+  useEffect(() => {
+    if (!state.profile.id) return;
+    posthog.identify(state.profile.id);
+  }, [state.profile.id, posthog]);
 
   // Resolves once per app session (cached in a ref) so re-entering the nearby
   // flow doesn't re-prompt for location permission on every publish/poll tick.
@@ -210,7 +221,14 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       supportedSendWallets: getCheckoutEnabledWallets(state.wallets),
       hasAnyWallets: state.wallets.length > 0,
       unreadNotifications: state.notifications.filter((item) => item.unread).length,
-      availableProviders: PROVIDERS.filter((provider) => !state.wallets.some((wallet) => wallet.providerId === provider.id)),
+      // A tourist has no Tunisian bank/wallet destination to link (see
+      // AccountType in auth/types.ts) - they only ever get offered the one
+      // foreign-card provider; residents never see that provider at all.
+      availableProviders: PROVIDERS.filter(
+        (provider) =>
+          !state.wallets.some((wallet) => wallet.providerId === provider.id) &&
+          (state.profile.accountType === "tourist" ? !!provider.international : !provider.international),
+      ),
       linkProvider: PROVIDERS.find((provider) => provider.id === state.linkProviderId) ?? null,
       recentContacts: allContacts.slice(0, 8),
       allContacts,

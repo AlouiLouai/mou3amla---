@@ -22,6 +22,12 @@ export interface Provider {
    * merchant_id/rib provider, just reuses wallet_tag's validation shape) -
    * leave unset to use the routing-type default every other provider shares. */
   routingPlaceholder?: string;
+  /** True only for the foreign-card/e-wallet provider a tourist already
+   * holds (see AccountType in auth/types.ts) - a tourist has no Tunisian
+   * bank/wallet destination to link, so linking filters to only this
+   * provider for them, and residents never see it. Unset/false for every
+   * Tunisian TUNPAY/interbank provider. */
+  international?: boolean;
 }
 
 /** A linked destination — Mou3amla never sees or stores a balance for this. */

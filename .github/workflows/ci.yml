@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [mainn]
+  pull_request:
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    # src/config/env.ts (and env.server.ts) validate required env vars at
+    # module-load time - `pnpm test`/`pnpm build` both transitively import
+    # them, so CI needs *some* value here even though it never talks to a
+    # real Supabase project. Placeholders satisfy the zod schema; they are
+    # not read for anything meaningful in this job.
+    env:
+      NEXT_PUBLIC_APP_URL: https://placeholder.example
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder-publishable-key
+      NEXT_PUBLIC_POSTHOG_KEY: placeholder-posthog-key
+      NEXT_PUBLIC_POSTHOG_HOST: https://placeholder-posthog.example
+      SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
+      QR_TOKEN_SECRET: placeholder-qr-token-secret-placeholder-32-chars
+      KONNECT_API_KEY: placeholder-konnect-api-key
+      KONNECT_RECEIVER_WALLET_ID: placeholder-konnect-wallet-id
+      KONNECT_API_BASE_URL: https://placeholder-konnect.example
+      FLOUCI_PUBLIC_KEY: placeholder-flouci-public-key
+      FLOUCI_PRIVATE_KEY: placeholder-flouci-private-key
+      FLOUCI_API_BASE_URL: https://placeholder-flouci.example
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      - run: pnpm test
+
+      - run: pnpm build

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { BCT_SANDBOX_TEST_LIMIT_TND, NEARBY_CODE_TTL_MS } from "@/features/payments/constants";
 import { roundCoord } from "@/features/payments/lib/geolocation";
 import { generateNearbyCode } from "@/features/payments/lib/nearby-code";
+import { resolveUsername } from "@/features/payments/server/nearby-match";
 import { withRouteErrorHandling } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -28,6 +29,7 @@ type ExistingHandoffRow = {
   payer_accepted_at: string | null;
   expires_at: string;
   amount: number | null;
+  payer_user_id: string | null;
 };
 
 export const POST = withRouteErrorHandling(async (request: Request) => {
@@ -80,12 +82,14 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
   // or an abandoned handshake would never free up its code while this screen stays open.
   const { data: existing } = await admin
     .from("nearby_handoffs")
-    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at, expires_at, amount")
+    .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at, expires_at, amount, payer_user_id")
     .eq("owner_user_id", userId)
     .gt("expires_at", nowIso)
     .maybeSingle<ExistingHandoffRow>();
 
   if (existing && existing.status !== "published") {
+    const counterpartUsername = existing.payer_user_id ? await resolveUsername(existing.payer_user_id) : null;
+
     return NextResponse.json({
       handoff: {
         code: existing.challenge_code,
@@ -94,6 +98,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
         ownerAccepted: !!existing.owner_accepted_at,
         payerAccepted: !!existing.payer_accepted_at,
         amount: existing.amount,
+        counterpartUsername,
       },
     });
   }
@@ -169,6 +174,9 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
       ownerAccepted: false,
       payerAccepted: false,
       amount,
+      // A fresh rotation always clears payer_user_id back to null in the
+      // upsert above - there's never a counterpart to know about yet here.
+      counterpartUsername: null,
     },
   });
 });

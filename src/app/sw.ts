@@ -40,7 +40,14 @@ const authenticatedPageRoutes: RuntimeCaching[] = [
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: true,
+  // Deliberately not `skipWaiting: true` - that would activate a new worker
+  // (and its new cache/routing behavior) the instant it finishes installing,
+  // with no chance for the user to consent. Leaving this false makes a new
+  // worker sit in "waiting" state until the client explicitly posts
+  // `{ type: "SKIP_WAITING" }` (Serwist's core package listens for exactly
+  // that message unconditionally - see UpdatePrompt in
+  // src/components/pwa/update-prompt.tsx, which is what shows the user the
+  // "update available" modal and sends this on confirmation).
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [...paymentApiRoutes, ...authenticatedPageRoutes, ...defaultCache],

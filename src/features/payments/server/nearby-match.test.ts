@@ -87,6 +87,20 @@ describe("loadNearbyMatchByCode", () => {
 });
 
 describe("buildNearbyMatchPayload", () => {
+  beforeEach(() => {
+    // resolveUsername (counterpartUsername) uses the admin client directly,
+    // independent of resolveRecipientPreview's own mock above.
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ username: "counterpart" }) as never);
+  });
+
+  it("resolves the counterpart's username from the other role's identity", async () => {
+    const ownerPayload = await buildNearbyMatchPayload(baseRow({ status: "matched" }) as never, "owner");
+    const payerPayload = await buildNearbyMatchPayload(baseRow({ status: "matched" }) as never, "payer");
+
+    expect(ownerPayload.counterpartUsername).toBe("counterpart");
+    expect(payerPayload.counterpartUsername).toBe("counterpart");
+  });
+
   it("never resolves recipient before status is confirmed", async () => {
     for (const role of ["owner", "payer"] as const) {
       const payload = await buildNearbyMatchPayload(baseRow({ status: "matched" }) as never, role);

@@ -249,7 +249,7 @@ export function useQrNearbyActions({
           const payload = (await response.json()) as {
             message?: string;
             reason?: "not_found" | "busy";
-            handoff?: { code: string; expiresAt: number; amount: number | null };
+            handoff?: { code: string; expiresAt: number; amount: number | null; counterpartUsername: string | null };
           };
 
           toast.dismiss(loadingToast);
@@ -280,6 +280,7 @@ export function useQrNearbyActions({
               payerAccepted: false,
               expiresAt: payload.handoff.expiresAt,
               amount: payload.handoff.amount,
+              counterpartUsername: payload.handoff.counterpartUsername,
             },
             nearbyOptions: [],
             hasLiveNearbyMatch: false,
@@ -307,7 +308,13 @@ export function useQrNearbyActions({
 
         const payload = (await response.json()) as {
           message?: string;
-          match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean; recipient?: NonNullable<Mou3amlaState["recipientPreview"]> };
+          match?: {
+            status: "published" | "matched" | "confirmed";
+            ownerAccepted: boolean;
+            payerAccepted: boolean;
+            counterpartUsername: string | null;
+            recipient?: NonNullable<Mou3amlaState["recipientPreview"]>;
+          };
         };
 
         if (!response.ok || !payload.match) {
@@ -329,7 +336,16 @@ export function useQrNearbyActions({
         }
 
         dispatch((s) =>
-          s.payerMatch ? { payerMatch: { ...s.payerMatch, ownerAccepted: payload.match!.ownerAccepted, payerAccepted: payload.match!.payerAccepted } } : null,
+          s.payerMatch
+            ? {
+                payerMatch: {
+                  ...s.payerMatch,
+                  ownerAccepted: payload.match!.ownerAccepted,
+                  payerAccepted: payload.match!.payerAccepted,
+                  counterpartUsername: payload.match!.counterpartUsername,
+                },
+              }
+            : null,
         );
       } catch {
         toast.error("We couldn't confirm that match right now.");
@@ -351,7 +367,7 @@ export function useQrNearbyActions({
 
         const payload = (await response.json()) as {
           message?: string;
-          match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean };
+          match?: { status: "published" | "matched" | "confirmed"; ownerAccepted: boolean; payerAccepted: boolean; counterpartUsername: string | null };
         };
 
         if (!response.ok || !payload.match) {
@@ -363,7 +379,15 @@ export function useQrNearbyActions({
 
         dispatch((s) =>
           s.nearbyHandoff
-            ? { nearbyHandoff: { ...s.nearbyHandoff, status: payload.match!.status, ownerAccepted: payload.match!.ownerAccepted, payerAccepted: payload.match!.payerAccepted } }
+            ? {
+                nearbyHandoff: {
+                  ...s.nearbyHandoff,
+                  status: payload.match!.status,
+                  ownerAccepted: payload.match!.ownerAccepted,
+                  payerAccepted: payload.match!.payerAccepted,
+                  counterpartUsername: payload.match!.counterpartUsername,
+                },
+              }
             : null,
         );
       } catch {
@@ -424,6 +448,27 @@ export function useQrNearbyActions({
       let cancelled = false;
       const supabase = createClient();
 
+      // Owner-only: the realtime row itself carries no username (it's the
+      // raw DB row, no join), so the moment a payer claims this owner's code
+      // the owner needs one extra fetch to learn who it was - same
+      // /api/nearby/status endpoint the confirmed-recipient resolve below
+      // already uses, just reading a narrower field off it. Best-effort: the
+      // username is a confirmation nicety here, not required to proceed, and
+      // acceptOwnerMatch's own response carries it too as a backstop.
+      const fetchCounterpartUsername = async (code: string) => {
+        try {
+          const response = await fetchWithTimeout(`/api/nearby/status?code=${encodeURIComponent(code)}`, { cache: "no-store" });
+          if (!response.ok) return;
+          const payload = (await response.json()) as { match?: { counterpartUsername?: string | null } };
+          if (cancelled || payload.match?.counterpartUsername === undefined) return;
+          dispatch((s) =>
+            s.nearbyHandoff ? { nearbyHandoff: { ...s.nearbyHandoff, counterpartUsername: payload.match!.counterpartUsername ?? null } } : null,
+          );
+        } catch {
+          // Best-effort, see comment above.
+        }
+      };
+
       const resolveConfirmedRecipient = async (code: string) => {
         try {
           const response = await fetchWithTimeout(`/api/nearby/status?code=${encodeURIComponent(code)}`, { cache: "no-store" });
@@ -462,6 +507,7 @@ export function useQrNearbyActions({
           const previousStatus = stateRef.current.nearbyHandoff?.status;
           if (previousStatus === "published" && row.status !== "published") {
             vibrate([80, 60, 80]);
+            void fetchCounterpartUsername(row.challenge_code);
           }
           // A lighter tick for "the payer just accepted their side too" -
           // the AirDrop-style connecting animation (NearbyConnecting) needs

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import posthog from "posthog-js";
 
 // Catches errors thrown by the root layout itself, where the nearest regular
 // error.tsx boundary can't help because the layout it would render inside is
@@ -8,6 +9,12 @@ import { useEffect } from "react";
 // layout entirely while active. This Next.js build exposes `unstable_retry`,
 // not the `reset` prop from stock Next.js docs - see
 // node_modules/next/dist/docs/01-app/01-getting-started/10-error-handling.md.
+//
+// This renders *outside* AnalyticsProvider (the root layout it would
+// normally live in is what just broke), so this imports the raw posthog-js
+// singleton directly instead of the usePostHog() hook - captureException()
+// no-ops safely either way if analytics was never initialized (no
+// NEXT_PUBLIC_POSTHOG_KEY) or hadn't mounted yet when this fired.
 export default function GlobalError({
   error,
   unstable_retry,
@@ -26,6 +33,7 @@ export default function GlobalError({
         digest: error.digest,
       }),
     );
+    posthog.captureException(error, { digest: error.digest, boundary: "global" });
   }, [error]);
 
   return (

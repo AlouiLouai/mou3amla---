@@ -76,6 +76,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
 
   const amountDisplay = isForeignInput ? foreignAmountRaw || "0" : state.amount || "0";
   const recipientVerified = !state.recipientPreview || state.recipientPreview.verificationStatus === "verified";
+  const senderVerified = account.profile.verificationStatus === "verified";
   const parsedAmount = Number.parseFloat(state.amount);
   const exceedsSandboxCap = parsedAmount > BCT_SANDBOX_TEST_LIMIT_TND;
   const canGenerate =
@@ -84,6 +85,7 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
     !exceedsSandboxCap &&
     state.recipientInput.trim().length > 0 &&
     recipientVerified &&
+    senderVerified &&
     !!sourceWallet &&
     !state.isSendingPayment;
   const header = (
@@ -442,6 +444,25 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             {key === "backspace" ? <Delete className="size-4.5" /> : key}
           </button>
         ))}
+      </div>
+
+      <div
+        className="mb-3 flex items-center gap-2.5 rounded-2xl border p-3"
+        style={{
+          background: senderVerified ? mou3amla.cardAlt : alpha(mou3amla.destructive, 0.05),
+          borderColor: senderVerified ? alpha(mou3amla.accent, 0.2) : alpha(mou3amla.destructive, 0.24),
+        }}
+      >
+        {senderVerified ? (
+          <ShieldCheck className="size-4.5 shrink-0" style={{ color: mou3amla.accent }} />
+        ) : (
+          <TriangleAlert className="size-4.5 shrink-0" style={{ color: mou3amla.destructive }} />
+        )}
+        <p className="text-[11px] leading-relaxed" style={{ color: senderVerified ? mou3amla.textMuted : mou3amla.destructive }}>
+          {senderVerified
+            ? `You're KYC-verified as ${account.profile.fullName} (@${account.profile.username}) - this checkout will show you as the confirmed sender.`
+            : "Complete your own identity verification before you can send a payment."}
+        </p>
       </div>
 
       <button

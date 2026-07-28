@@ -131,6 +131,7 @@ export const PROVIDERS: Provider[] = [
     acceptedRoutingTypes: ["wallet_tag"],
     demoCheckoutStatus: "mock",
     routingPlaceholder: "e.g. visa-1044",
+    international: true,
   },
 ];
 

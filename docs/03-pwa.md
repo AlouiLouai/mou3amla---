@@ -108,6 +108,30 @@ The actual setup:
 If you need to change caching behavior, edit `src/app/sw.ts`. Never hand-edit
 generated worker output under `public/`.
 
+### Update flow (new worker available)
+
+`src/app/sw.ts` deliberately does **not** set `skipWaiting: true`. A newly
+installed worker sits in the browser's normal "waiting" state instead of
+activating itself the instant it finishes installing - `clientsClaim: true`
+is still set, so once it *does* activate it takes over immediately without
+needing a full navigation.
+
+`src/components/pwa/update-prompt.tsx` is what surfaces this to the user: it
+listens for `serwist.addEventListener("waiting", ...)` via `useSerwist()`
+(from `@serwist/turbopack/react`) and opens a center modal only when
+`event.isUpdate` is true (false/undefined the very first time a worker is
+ever installed for this origin - there's nothing to update from yet, so no
+modal). Confirming sends `{ type: "SKIP_WAITING" }` to the waiting worker
+(`serwist.messageSkipWaiting()` - Serwist's core package always listens for
+that exact message unless told to skip waiting unconditionally, which this
+worker isn't) and reloads once the `"controlling"` event fires, i.e. once the
+new worker has actually taken over.
+
+Do not reintroduce `skipWaiting: true` without also removing this component -
+the two are mutually exclusive: `skipWaiting: true` activates a new worker
+before the user ever sees the prompt, making `UpdatePrompt`'s "waiting" listener
+fire too late (or not at all) to mean anything.
+
 ### Verifying the SW after changes
 
 ```bash

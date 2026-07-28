@@ -292,6 +292,15 @@ external API) follows the same `xUnsafe` + wrapper split - see
   locked unless `verificationStatus === "verified"` - enforced server-side in
   `linkDestination` (`src/features/wallets/server/actions.ts`), not just in
   the UI.
+- **Sending a payment is gated on the sender's own verification, not just
+  the recipient's.** `createPaymentIntentUnsafe`
+  (`src/features/payments/server/actions.ts`) checks
+  `senderProfile.verification_status === "verified"` right alongside its
+  existing recipient-side check. `generate-intent-screen.tsx` mirrors this in
+  the UI with a sender-verification card (using `account.profile.verificationStatus`)
+  next to the existing recipient-verification card, both gating
+  `canGenerate` - this is a mock-KYC confirmation shown just before the
+  redirect to the mock checkout, not a new identity check of its own.
 - **A `(provider_id, routing_value)` pair is globally exclusive across all
   users**, not just per-user - `linked_destinations_provider_routing_unique`
   is a unique index scoped to the whole table. A RIB or wallet tag belongs to
@@ -461,6 +470,14 @@ external API) follows the same `xUnsafe` + wrapper split - see
   reusing `wallet_tag`'s existing validation shape (`Provider.routingPlaceholder`
   overrides the linking sheet's default placeholder for this one provider
   only, e.g. "visa-1044" instead of "@yourname").
+- **Linking is filtered by `Provider.international`, not just displayed
+  differently.** `derived.availableProviders` (`use-mou3amla-app.ts`) only
+  offers `intlcard` (the sole provider with `international: true`) to
+  tourist accounts, and only the Tunisian TUNPAY/interbank providers to
+  residents - a tourist never sees the Tunisian wallet/bank list in
+  `WalletRegistrySheet`, and a resident never sees International Card. Any
+  new provider added to `PROVIDERS` defaults to resident-only unless it
+  explicitly sets `international: true`.
 - Profile screen shows a small "Visiting - Send only" badge
   (`profile.touristBadge`) next to the verification badge for tourist
   accounts - demo clarity, not enforcement.
@@ -486,11 +503,35 @@ external API) follows the same `xUnsafe` + wrapper split - see
   switches both `receive-qr-screen.tsx` and `scan-qr-screen.tsx` between a
   `"qr"` and a `"nearby"` mode.
 - The nearby flow requires **both sides to explicitly accept** a shared
-  3-digit code before the recipient's identity is revealed to the payer:
+  5-digit code before the recipient's identity is revealed to the payer:
   `claim` proposes a match (`published` -> `matched`), then each side calls
   `/api/nearby/accept` independently; only once both are accepted does status
   become `confirmed` and `/api/nearby/status` starts returning the recipient.
   Do not shortcut this back to a one-sided reveal.
+- **The counterpart's `@username` (not their full `RecipientPreview`) is
+  revealed as soon as `status` reaches `matched`**, ahead of the
+  `confirmed`-gated full identity reveal above -
+  `resolveUsername`/`counterpartUsername` in
+  `src/features/payments/server/nearby-match.ts`, threaded through
+  `claim`/`publish`'s responses and shown in `NearbyConnecting` as "Matched
+  with @username". This exists purely so both people can visually confirm
+  they matched the physical person they intended before tapping Accept, not
+  just trusting that a 5-digit code happened to line up (someone could
+  otherwise mistype/mis-tap the wrong live code). It's still resolved
+  server-side per-request from a lookup, never added as a column on
+  `nearby_handoffs` itself - doing that would put it on the Realtime-replicated
+  row and leak it to both sides pre-accept regardless of intent, same
+  reasoning as the `signed_token` removal below.
+- **The recipient can optionally attach an amount when publishing**
+  (`nearby_handoffs.amount`, set via `/api/nearby/publish`'s `amount` field -
+  blank means "open"). This is shown to the payer as soon as they're matched
+  (`amount` is not identity, so unlike `recipient` it doesn't wait for
+  `confirmed`) purely as context - it is **not** a second required input.
+  Whether the recipient set one or left it open, the payer still enters the
+  actual amount on `generate-intent-screen.tsx` once confirmed, exactly like
+  the QR flow. An earlier iteration had the payer fill in an amount inline
+  for an open code before the accept step - that was removed for asking the
+  same question twice; don't reintroduce a pre-accept amount prompt.
 - **Both sides get status/accept updates over Supabase Realtime, not a
   poll.** `startNearbyRealtime` (`use-qr-nearby-actions.ts`) subscribes to
   `postgres_changes` UPDATE and DELETE events on `public.nearby_handoffs`,
@@ -547,7 +588,7 @@ Read this before "fixing" something that looks incomplete:
   resolve recipient data.
 - **BLE proximity** is still a visual simulation; web PWAs cannot act as BLE
   advertisers. The current app simulates "nearby" discovery with a short
-  server-backed 3-digit handoff code, with recipient identity resolved and
+  server-backed 5-digit handoff code, with recipient identity resolved and
   returned server-side only after both sides mutually accept.
 - **`lib/el-fatoora.ts` stamp duty** remains a placeholder until the user
   confirms the current legal amount.
@@ -569,7 +610,7 @@ Read this before "fixing" something that looks incomplete:
   `/api/nearby/claim` (8/30s per user), `/api/nearby/accept` (20/60s per
   user), and `/api/qr/mint` (15/60s per user) all call `checkRateLimit`
   (`src/lib/rate-limit.ts`), same as `createPaymentIntent` and
-  `/api/users/search`. `claim` in particular guards a 3-digit (000-999)
+  `/api/users/search`. `claim` in particular guards a 5-digit (00000-99999)
   challenge code - without a tight per-user cap, a script could exhaust the
   whole keyspace well inside the code's own TTL. New abuse-prone routes
   (anything that mutates state, resolves identity, or is cheap to call
@@ -686,9 +727,12 @@ Read this before "fixing" something that looks incomplete:
   bundle — that includes anything reachable from a `"use client"` component,
   not just files literally marked `"use client"` themselves.
 - Client-visible vars must use the `NEXT_PUBLIC_` prefix.
-- Current auth-related vars include:
+- Current vars include:
+  `NEXT_PUBLIC_APP_URL`,
   `NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+  `NEXT_PUBLIC_POSTHOG_KEY`,
+  `NEXT_PUBLIC_POSTHOG_HOST`,
   `SUPABASE_SERVICE_ROLE_KEY`,
   `QR_TOKEN_SECRET`,
   `KONNECT_API_KEY`,
@@ -698,6 +742,12 @@ Read this before "fixing" something that looks incomplete:
   `FLOUCI_PRIVATE_KEY`,
   `FLOUCI_API_BASE_URL`.
   (No KYC-provider vars exist right now - see KYC conventions above.)
+- **`.github/workflows/ci.yml` sets a placeholder value for every var above**
+  (not real credentials - see the comment in that file), since `pnpm
+  test`/`pnpm build` both transitively import `env.ts`/`env.server.ts` and
+  those throw at module-load time if a required var is missing. When adding
+  a new var to either schema, add its placeholder to the workflow's `env:`
+  block in the same change, or CI breaks on the next `pnpm build`.
 
 ## Package manager
 

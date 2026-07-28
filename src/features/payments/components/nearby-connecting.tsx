@@ -49,6 +49,7 @@ export function NearbyConnecting({
   otherIcon,
   title,
   subtitle,
+  counterpartUsername,
   acceptLabel,
   waitingLabel,
   cancelLabel,
@@ -61,6 +62,12 @@ export function NearbyConnecting({
   otherIcon: ReactNode;
   title: string;
   subtitle: string;
+  /** The matched counterpart's @username, shown so both sides can visually
+   * confirm they matched the physical person they intended before tapping
+   * Accept - not just trusting that a 5-digit code happened to line up.
+   * Null while still resolving (owner side needs one extra round trip after
+   * a fresh claim - see fetchCounterpartUsername in use-qr-nearby-actions.ts). */
+  counterpartUsername: string | null;
   acceptLabel: string;
   waitingLabel: string;
   cancelLabel: string;
@@ -89,8 +96,18 @@ export function NearbyConnecting({
       </div>
 
       <div className="mt-4 text-[13px] font-black">{title}</div>
+      {counterpartUsername ? (
+        <div
+          className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black"
+          style={{ background: alpha(mou3amla.accent, 0.12), color: mou3amla.accent }}
+        >
+          Matched with @{counterpartUsername}
+        </div>
+      ) : null}
       <p className="mt-1 mb-4 text-[11.5px] leading-relaxed" style={{ color: mou3amla.textMuted }}>
-        {subtitle}
+        {counterpartUsername
+          ? `Double-check that's the right person before you confirm. ${subtitle}`
+          : subtitle}
       </p>
 
       <button

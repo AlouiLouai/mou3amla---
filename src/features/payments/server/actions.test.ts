@@ -55,7 +55,10 @@ function makeFakeAdmin(queue: unknown[] = []) {
   return { admin: { from }, calls };
 }
 
-const senderRow = { data: { id: SENDER_ID, username: "sender", display_name: "Sender Person" }, error: null };
+const senderRow = {
+  data: { id: SENDER_ID, username: "sender", display_name: "Sender Person", verification_status: "verified" },
+  error: null,
+};
 const sourceWalletRow = {
   data: { id: SOURCE_WALLET_ID, user_id: SENDER_ID, provider_id: "biat", name: "BIAT", routing_value: "12345678901234567890" },
   error: null,
@@ -125,6 +128,17 @@ describe("createPaymentIntent", () => {
 
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/too many/i) });
     expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("blocks sending from an unverified sender", async () => {
+    const unverifiedSenderRow = { data: { ...senderRow.data, verification_status: "unverified" }, error: null };
+    const { admin } = makeFakeAdmin([unverifiedSenderRow]);
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const result = await createPaymentIntent(VALID_INPUT);
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/complete your own identity verification/i) });
+    expect(createProviderCheckout).not.toHaveBeenCalled();
   });
 
   it("rejects when the source wallet doesn't belong to the caller", async () => {

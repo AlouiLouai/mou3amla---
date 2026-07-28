@@ -2,16 +2,21 @@ import { z } from "zod";
 
 const clientSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
-  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+  // Optional: unset in dev/most environments, and PostHog itself no-ops
+  // client-side when NEXT_PUBLIC_POSTHOG_KEY is absent - see
+  // src/components/analytics/posthog-provider.tsx.
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
 });
 
 const parsedClient = clientSchema.safeParse({
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+  NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
 });
 
 if (!parsedClient.success) {

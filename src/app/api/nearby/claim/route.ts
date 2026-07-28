@@ -3,6 +3,7 @@ import { z } from "zod";
 import { NEARBY_GEO_MATCH_RADIUS_DEG, NEARBY_HANDSHAKE_TTL_MS } from "@/features/payments/constants";
 import { roundCoord } from "@/features/payments/lib/geolocation";
 import { NEARBY_CODE_REGEX } from "@/features/payments/lib/nearby-code";
+import { resolveUsername } from "@/features/payments/server/nearby-match";
 import { withRouteErrorHandling } from "@/lib/api-handler";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,14 +17,17 @@ const claimSchema = z.object({
 
 type NearbyRow = {
   id: string;
+  owner_user_id: string;
   status: "published" | "matched" | "confirmed";
   expires_at: string;
   amount: number | null;
 };
 
-// Proposes a match on a published nearby code. This does not reveal the
-// recipient yet - both the payer and the owner must separately call
-// /api/nearby/accept before /api/nearby/status returns recipient details.
+// Proposes a match on a published nearby code. This reveals the owner's
+// username only (so the payer can visually confirm they matched the right
+// physical person before accepting) - full recipient details (routing,
+// verification status) still wait until both sides separately call
+// /api/nearby/accept and status becomes "confirmed".
 export const POST = withRouteErrorHandling(async (request: Request) => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
@@ -63,7 +67,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
   // different, honest message instead of an identical dead end.
   let lookup = admin
     .from("nearby_handoffs")
-    .select("id, status, expires_at, amount")
+    .select("id, owner_user_id, status, expires_at, amount")
     .eq("challenge_code", parsed.data.code)
     .neq("owner_user_id", userId)
     .gt("expires_at", nowIso);
@@ -112,6 +116,8 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     return busyResponse;
   }
 
+  const counterpartUsername = await resolveUsername(row.owner_user_id);
+
   return NextResponse.json({
     handoff: {
       code: parsed.data.code,
@@ -120,6 +126,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
       ownerAccepted: false,
       payerAccepted: false,
       amount: row.amount,
+      counterpartUsername,
     },
   });
 });

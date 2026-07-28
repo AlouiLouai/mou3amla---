@@ -4,10 +4,12 @@ import { IBM_Plex_Mono, Plus_Jakarta_Sans, Syne } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
+import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { NetworkStatusToast } from "@/components/pwa/network-status-toast";
 import { SplashScreen } from "@/components/pwa/splash-screen";
+import { UpdatePrompt } from "@/components/pwa/update-prompt";
 import { Toaster } from "@/components/ui/sonner";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -70,15 +72,18 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
-        <SerwistProvider swUrl="/serwist/sw.js">
-          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-            <main className="flex flex-1 flex-col">{children}</main>
-            <InstallPrompt />
-            <NetworkStatusToast />
-            <Toaster />
-            {!splashAlreadySeen && <SplashScreen />}
-          </ThemeProvider>
-        </SerwistProvider>
+        <AnalyticsProvider>
+          <SerwistProvider swUrl="/serwist/sw.js">
+            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
+              <main className="flex flex-1 flex-col">{children}</main>
+              <InstallPrompt />
+              <UpdatePrompt />
+              <NetworkStatusToast />
+              <Toaster />
+              {!splashAlreadySeen && <SplashScreen />}
+            </ThemeProvider>
+          </SerwistProvider>
+        </AnalyticsProvider>
       </body>
     </html>
   );

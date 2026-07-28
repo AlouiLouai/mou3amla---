@@ -19,6 +19,7 @@ type SenderProfileRow = {
   id: string;
   username: string;
   display_name: string;
+  verification_status: "unverified" | "pending" | "verified" | "rejected";
 };
 
 type DestinationRow = {
@@ -122,7 +123,7 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   const admin = createAdminClient();
   const [{ data: senderProfile, error: senderError }, { data: sourceWallet, error: sourceError }, { data: recipient, error: recipientError }] =
     await Promise.all([
-      admin.from("profiles").select("id, username, display_name").eq("id", identity.userId).maybeSingle<SenderProfileRow>(),
+      admin.from("profiles").select("id, username, display_name, verification_status").eq("id", identity.userId).maybeSingle<SenderProfileRow>(),
       admin
         .from("linked_destinations")
         .select("id, user_id, provider_id, name, routing_value")
@@ -138,6 +139,10 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
 
   if (senderError || !senderProfile) {
     return { ok: false, message: "We couldn't reload your profile right now." };
+  }
+
+  if (senderProfile.verification_status !== "verified") {
+    return { ok: false, message: "Complete your own identity verification before you can send a payment." };
   }
 
   if (sourceError || !sourceWallet) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePostHog } from "posthog-js/react";
 
 // Error boundaries must be Client Components. This Next.js build's error
 // file convention exposes `unstable_retry`, not the `reset` prop from
@@ -12,6 +13,8 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  const posthog = usePostHog();
+
   useEffect(() => {
     console.error(
       JSON.stringify({
@@ -23,7 +26,10 @@ export default function ErrorPage({
         digest: error.digest,
       }),
     );
-  }, [error]);
+    // No-ops safely if analytics is disabled (no NEXT_PUBLIC_POSTHOG_KEY) -
+    // see analytics-provider.tsx.
+    posthog.captureException(error, { digest: error.digest, boundary: "route" });
+  }, [error, posthog]);
 
   return (
     <div className="bg-background text-foreground flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">

@@ -21,6 +21,16 @@ export interface NearbyMatchLookup {
   role: "owner" | "payer";
 }
 
+// Username only - not the full RecipientPreview (no routing/verification
+// detail). Shared by buildNearbyMatchPayload and /api/nearby/claim's own
+// response so both call sites resolve "the other side's public handle" the
+// same lightweight way.
+export async function resolveUsername(userId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("profiles").select("username").eq("id", userId).maybeSingle<{ username: string }>();
+  return data?.username ?? null;
+}
+
 export async function loadNearbyMatchByCode(code: string, userId: string): Promise<NearbyMatchLookup | { error: "not_found" | "forbidden" }> {
   const admin = createAdminClient();
   const nowIso = new Date().toISOString();
@@ -56,6 +66,17 @@ export async function buildNearbyMatchPayload(row: NearbyHandoffRow, role: "owne
     recipient = await resolveRecipientPreview({ recipientUserId: row.owner_user_id });
   }
 
+  // The counterpart's username alone surfaces as soon as a match exists
+  // (published -> matched), well before `recipient` above - so both sides
+  // can visually confirm they matched the physical person they intended
+  // (not just trust that the numeric code happened to line up) before ever
+  // tapping Accept. Deliberately narrower than `recipient`: no routing value,
+  // no verification status, just the public @handle this whole product is
+  // built around (already searchable via /api/users/search) - a much smaller
+  // reveal than full identity, and shown a stage earlier on purpose.
+  const counterpartUserId = role === "owner" ? row.payer_user_id : row.owner_user_id;
+  const counterpartUsername = counterpartUserId ? await resolveUsername(counterpartUserId) : null;
+
   return {
     code: row.challenge_code,
     status: row.status,
@@ -65,5 +86,6 @@ export async function buildNearbyMatchPayload(row: NearbyHandoffRow, role: "owne
     isOwner: role === "owner",
     expiresAt: new Date(row.expires_at).getTime(),
     recipient: recipient ?? undefined,
+    counterpartUsername,
   };
 }

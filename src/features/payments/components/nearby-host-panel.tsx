@@ -143,6 +143,7 @@ export function NearbyHostPanel({
           otherIcon={<Smartphone className="size-5" />}
           title={waitingTitle}
           subtitle="Confirm on your side too - both phones need to accept before the code unlocks."
+          counterpartUsername={nearbyHandoff.counterpartUsername}
           acceptLabel="Accept this match"
           waitingLabel="Waiting for the other phone..."
           cancelLabel="Cancel and generate a new code"

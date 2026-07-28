@@ -102,6 +102,20 @@ rules most likely to be broken by stale training data or over-eager refactors.
     treat local filenames as documentation-only and never assume
     `supabase migration list`/`db push` will line up with them without
     checking first.
+24. **Reverting a schema change means writing a new migration that undoes
+    it, never editing or deleting the migration that introduced it.** Once a
+    migration has been applied (to this shared project, not just written
+    locally), treat it as immutable history - the same way you wouldn't
+    force-push over a commit someone already pulled. Concrete precedent:
+    `20260727121120_nearby_handoffs_direction_amount.sql` added a `direction`
+    column for a sender-as-host feature; when that feature was cut,
+    `20260727230729_nearby_handoffs_remove_direction.sql` dropped the column
+    back out as its own migration, and a further
+    `20260727232453_nearby_handoffs_remove_amount_source.sql` did the same
+    for a column that became dead weight once a dependent feature was
+    removed. All three stay in `supabase/migrations/` - that's the accurate
+    history of what this schema actually went through, not clutter to clean
+    up.
 
 ## Before you finish a change
 

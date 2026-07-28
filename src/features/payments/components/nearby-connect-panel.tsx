@@ -109,6 +109,7 @@ export function NearbyConnectPanel({
             otherIcon={<Smartphone className="size-5" />}
             title="Connecting..."
             subtitle="Both phones vibrated - confirm on your side too. The recipient reveals once you both accept."
+            counterpartUsername={payerMatch.counterpartUsername}
             acceptLabel="Accept this match"
             waitingLabel="Waiting for the other phone..."
             cancelLabel="Not this one? Cancel and pick another code"

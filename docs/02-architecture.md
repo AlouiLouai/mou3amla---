@@ -17,7 +17,7 @@ src/
     payments/return/      # Provider redirect landing pages (Flouci/Konnect)
     verify-identity/      # Identity verification entry (demo KYC flow only, see conventions)
     api/qr/               # Signed QR mint + recipient resolve
-    api/nearby/           # Nearby 3-digit handoff publish/options/claim
+    api/nearby/           # Nearby 5-digit handoff publish/options/claim
     api/payments/providers/# Provider webhooks / payment finalization callbacks
     auth/logout/route.ts  # Session teardown
 
@@ -88,7 +88,11 @@ src/
                            #     the pre-auth teaser and the real feature
                            #     actually look like the same feature.
     layout/               # theme-provider and layout helpers
-    pwa/                  # install prompt / online-state shared UI, splash screen
+    pwa/                  # install prompt, update-available prompt, online-state
+                           # shared UI, splash screen
+    analytics/            # analytics-provider.tsx - optional PostHog wiring,
+                           # a no-op with zero network calls when
+                           # NEXT_PUBLIC_POSTHOG_KEY is unset
 
   hooks/                  # Shared hooks used across features - only put a hook
                            # here if it has zero feature-specific coupling
@@ -145,11 +149,15 @@ supabase/
   `src/app/api/nearby/**`. The nearby flow is a mutual-accept, AirDrop-style
   alternative to QR (not real BLE - see
   [07-agent-guardrails.md](./07-agent-guardrails.md)): both the payer and the
-  recipient must independently accept a shared 3-digit code before the
-  recipient is revealed. Shared lookup/response-shaping logic for that
-  handshake lives in `src/features/payments/server/nearby-match.ts`, polled
-  from the client via `/api/nearby/status`. A claimed-but-unconfirmed handoff
-  gets a bounded acceptance window (`NEARBY_HANDSHAKE_TTL_MS` in
+  recipient must independently accept a shared 5-digit code before the
+  recipient is revealed. The recipient can optionally attach an amount when
+  publishing (`nearby_handoffs.amount`, blank = "open") - shown early to the
+  payer once matched, but never a second required input, since the payer
+  still enters the actual amount on `generate-intent-screen.tsx` regardless.
+  Shared lookup/response-shaping logic for that handshake lives in
+  `src/features/payments/server/nearby-match.ts`, polled from the client via
+  `/api/nearby/status`. A claimed-but-unconfirmed handoff gets a bounded
+  acceptance window (`NEARBY_HANDSHAKE_TTL_MS` in
   `src/features/payments/constants.ts`) set once at claim time - the owner's
   background QR/code republish must never slide that expiry forward, or an
   abandoned handshake would block that owner's code slot indefinitely.
