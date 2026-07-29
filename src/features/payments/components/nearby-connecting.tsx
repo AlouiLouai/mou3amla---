@@ -117,7 +117,11 @@ export function NearbyConnecting({
         className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-[13.5px] font-black disabled:opacity-60"
         style={{ background: mou3amla.accent, color: "#FFFFFF" }}
       >
-        {selfAccepted ? waitingLabel : acceptLabel}
+        {/* Names the counterpart right on the CTA itself, not just in the
+            pill above - the action you're about to take ("accept @username")
+            reads as one attractive, personal decision instead of a generic
+            button plus a caption to cross-reference. */}
+        {selfAccepted ? waitingLabel : counterpartUsername ? `Yes, this is @${counterpartUsername}` : acceptLabel}
       </button>
       <button
         type="button"

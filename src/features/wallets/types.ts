@@ -12,21 +12,11 @@ export interface Provider {
   network: string;
   subtitle: string;
   acceptedRoutingTypes: RoutingType[];
-  /** "service_down" = temporary sandbox outage (Konnect); "pending_approval"
-   * = waiting on a real business-registration/KYB step before sandbox
-   * onboarding can open (Flouci) - see docs/09-bct-sandbox-readiness.md. Both
-   * are unavailable for linking/checkout, only the reason shown differs. */
+  /** "service_down" = temporary sandbox outage (Konnect); "pending_approval" = waiting on business-registration/KYB (Flouci) - see docs/09-bct-sandbox-readiness.md. Both block linking/checkout. */
   demoCheckoutStatus?: "mock" | "hosted" | "service_down" | "pending_approval";
-  /** Overrides WalletRegistrySheet's default routing-type placeholder for
-   * this one provider (e.g. "international" isn't a real wallet_tag/
-   * merchant_id/rib provider, just reuses wallet_tag's validation shape) -
-   * leave unset to use the routing-type default every other provider shares. */
+  /** Overrides WalletRegistrySheet's default routing-type placeholder for this provider only. */
   routingPlaceholder?: string;
-  /** True only for the foreign-card/e-wallet provider a tourist already
-   * holds (see AccountType in auth/types.ts) - a tourist has no Tunisian
-   * bank/wallet destination to link, so linking filters to only this
-   * provider for them, and residents never see it. Unset/false for every
-   * Tunisian TUNPAY/interbank provider. */
+  /** True only for the foreign-card provider a tourist links instead of a Tunisian wallet/bank (see AccountType in auth/types.ts). */
   international?: boolean;
 }
 

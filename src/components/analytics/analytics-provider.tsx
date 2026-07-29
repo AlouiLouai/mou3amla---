@@ -5,12 +5,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { PostHogProvider, usePostHog } from "posthog-js/react";
 import { env } from "@/config/env";
 
-// App Router navigations aren't full page loads, so PostHog's own
-// `capture_pageview` autocapture (page-load-based) never fires again after
-// the first one - this is the client-side substitute, same pattern as
-// PostHog's own Next.js App Router guide. `useSearchParams` requires a
-// Suspense boundary in the App Router (it can otherwise force the whole
-// page into client-only rendering) - see the wrapping <Suspense> below.
+// Manual pageview capture: App Router navigations aren't full page loads, so
+// PostHog's own autocapture never fires again after the first one.
 function PostHogPageview() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -27,10 +23,7 @@ function PostHogPageview() {
   return null;
 }
 
-/** Entirely opt-in: with no `NEXT_PUBLIC_POSTHOG_KEY` set (the default for
- * local dev and anyone without a PostHog project), this renders children
- * directly - zero init, zero network calls, never a hard requirement to run
- * the app. */
+/** Entirely opt-in: with no `NEXT_PUBLIC_POSTHOG_KEY` set, renders children directly - zero init, zero network calls. */
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
   if (!env.NEXT_PUBLIC_POSTHOG_KEY) {
     return <>{children}</>;
@@ -43,16 +36,12 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         api_host: env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com",
         person_profiles: "identified_only",
         capture_pageview: false,
-        // Catches truly unhandled window errors/promise rejections. React
-        // render errors caught by error.tsx/global-error.tsx are reported
-        // separately via posthog.captureException there - a caught error
-        // never reaches window.onerror, so this alone wouldn't see them.
+        // Catches unhandled window errors/rejections; caught React render
+        // errors are reported separately via posthog.captureException (error.tsx).
         capture_exceptions: true,
         session_recording: {
-          // Routing values (RIB/wallet tag/merchant id) are already
-          // pre-masked before they ever reach the DOM (see maskRoutingValue
-          // in wallets/lib/routing.ts) - this covers the real <input>
-          // elements instead (phone number, amounts, usernames).
+          // Routing values are pre-masked before reaching the DOM (maskRoutingValue
+          // in wallets/lib/routing.ts) - this covers the raw <input> elements.
           maskAllInputs: true,
         },
       }}

@@ -22,13 +22,8 @@ const paymentApiRoutes: RuntimeCaching[] = [
   },
 ];
 
-// `defaultCache` caches same-origin HTML navigations with NetworkFirst (24h
-// TTL) - fine for public pages, but on a shared/handed-off device it can
-// serve a previous user's cached authenticated HTML if the next user
-// navigates here while offline. `/home` renders the entire authenticated
-// dashboard (every screen is client-side state under this one route), and
-// `/verify`/`/verify-identity` carry a live session too, so all of them stay
-// NetworkOnly rather than falling back to a stale cross-user cache entry.
+// `defaultCache`'s NetworkFirst HTML caching could serve a previous user's
+// cached authenticated page on a shared device - these stay NetworkOnly instead.
 const authenticatedPageRoutes: RuntimeCaching[] = [
   {
     matcher({ url }) {
@@ -40,14 +35,9 @@ const authenticatedPageRoutes: RuntimeCaching[] = [
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  // Deliberately not `skipWaiting: true` - that would activate a new worker
-  // (and its new cache/routing behavior) the instant it finishes installing,
-  // with no chance for the user to consent. Leaving this false makes a new
-  // worker sit in "waiting" state until the client explicitly posts
-  // `{ type: "SKIP_WAITING" }` (Serwist's core package listens for exactly
-  // that message unconditionally - see UpdatePrompt in
-  // src/components/pwa/update-prompt.tsx, which is what shows the user the
-  // "update available" modal and sends this on confirmation).
+  // Deliberately not `skipWaiting: true` - a new worker waits until the
+  // client posts `{ type: "SKIP_WAITING" }`, which UpdatePrompt sends once
+  // the user consents (src/components/pwa/update-prompt.tsx).
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [...paymentApiRoutes, ...authenticatedPageRoutes, ...defaultCache],

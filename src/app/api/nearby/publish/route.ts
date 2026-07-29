@@ -76,10 +76,8 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     return NextResponse.json({ message: "Link a destination before publishing a nearby code." }, { status: 403 });
   }
 
-  // A payer may already be mid-handshake on this owner's current code: never clobber
-  // that with a fresh rotation. Report it as-is and let its own bounded handshake
-  // TTL (set at claim time) decide when it expires - don't slide it forward here,
-  // or an abandoned handshake would never free up its code while this screen stays open.
+  // Never clobber a code a payer is already mid-handshake on - report it
+  // as-is and let its own handshake TTL (set at claim time) decide when it expires.
   const { data: existing } = await admin
     .from("nearby_handoffs")
     .select("id, status, challenge_code, owner_accepted_at, payer_accepted_at, expires_at, amount, payer_user_id")
@@ -103,26 +101,14 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     });
   }
 
-  // No longer sweeping *other* owners' globally-expired rows here (it used
-  // to: `delete().lt("expires_at", nowIso)` with no owner filter). That sweep
-  // wasn't actually needed for this owner's own row - the upsert below
-  // replaces it in place via onConflict regardless of whether it was
-  // expired - but deleting a *different* owner's expired row fired a
-  // Realtime DELETE event on *their* subscription, which their client
-  // correctly-but-wrongly treated as "my match was cancelled" and blanked
-  // their screen back to "---" well before their own rotation was due
-  // (whenever anyone else happened to call publish). A stray challenge_code
-  // collision with an old, expired-but-undeleted row from another owner is
-  // still handled below by retrying with a fresh code.
-  //
-  // `owner_user_id` carries a unique index (one row per owner) - the old
-  // delete-then-insert here raced two concurrent publish calls for the same
-  // owner (React Strict Mode's double-effect-invocation in dev reproduced it
-  // on every single mount): both would delete, then both try to insert, and
-  // whichever inserted second hit a unique-constraint violation and 500'd.
-  // A single atomic upsert keyed on that same unique index removes the race
-  // window entirely - Postgres serializes concurrent upserts on a conflict
-  // target instead of one of them erroring.
+  // Deliberately doesn't sweep *other* owners' expired rows here - deleting
+  // one fires a Realtime DELETE on their own subscription, wrongly reading
+  // as "my match was cancelled". A stray challenge_code collision is instead
+  // handled below by retrying with a fresh code. The upsert (rather than
+  // delete-then-insert) also removes a real unique-constraint race between
+  // concurrent publish calls for the same owner (e.g. Strict Mode's double
+  // effect invocation) - Postgres serializes concurrent upserts on the
+  // conflict target instead of one erroring.
   let insertedRow: { challenge_code: string; expires_at: string } | null = null;
   let lastError: { code?: string } | null = null;
 

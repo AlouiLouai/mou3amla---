@@ -44,8 +44,7 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
 
   const userId = authData.claims.sub;
 
-  // Polled every NEARBY_OPTIONS_REFRESH_MS (3s) while idle - max here needs
-  // headroom above the ~20 legitimate calls/min that implies.
+  // Headroom above the ~20 legitimate calls/min from polling every NEARBY_OPTIONS_REFRESH_MS.
   const withinLimit = await checkRateLimit(`nearby-options:${userId}`, { max: 40, windowSeconds: 60 });
   if (!withinLimit) {
     return NextResponse.json({ message: "Too many requests. Please wait a moment and try again." }, { status: 429 });
@@ -61,37 +60,21 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
       .neq("owner_user_id", userId)
       .eq("status", "published")
       .gt("expires_at", nowIso)
-      // `expires_at` is freshly set on every rotation (publish upserts it
-      // unconditionally); `created_at` is not - an owner's very first
-      // publish for that row's unique owner_user_id sets it once, and a
-      // later upsert-on-conflict only touches the columns actually in its
-      // payload, which never included created_at. Ordering by created_at
-      // silently sank long-session owners in the ranking behind anyone who
-      // started publishing more recently, even though both had equally
-      // fresh, currently-valid codes.
+      // Order by expires_at, not created_at - created_at only ever gets set
+      // once per owner (upsert-on-conflict doesn't touch it on rotation).
       .order("expires_at", { ascending: false });
   }
 
-  // Geolocation is a *preference*, not a gate: coarse browser geolocation
-  // (especially desktop/indoor) can easily be off by more than
-  // NEARBY_GEO_MATCH_RADIUS_DEG even for two phones in the same room, and a
-  // NULL geo_lat/geo_lng (owner declined the permission prompt) makes every
-  // >=/<= comparison below evaluate to NULL - i.e. silently excluded - per
-  // Postgres NULL semantics. Treating that as a hard filter meant a single
-  // denied permission on either side made a otherwise-valid code invisible
-  // forever, with no error surfaced anywhere. Try the geo-bounded query
-  // first (it's a meaningful anti-abuse/precision signal when it works),
-  // but always fall back to the unfiltered pool rather than ever returning
-  // zero real candidates when a real one exists.
+  // Geolocation is a preference, not a gate: a NULL geo_lat/geo_lng (denied
+  // permission) would make the range comparisons below silently exclude a
+  // row under Postgres NULL semantics, so always fall back to the unfiltered
+  // pool rather than ever returning zero candidates when a real one exists.
   let rows: NearbyRow[] | null = null;
   let error: { message: string } | null = null;
 
-  // Fetch well beyond the 4 slots actually shown (see the shuffle below) -
-  // with more than 4 codes live at once, `order by expires_at desc limit 4`
-  // alone would deterministically return the *same* top-4 to every payer
-  // polling at that moment, starving every other live host of visibility for
-  // as long as 4 others stayed fresher. 24 is a cheap, bounded overfetch that
-  // gives the shuffle a real pool to pick a fair 4 from.
+  // Overfetch to 24 so the shuffle below has a real pool to pick a fair 4
+  // from - `limit 4` straight off expires_at would starve every host but
+  // the top 4 freshest of visibility.
   if (hasLocation) {
     const geoQuery = baseQuery()
       .gte("geo_lat", lat - NEARBY_GEO_MATCH_RADIUS_DEG)
@@ -114,9 +97,8 @@ export const GET = withRouteErrorHandling(async (request: Request) => {
     return NextResponse.json({ message: "We couldn't load nearby codes right now." }, { status: 500 });
   }
 
-  // Shuffled *before* slicing to 4 - see the overfetch comment above. Slicing
-  // straight off the deterministic expires_at ordering is exactly what
-  // reintroduces the starvation bug this replaced.
+  // Shuffle before slicing to 4 - slicing straight off expires_at ordering
+  // reintroduces the starvation this overfetch avoids.
   const realCodes = shuffle(Array.from(new Set(((rows ?? []) as NearbyRow[]).map((row) => row.challenge_code)))).slice(0, 4);
   const excluded = new Set(realCodes);
   const options = [...realCodes];

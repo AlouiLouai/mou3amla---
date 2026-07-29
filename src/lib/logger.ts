@@ -9,13 +9,8 @@ function serializeError(error: unknown) {
   return { value: error };
 }
 
-// Key-based, not value-based: this is a payments/KYC app, so a caller could
-// easily pass a phone number, a RIB/wallet routing value, or a WebAuthn
-// credential straight into a log's context object without thinking twice -
-// there was previously no redaction at all, so any such value would print in
-// the clear to stdout/Vercel logs. Matching on the key name (rather than
-// trying to pattern-match values) is cheap and catches the field regardless
-// of which log call introduces it, current or future.
+// Key-based, not value-based redaction: cheap, and catches a sensitive field
+// (phone, RIB, credential, token) regardless of which log call introduces it.
 const REDACTED_KEY_PATTERN = /phone|routing_value|routingvalue|\brib\b|credential|public_key|publickey|challenge|token|secret|password/i;
 const REDACTED_PLACEHOLDER = "[redacted]";
 const MAX_REDACTION_DEPTH = 6;
@@ -54,10 +49,7 @@ function emit(level: "info" | "warn" | "error", message: string, context?: LogCo
   else console.log(serialized);
 }
 
-// A minimal structured server-side logger - not a swap-in for a full
-// observability vendor, just enough that "something broke in production"
-// always leaves a greppable, contextual trace instead of a bare stack trace
-// or, worse, nothing at all.
+/** Minimal structured server-side logger - not a full observability vendor, just enough to leave a greppable, contextual trace. */
 export const logger = {
   info(message: string, context?: LogContext) {
     emit("info", message, context);

@@ -49,10 +49,7 @@ type FindAuthUserRow = {
   raw_user_meta_data: { preferred_username?: string } | null;
 };
 
-/** O(1) indexed lookup via the find_auth_user_id RPC (see the migration
- * alongside this file) instead of paginating admin.auth.admin.listUsers() -
- * that used to cap out at 1000 total Supabase Auth users, silently failing
- * to recover a legitimate race-condition retry past that point. */
+/** O(1) lookup via the `find_auth_user_id` RPC instead of paginating `admin.auth.admin.listUsers()`, which caps out at 1000 users. */
 async function findAuthUser(admin: AdminClient, phone: string, email: string): Promise<{ user: AuthUserSummary | null; error: unknown }> {
   const { data, error } = await admin.rpc("find_auth_user_id", { target_email: email, target_phone: phone }).maybeSingle<FindAuthUserRow>();
 
@@ -123,9 +120,7 @@ async function createIdentity(
   return { ok: true, profileId };
 }
 
-/** Re-resolves the exact (phone, username) pair to a profile id on every
- * passkey-related action - never trust a client-supplied id alone, and never
- * confirm a partial match (see the mismatch messages in startPhoneAuthUnsafe). */
+/** Re-resolves the exact (phone, username) pair to a profile id - never trust a client-supplied id alone. */
 async function resolveExactProfile(admin: AdminClient, phone: string, username: string): Promise<{ id: string } | null> {
   const { data, error } = await admin
     .from("profiles")
@@ -143,11 +138,8 @@ async function resolveExactProfile(admin: AdminClient, phone: string, username: 
 
 type StartPhoneAuthOutcome = AuthFormState | { redirectTo: string };
 
-// `redirect()` throws internally, so - per Next.js's own docs - it must be
-// called outside any try/catch. This inner function returns a plain
-// `{ redirectTo }` instruction instead of calling `redirect()` itself; the
-// exported wrapper below is the only place that actually calls it, after the
-// try/catch has already run.
+// redirect() must be called outside try/catch (Next.js docs), so this inner
+// function returns `{ redirectTo }` and only the exported wrapper calls it.
 async function startPhoneAuthUnsafe(formData: FormData): Promise<StartPhoneAuthOutcome> {
   const parsed = landingInputSchema.safeParse({
     phone: formData.get("phone"),
@@ -158,9 +150,7 @@ async function startPhoneAuthUnsafe(formData: FormData): Promise<StartPhoneAuthO
     return { errors: parsed.error.flatten().fieldErrors };
   }
 
-  // Pre-auth, so this is the one place in the flow an attacker could script
-  // against without ever holding a session - cap attempts per IP before
-  // touching the database at all.
+  // Pre-auth, so rate-limit per IP before touching the database at all.
   const clientIp = await getClientIp();
   const withinLimit = await checkRateLimit(`start-phone-auth:${clientIp}`, { max: 10, windowSeconds: 300 });
   if (!withinLimit) {
@@ -184,9 +174,8 @@ async function startPhoneAuthUnsafe(formData: FormData): Promise<StartPhoneAuthO
   const phoneMatch = profiles.find((profile) => profile.phone === phone) ?? null;
   const usernameMatch = profiles.find((profile) => profile.username === username) ?? null;
 
-  // Never confirm *which* identity a phone/username belongs to beyond "an
-  // account already exists" - revealing more would let an unauthenticated
-  // caller enumerate registered phone numbers or handles.
+  // Never confirm more than "an account already exists" - more detail would
+  // let an unauthenticated caller enumerate phone numbers or handles.
   if (phoneMatch && usernameMatch && phoneMatch.id !== usernameMatch.id) {
     return { message: "This phone number and handle belong to two different Mou3amla accounts. Double-check both, or use the pair you originally signed up with." };
   }
@@ -209,12 +198,8 @@ async function startPhoneAuthUnsafe(formData: FormData): Promise<StartPhoneAuthO
     profileId = created.profileId;
   }
 
-  // The real precondition for signing in with a passkey is "this profile has
-  // a registered credential in our own passkeys table" - not "a profile row
-  // exists." Deciding on row existence alone would strand anyone who
-  // abandoned the ceremony mid-registration: they'd get routed to sign-in
-  // with no passkey to sign in with. Checking the actual precondition fixes
-  // that for free.
+  // Gate on "has a registered passkey", not "profile row exists" - otherwise
+  // anyone who abandoned registration mid-ceremony gets stranded on sign-in.
   const mode: "register" | "authenticate" = (await hasPasskey(profileId)) ? "authenticate" : "register";
   await setPasskeyModeCookie({ phone, username, mode });
 
@@ -238,11 +223,7 @@ export async function startPhoneAuth(_prevState: AuthFormState | undefined, form
   return outcome;
 }
 
-/** Mints the real Supabase session for a resolved identity via the same
- * synthetic-email magic-link handshake used since the bridge design - this
- * part was never the problem (only Supabase's own experimental native-passkey
- * verify endpoint was), so it's reused as-is, now called *after* our own
- * self-hosted WebAuthn verification succeeds rather than before it. */
+/** Mints the real Supabase session for a resolved identity via a synthetic-email magic-link handshake, called after our own WebAuthn verification succeeds. */
 async function mintSessionForIdentity(phone: string, username: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const admin = createAdminClient();
   const bridgeEmail = buildBridgeEmail(phone, username);
@@ -449,28 +430,18 @@ export async function verifyPasskeyAuthentication(
   return outcome;
 }
 
-/** The WebAuthn ceremony itself (navigator.credentials.create()/.get()) runs
- * entirely client-side and never otherwise reaches our own logs. Call this
- * from the client on failure so a real diagnosis is possible. */
+/** The WebAuthn ceremony runs entirely client-side and never otherwise reaches our logs - call this from the client on failure. */
 export async function logPasskeyCeremonyFailure(mode: "register" | "authenticate", detail: string): Promise<void> {
   try {
     logger.warn(`Passkey ceremony failed (${mode})`, { detail });
   } catch {
-    // The one server action in this file with nothing to fall back to if
-    // logging itself throws - swallow rather than let a diagnostic-only
-    // call become the thing that breaks the passkey ceremony's own error
-    // path (this is already inside a client-side catch block's `void` call).
+    // Nothing to fall back to if logging itself throws - swallow.
   }
 }
 
 type SetCardGradientResult = { ok: true } | { ok: false; message: string };
 
-/** ProfileBuilderScreen's IKEA-effect step: persists the personal card style
- * (cyan/magenta) the user picks before the passkey ceremony. Runs pre-session
- * like the rest of Stage 1, so it's rate-limited per IP rather than per user
- * (see startPhoneAuthUnsafe) and re-resolves the profile from the exact
- * (phone, username) pair rather than trusting a client-supplied id, same as
- * every other passkey-adjacent action here. */
+/** Persists the personal card style the user picks before the passkey ceremony - pre-session, so rate-limited per IP like the rest of Stage 1. */
 async function setProfileCardGradientUnsafe(phone: string, username: string, gradient: "cyan" | "magenta" | "amber" | "emerald"): Promise<SetCardGradientResult> {
   const clientIp = await getClientIp();
   const withinLimit = await checkRateLimit(`set-card-gradient:${clientIp}`, { max: 20, windowSeconds: 300 });
@@ -505,12 +476,7 @@ export async function setProfileCardGradient(phone: string, username: string, gr
 
 type SetAccountTypeResult = { ok: true } | { ok: false; message: string };
 
-/** ProfileBuilderScreen's resident/tourist choice - a visiting tourist has
- * no Tunisian bank/wallet destination to ever receive into, so this is what
- * the rest of the app (home quick actions, the smart scan tab, goReceiveQr)
- * gates the receive side on. Same pre-session, IP-rate-limited,
- * resolveExactProfile pattern as setProfileCardGradient - there is no
- * session yet at this point in the registration flow. */
+/** Persists the resident/tourist choice the rest of the app gates the receive side on (home quick actions, the smart scan tab, goReceiveQr). Pre-session, same pattern as setProfileCardGradient. */
 async function setAccountTypeUnsafe(phone: string, username: string, accountType: "resident" | "tourist"): Promise<SetAccountTypeResult> {
   const clientIp = await getClientIp();
   const withinLimit = await checkRateLimit(`set-account-type:${clientIp}`, { max: 20, windowSeconds: 300 });

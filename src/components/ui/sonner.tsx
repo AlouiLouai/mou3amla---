@@ -7,13 +7,9 @@ import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon
 import { alpha, mou3amla } from "@/features/mou3amla/constants";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  // Sonner's own bundled CSS keys several things we don't override
-  // ourselves (close-button icon color, default toast-type icon tints) off
-  // its `theme` prop via a `data-theme` attribute, independent of our
-  // `--normal-*` / `--mou3amla-*` custom properties below. A prior hardcoded
-  // `theme="dark"` here meant those elements silently rendered dark-mode
-  // colors even in light mode, making the close button essentially
-  // invisible - visible/clickable now that it follows the real theme.
+  // Sonner keys some of its own bundled CSS (close-button color, icon tints)
+  // off this `theme` prop, independent of our custom properties below - must
+  // track the real theme, not be hardcoded, or those elements go invisible.
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === "light" ? "light" : "dark";
 
@@ -73,19 +69,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as CSSProperties
       }
       toastOptions={{
-        // `duration` above (3200ms) is only the fallback for an untyped
-        // `toast("...")`/`toast.message(...)` call - `src/lib/toast.ts`'s
-        // wrapper passes a longer-for-error, shorter-for-success duration
-        // per type for every typed call (success/error/warning/info), which
-        // is what every real call site in this app actually uses. The
-        // explicit close button (styled here, not left to Sonner's own
-        // theme heuristics) and drag-to-dismiss are both always available
-        // immediately regardless of duration.
+        // `duration` above (3200ms) is only the untyped-call fallback -
+        // src/lib/toast.ts's wrapper passes a per-type duration for every real call site.
         classNames: {
-          // A left accent bar per semantic type (in addition to the icon
-          // badge above) makes the toast's category readable at a glance,
-          // even before reading the copy - closer to how a native
-          // notification center distinguishes alert kinds.
+          // Left accent bar per semantic type makes the category readable at a glance.
           toast: "cn-toast relative overflow-hidden border border-l-[3px] shadow-[0_18px_44px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.4)]",
           success: "border-l-(--success-border)",
           error: "border-l-(--error-border)",

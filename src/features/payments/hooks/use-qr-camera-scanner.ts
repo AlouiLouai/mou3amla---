@@ -24,15 +24,7 @@ function getServerSnapshot() {
   return false;
 }
 
-/**
- * Drives the live camera QR-scan loop via the (Chromium-only) BarcodeDetector
- * API. `isSupported` is read through useSyncExternalStore rather than a plain
- * `typeof window !== "undefined"` check: computed inline, that expression is
- * `false` during SSR and can flip to `true` on the very first client render,
- * which is a hydration mismatch, not just a stale value - `getServerSnapshot`
- * pins it to `false` for the initial render on both sides, then reconciles
- * after hydration.
- */
+/** Drives the live camera QR-scan loop via the (Chromium-only) BarcodeDetector API. `isSupported` uses useSyncExternalStore, not a plain window check, to avoid a hydration mismatch. */
 export function useQrCameraScanner({ enabled, onDetect }: { enabled: boolean; onDetect: (rawValue: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);

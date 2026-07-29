@@ -16,6 +16,11 @@ import { useQrNearbyActions } from "@/features/mou3amla/hooks/use-qr-nearby-acti
 import { getCheckoutEnabledWallets, getPreferredSendWalletId, getRecentContacts } from "@/features/mou3amla/hooks/utils";
 import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
 
+/**
+ * Root state/actions hook for the authenticated shell - owns the reducer,
+ * derived selectors, and every screen-navigation/QR/nearby/wallet/payment
+ * action, assembled from the feature-specific `use*Actions` hooks below.
+ */
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const router = useRouter();
   const [state, dispatch] = useReducer(reducer, initialState(initialUser));
@@ -24,10 +29,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const nearbyGeoRef = useRef<CoarseLocation | null | undefined>(undefined);
   const posthog = usePostHog();
 
-  // Ties analytics events to the actual account instead of leaving every
-  // event anonymous - safe to call unconditionally: usePostHog() falls back
-  // to a safe no-op default instance when analytics is disabled entirely
-  // (see analytics-provider.tsx).
+  // Identifies analytics events to the account; safe to call unconditionally
+  // since usePostHog() no-ops when analytics is disabled (analytics-provider.tsx).
   useEffect(() => {
     if (!state.profile.id) return;
     posthog.identify(state.profile.id);
@@ -61,12 +64,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     router.replace("/home", { scroll: false });
   }, [initialUser?.highlightedActivityId, initialUser?.initialScreen, router]);
 
-  // Delivers "payment received" (and any other) notification the instant it's
-  // inserted, instead of only on the next full page load - see
-  // use-realtime-notifications.ts. A payment_received event is emitted only
-  // once the provider checkout is actually confirmed, and it carries the
-  // recipient's own Activity row in metadata so they can jump straight to
-  // Activity and see the confirmed transfer highlighted.
+  // Delivers a "payment received" (or other) notification the instant it's
+  // inserted, instead of on next page load - see use-realtime-notifications.ts.
   useRealtimeNotifications(
     state.profile.id,
     state.notifications.map((item) => item.id),
@@ -81,12 +80,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
         if (notification.type === "payment_received") {
           const fallbackActivityId = activity?.id ?? transactionId ?? null;
 
-          // The sender could only reach this point because both accounts are
-          // identity-verified: linking a source destination requires the
-          // sender's own verification_status === "verified", and this
-          // recipient's own verified status is what let createPaymentIntent
-          // accept them in the first place. A real enforced guarantee, not a
-          // trust claim invented for the toast.
+          // Both accounts are enforced-verified by this point (linking a
+          // source destination and createPaymentIntent both require it).
           toast.success(notification.title, {
             description: `${notification.body} Routed between two identity-verified Mou3amla accounts.`,
           });
@@ -129,10 +124,8 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     dispatch({ screen: "generate-intent", amount: "", recipientInput: "", recipientPreview: null, sendSourceWalletId });
   }, []);
   const goReceiveQr = useCallback((mode: HandoffMode = "qr") => {
-    // Defense in depth, not just a UI hide: a visiting tourist has no
-    // Tunisian bank/wallet destination to ever receive into (see
-    // AccountType in auth/types.ts), so this stays blocked here even if
-    // some future entry point forgets to hide the Receive affordance.
+    // Enforced here too, not just hidden in the UI: a tourist has no
+    // Tunisian bank/wallet destination to receive into (see AccountType).
     if (stateRef.current.profile.accountType === "tourist") {
       toast.error("Visitor accounts can only send money in this demo - receiving needs a Tunisian bank/wallet destination.");
       return;
@@ -144,7 +137,19 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     }
 
     setLastScanRole("receive");
-    dispatch({ screen: "receive-qr", qrToken: null, nearbyHandoff: null, nearbyHostAmount: "", initialHandoffMode: mode });
+    // Preserve an in-flight nearby handoff on re-entry (e.g. goScanSmart's
+    // bottom-tab route back into a live match) - wiping it would blank the
+    // screen and let startNearbyPublishRotation's mount effect race a stale
+    // realtime update. Only a genuinely fresh entry resets it.
+    const current = stateRef.current;
+    const keepHandoff = mode === "nearby" && !!current.nearbyHandoff;
+    dispatch({
+      screen: "receive-qr",
+      qrToken: null,
+      nearbyHandoff: keepHandoff ? current.nearbyHandoff : null,
+      nearbyHostAmount: keepHandoff ? current.nearbyHostAmount : "",
+      initialHandoffMode: mode,
+    });
   }, []);
   const goScanQr = useCallback((mode: HandoffMode = "qr") => {
     if (!stateRef.current.wallets.length) {
@@ -158,24 +163,22 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     }
 
     setLastScanRole("send");
+    // Mirrors goReceiveQr above - the payer has no server-side self-heal on
+    // remount, so wiping payerMatch here would strand them with no way back
+    // to a match already claimed/accepted.
+    const current = stateRef.current;
+    const keepPayerMatch = mode === "nearby" && !!current.payerMatch;
     dispatch({
       screen: "scan-qr",
       scanManualInput: "",
-      nearbyOptions: [],
-      hasLiveNearbyMatch: false,
+      nearbyOptions: keepPayerMatch ? current.nearbyOptions : [],
+      hasLiveNearbyMatch: keepPayerMatch ? current.hasLiveNearbyMatch : false,
       isLoadingNearbyOptions: false,
-      payerMatch: null,
+      payerMatch: keepPayerMatch ? current.payerMatch : null,
       initialHandoffMode: mode,
     });
   }, []);
-  // The bottom nav's single "scan" tab is ambiguous between "I'm paying"
-  // and "I'm getting paid" - this is what makes it smart rather than a
-  // coin flip: first, prefer whichever role has real unfinished business
-  // (a live nearby match on either side of the handshake), then fall back
-  // to whichever role the user actually used last time (persisted by
-  // goScanQr/goReceiveQr themselves, so every entry point keeps it
-  // accurate - home's own Send/Receive quick actions included), defaulting
-  // to "send" (scan-to-pay) only for a user who has never used either yet.
+  /** Bottom nav's single "scan" tab: prefers a role with unfinished nearby business, else the last-used role, else defaults to "send". */
   const goScanSmart = useCallback(() => {
     const current = stateRef.current;
 
@@ -221,9 +224,7 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
       supportedSendWallets: getCheckoutEnabledWallets(state.wallets),
       hasAnyWallets: state.wallets.length > 0,
       unreadNotifications: state.notifications.filter((item) => item.unread).length,
-      // A tourist has no Tunisian bank/wallet destination to link (see
-      // AccountType in auth/types.ts) - they only ever get offered the one
-      // foreign-card provider; residents never see that provider at all.
+      // Tourists only ever see the one foreign-card provider; residents never see it.
       availableProviders: PROVIDERS.filter(
         (provider) =>
           !state.wallets.some((wallet) => wallet.providerId === provider.id) &&
@@ -254,4 +255,5 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   };
 }
 
+/** Shape returned by `useMou3amlaApp` - `{ state, derived, actions }`, threaded into every screen component as a single prop. */
 export type UseMou3amlaApp = ReturnType<typeof useMou3amlaApp>;

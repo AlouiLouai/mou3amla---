@@ -66,12 +66,7 @@ function mergeSeenNotificationIds(target: Set<string>, notificationIds: readonly
   }
 }
 
-/** Delivers new rows in `public.notifications` the moment they're inserted -
- * e.g. a "payment received" notification lands live, not on the next page
- * load. Scoped to the current user's own rows via a Postgres Changes filter,
- * which Supabase Realtime enforces against the same `notifications_select_own`
- * RLS policy the REST API already uses - a user can't subscribe to anyone
- * else's notifications by constructing a different filter client-side. */
+/** Delivers new `public.notifications` rows live, scoped to the current user via the same `notifications_select_own` RLS policy the REST API uses. */
 export function useRealtimeNotifications(
   userId: string,
   knownNotificationIds: readonly string[],
@@ -91,11 +86,7 @@ export function useRealtimeNotifications(
   useEffect(() => {
     if (!userId) return;
 
-    // React (Strict Mode in dev, or a fast unmount/remount) tears this
-    // effect down and immediately sets it back up - removeChannel() below
-    // then reports its own status as CLOSED, which is expected teardown, not
-    // a failure. Without this flag that indistinguishable CLOSED would
-    // console.error on every single mount.
+    // Distinguishes expected teardown (Strict Mode remount) from a real CLOSED failure below.
     let tornDown = false;
     let pollFailureLogged = false;
 
@@ -118,16 +109,10 @@ export function useRealtimeNotifications(
           emitIfUnseen(payload.new as NotificationRow);
         },
       )
-      // `.subscribe()`'s result never surfaced whether the channel actually
-      // came up - a silent CHANNEL_ERROR/TIMED_OUT (RLS/auth misconfigured,
-      // Realtime not reachable, etc.) would look identical to "notifications
-      // just aren't arriving," with nothing to diagnose it from.
       .subscribe((status, err) => {
         if (tornDown) return;
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          // Always worth knowing about, even in production - a silent drop
-          // here means "payment received" toasts stop arriving live with no
-          // other signal.
+          // Worth knowing in production - a silent drop here means "payment received" toasts stop arriving live.
           console.error(`[realtime-notifications] subscription ${status}`, err);
         } else if (process.env.NODE_ENV !== "production") {
           console.log(`[realtime-notifications] subscription ${status}`);

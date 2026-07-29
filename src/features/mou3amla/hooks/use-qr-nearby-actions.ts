@@ -21,6 +21,11 @@ type NearbyHandoffRealtimeRow = {
   amount: number | null;
 };
 
+/**
+ * QR-mint and nearby-handoff actions (rotation, publish, claim, accept,
+ * realtime) shared by the send/receive/scan screens. Returned actions are
+ * spread into `useMou3amlaApp`'s own `actions` object.
+ */
 export function useQrNearbyActions({
   dispatch,
   stateRef,
@@ -34,27 +39,12 @@ export function useQrNearbyActions({
   resolveNearbyGeo: () => Promise<CoarseLocation | null>;
   goHome: () => void;
 }) {
-  // Lives at the hook level, shared across every separate call to a given
-  // rotation starter - specifically React Strict Mode's dev-only mount ->
-  // cleanup -> mount, which invokes the effect (and so this) twice in a row
-  // for the same real mount. Tagging each call and trusting "whichever was
-  // issued last" is not enough: with two independent requests in flight,
-  // network/server timing decides which one's write actually lands last in
-  // the database, and that is not guaranteed to match which one was issued
-  // last client-side - so the client could confidently display a code the
-  // database no longer agrees with. Coalescing every concurrent refresh()
-  // call into one shared in-flight promise removes the ambiguity outright:
-  // there is only ever one publish/mint request in flight at a time, so
-  // every caller ends up awaiting and applying the exact same result.
+  // Coalesces concurrent rotation calls (e.g. React Strict Mode's double-invoke)
+  // into one shared in-flight request, so every caller awaits the same result.
   const qrRotationInFlightRef = useRef<Promise<QrToken | null> | null>(null);
   const nearbyRotationInFlightRef = useRef<Promise<NearbyHandoff | null> | null>(null);
 
-  // QR image and nearby code rotate on independent cadences - the QR token
-  // stays legible on screen for QR_TOKEN_TTL_MS (60s), while the nearby code
-  // is deliberately much shorter-lived (NEARBY_CODE_TTL_MS) as its primary
-  // anti-brute-force control. Re-minting the QR every time the nearby code
-  // rotates would needlessly reset its own countdown and burn through its
-  // rate limit for no reason.
+  /** Re-mints the signed QR token on its own `QR_TOKEN_TTL_MS` cadence, independent of the (much shorter-lived) nearby code rotation below. */
   const startQrRotation = useCallback(() => {
     let cancelled = false;
     let didShowError = false;
@@ -98,13 +88,7 @@ export function useQrNearbyActions({
     };
   }, [dispatch, timers]);
 
-  // Shared by the automatic 10s rotation below and commitNearbyHostAmount's
-  // "I just changed the amount, push it now" call - both go through the same
-  // in-flight-coalescing ref so a manual push racing an in-progress rotation
-  // tick can't produce two concurrent publish requests. Reads the host's
-  // current amount input fresh from stateRef every call, so whichever one
-  // fires next (rotation tick or manual commit) always sends the latest
-  // value - there's no separate "pending amount to send" to fall out of sync.
+  /** Publishes/refreshes the host's nearby code, reading the current host amount fresh from `stateRef` each call. Shared by the automatic rotation below and `commitNearbyHostAmount`'s immediate push. */
   const publishNearby = useCallback(async (): Promise<NearbyHandoff | null> => {
     const geo = await resolveNearbyGeo();
     const rawAmount = stateRef.current.nearbyHostAmount.trim();
@@ -129,6 +113,7 @@ export function useQrNearbyActions({
     return nearbyRotationInFlightRef.current;
   }, [resolveNearbyGeo, stateRef]);
 
+  /** Publishes a fresh nearby code every `NEARBY_CODE_TTL_MS` while the receive screen's host panel is mounted. `/api/nearby/publish` itself no-ops once a payer has claimed the code, so this is safe to keep running through a live handshake. */
   const startNearbyPublishRotation = useCallback(() => {
     let cancelled = false;
     let didShowError = false;
@@ -167,12 +152,7 @@ export function useQrNearbyActions({
     [dispatch],
   );
 
-  // Pushes the host's just-typed amount immediately instead of waiting for
-  // the next scheduled rotation tick (up to NEARBY_CODE_TTL_MS later) -
-  // /api/nearby/publish itself already no-ops once a payer has claimed the
-  // code (its "existing.status !== 'published'" early return just reports
-  // the current state back unchanged), so this is safe to call any time the
-  // host is still just broadcasting, and a no-op otherwise.
+  /** Pushes the host's just-typed amount immediately instead of waiting for the next rotation tick. */
   const commitNearbyHostAmount = useCallback(async () => {
     const nearbyHandoff = await publishNearby();
     if (nearbyHandoff) {
@@ -182,12 +162,9 @@ export function useQrNearbyActions({
     }
   }, [dispatch, publishNearby]);
 
-  // Same coalescing as the rotations above - the auto-refresh interval, a
-  // manual "Refresh" tap, and React Strict Mode's dev-only double-invoke can
-  // all trigger this within the same instant; without this guard that's
-  // multiple overlapping requests instead of one.
   const optionsInFlightRef = useRef<Promise<{ options: string[]; hasLiveMatch: boolean } | null> | null>(null);
 
+  /** Fetches the payer's "choose a code" grid. Coalesced the same way as the rotations above, since the auto-refresh interval, a manual retry, and Strict Mode's double-invoke can all fire at once. */
   const loadNearbyOptions = useCallback(() => {
     dispatch({ isLoadingNearbyOptions: true });
 
@@ -226,6 +203,7 @@ export function useQrNearbyActions({
     })();
   }, [dispatch, resolveNearbyGeo]);
 
+  /** Claims a tapped code from the options grid and moves the payer into a `payerMatch`. */
   const submitNearbyOption = useCallback(
     (code: string) => {
       if (!NEARBY_CODE_REGEX.test(code)) {
@@ -256,15 +234,9 @@ export function useQrNearbyActions({
 
           if (!response.ok || !payload.handoff) {
             toast.error(payload.message ?? "That nearby code is unavailable.");
-            // "busy" means the code is still legitimately live - its owner is
-            // just mid-handshake with someone else right now - so refetching
-            // immediately would show the exact same option back. Let the
-            // next scheduled poll (NEARBY_OPTIONS_REFRESH_MS) pick up the
-            // change once that handshake actually resolves. Any other
-            // reason (not_found: rotated, expired, out of range) means the
-            // grid the payer is looking at is already stale, so refresh now
-            // instead of leaving it stuck showing options the server just
-            // rejected.
+            // "busy" means the code is still live, just mid-handshake with
+            // someone else - wait for the next scheduled poll instead of
+            // refetching the same option back immediately.
             if (payload.reason !== "busy") {
               loadNearbyOptions();
             }
@@ -294,6 +266,7 @@ export function useQrNearbyActions({
     [dispatch, resolveNearbyGeo, loadNearbyOptions],
   );
 
+  /** Payer's side of mutual accept - confirms the match and, once both sides have accepted, hands off to `generate-intent` with the resolved recipient. */
   const acceptPayerMatch = useCallback(() => {
     const code = stateRef.current.payerMatch?.code;
     if (!code) return;
@@ -353,6 +326,7 @@ export function useQrNearbyActions({
     })();
   }, [dispatch, stateRef]);
 
+  /** Owner's side of mutual accept - mirrors `acceptPayerMatch`. */
   const acceptOwnerMatch = useCallback(() => {
     const code = stateRef.current.nearbyHandoff?.code;
     if (!code) return;
@@ -396,11 +370,7 @@ export function useQrNearbyActions({
     })();
   }, [dispatch, stateRef]);
 
-  // Realtime only fires on an actual write (claim/accept/cancel) - a match
-  // nobody acts on just sits past its own expiresAt with no event at all.
-  // The owner side self-heals within at most NEARBY_CODE_TTL_MS via its own
-  // publish rotation; the payer has no equivalent, so this is the payer's
-  // only path back to a usable state once their matched code goes stale.
+  /** Payer-side self-heal: a match nobody acts on has no event to catch it, so a client-side timeout (see `scan-qr-screen.tsx`) calls this once `expiresAt` passes. */
   const expirePayerMatch = useCallback(() => {
     dispatch((s) => (s.payerMatch ? { payerMatch: null, nearbyOptions: [], hasLiveNearbyMatch: false } : null));
     toast.error("That nearby match expired. Choose another code.");
@@ -413,7 +383,7 @@ export function useQrNearbyActions({
       try {
         await fetchWithTimeout("/api/nearby/cancel", { method: "POST" });
       } catch {
-        // The stale match TTL will still catch this within NEARBY_HANDSHAKE_TTL_MS.
+        // The stale-match TTL still catches this within NEARBY_HANDSHAKE_TTL_MS.
       }
     })();
 
@@ -425,21 +395,19 @@ export function useQrNearbyActions({
       try {
         await fetchWithTimeout("/api/nearby/cancel", { method: "POST" });
       } catch {
-        // The stale match TTL will still catch this within NEARBY_HANDSHAKE_TTL_MS.
+        // The stale-match TTL still catches this within NEARBY_HANDSHAKE_TTL_MS.
       }
     })();
 
     goHome();
   }, [goHome]);
 
-  // Replaces the old 1.5s poll with a Supabase Realtime subscription on
-  // nearby_handoffs (see the nearby_handoffs_select_participant RLS policy
-  // and the supabase_realtime publication entry added alongside it) - both
-  // phones now learn about a claim/accept/confirm the instant it's written,
-  // not up to 1.5s later. Two role-scoped filters cover both directions a
-  // single user can be part of a handoff (as owner, as payer); a cancel
-  // (row delete) reaches the *other* side the same way a status change does,
-  // which the previous poll could only infer from a 404 up to 1.5s late.
+  /**
+   * Subscribes to Supabase Realtime `postgres_changes` on `nearby_handoffs`
+   * for the given role, so both phones learn about a claim/accept/cancel the
+   * instant it's written instead of on the next poll. Returns an unsubscribe
+   * cleanup function.
+   */
   const startNearbyRealtime = useCallback(
     (role: "owner" | "payer") => {
       const userId = stateRef.current.profile.id;
@@ -448,13 +416,8 @@ export function useQrNearbyActions({
       let cancelled = false;
       const supabase = createClient();
 
-      // Owner-only: the realtime row itself carries no username (it's the
-      // raw DB row, no join), so the moment a payer claims this owner's code
-      // the owner needs one extra fetch to learn who it was - same
-      // /api/nearby/status endpoint the confirmed-recipient resolve below
-      // already uses, just reading a narrower field off it. Best-effort: the
-      // username is a confirmation nicety here, not required to proceed, and
-      // acceptOwnerMatch's own response carries it too as a backstop.
+      // Owner-only: the raw realtime row carries no username, so once a payer
+      // claims this owner's code, fetch it once via /api/nearby/status.
       const fetchCounterpartUsername = async (code: string) => {
         try {
           const response = await fetchWithTimeout(`/api/nearby/status?code=${encodeURIComponent(code)}`, { cache: "no-store" });
@@ -491,8 +454,8 @@ export function useQrNearbyActions({
               : null,
           );
         } catch {
-          // The manual "Accept this match" tap already resolves the recipient
-          // on success - this is only the passive, no-tap-needed path.
+          // Passive path only - the manual "Accept this match" tap already
+          // resolves the recipient on success.
         }
       };
 
@@ -509,20 +472,10 @@ export function useQrNearbyActions({
             vibrate([80, 60, 80]);
             void fetchCounterpartUsername(row.challenge_code);
           }
-          // A lighter tick for "the payer just accepted their side too" -
-          // the AirDrop-style connecting animation (NearbyConnecting) needs
-          // its own haptic beat distinct from the initial match buzz and the
-          // final confirm buzz, same as real AirDrop ticks at each stage.
+          // Distinct haptic beat for "the payer just accepted their side too".
           if (!stateRef.current.nearbyHandoff?.payerAccepted && row.payer_accepted_at) {
             vibrate([50, 40, 50]);
           }
-          // Also syncs code/expiresAt, not just status/accepted flags - a
-          // backstop against the rare case where two of this owner's own
-          // publish requests raced (e.g. React Strict Mode's dev-only
-          // double-mount) and the client ended up holding a code that a
-          // later request already superseded in the database. Whichever
-          // upsert actually committed last is what Postgres reports here,
-          // so this self-corrects within moments regardless.
           dispatch((s) =>
             s.nearbyHandoff
               ? {
@@ -575,10 +528,8 @@ export function useQrNearbyActions({
           handleChange(null),
         )
         .subscribe((status, err) => {
-          // React tearing this effect down (Strict Mode in dev, or a fast
-          // remount) triggers removeChannel() below, which reports its own
-          // status as CLOSED - expected teardown, not a failure. `cancelled`
-          // is already set at that point, so skip logging it as an error.
+          // `cancelled` is already true during expected teardown (Strict Mode,
+          // fast remount), so only log a genuine subscription failure.
           if (cancelled) return;
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             console.error(`[realtime-nearby] subscription ${status}`, err);

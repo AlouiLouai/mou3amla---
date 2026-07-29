@@ -4,10 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-// Lets either side bail out of a stuck handshake instead of waiting out the TTL.
-// Owner cancel deletes their own handoff outright (frees the code immediately).
-// Payer cancel only releases their claim back to "published" so the code stays
-// live for the owner and other nearby payers - it does not touch someone else's row.
+/** Lets either side bail out of a stuck handshake. Owner cancel deletes the handoff outright; payer cancel only releases their claim back to "published". */
 export const POST = withRouteErrorHandling(async () => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();

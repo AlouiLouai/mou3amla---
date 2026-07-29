@@ -23,11 +23,7 @@ type NearbyRow = {
   amount: number | null;
 };
 
-// Proposes a match on a published nearby code. This reveals the owner's
-// username only (so the payer can visually confirm they matched the right
-// physical person before accepting) - full recipient details (routing,
-// verification status) still wait until both sides separately call
-// /api/nearby/accept and status becomes "confirmed".
+/** Proposes a match on a published nearby code - reveals only the owner's username (full recipient details wait for mutual `/api/nearby/accept`, status "confirmed"). */
 export const POST = withRouteErrorHandling(async (request: Request) => {
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getClaims();
@@ -36,11 +32,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  // The challenge code space is only 100,000 wide (see NEARBY_CODE_DIGITS) -
-  // without a tight per-user cap, a script could still exhaust a meaningful
-  // slice of it inside the code's own short TTL. This caps brute-forcing a
-  // stranger's code to a handful of tries a minute, not a scan of the whole
-  // keyspace.
+  // Caps brute-forcing a stranger's code to a handful of tries/minute against the 100,000-wide keyspace (NEARBY_CODE_DIGITS).
   const withinLimit = await checkRateLimit(`nearby-claim:${authData.claims.sub}`, { max: 8, windowSeconds: 30 });
   if (!withinLimit) {
     return NextResponse.json({ message: "Too many attempts. Please wait a moment and try again." }, { status: 429 });
@@ -59,12 +51,8 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
   const lat = hasLocation ? roundCoord(parsed.data.lat!) : null;
   const lng = hasLocation ? roundCoord(parsed.data.lng!) : null;
 
-  // Deliberately no `.eq("status", "published")` here - that used to live in
-  // this same lookup, which meant a code that's legitimately busy (someone
-  // else mid-handshake with its owner) returned the exact same "not found"
-  // 404 as a code that's genuinely gone (expired/wrong code/out of range).
-  // Checking status separately below lets the two cases give the payer a
-  // different, honest message instead of an identical dead end.
+  // No `.eq("status", "published")` here - status is checked separately
+  // below so a "busy" code gives a different message than a genuinely gone one.
   let lookup = admin
     .from("nearby_handoffs")
     .select("id, owner_user_id, status, expires_at, amount")
@@ -72,10 +60,7 @@ export const POST = withRouteErrorHandling(async (request: Request) => {
     .neq("owner_user_id", userId)
     .gt("expires_at", nowIso);
 
-  // If the payer shared a coarse location, don't let a claim through for a
-  // code whose owner is (or claims to be) somewhere else entirely - a code
-  // published without a location can't be verified either way, so it's
-  // excluded here rather than trusted blindly.
+  // If the payer shared a coarse location, exclude an owner claiming to be elsewhere.
   if (hasLocation) {
     lookup = lookup
       .gte("geo_lat", lat! - NEARBY_GEO_MATCH_RADIUS_DEG)

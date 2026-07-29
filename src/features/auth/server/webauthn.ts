@@ -32,10 +32,7 @@ type PasskeyVerificationRow = {
   transports: string[] | null;
 };
 
-/** Derived from `NEXT_PUBLIC_APP_URL` rather than a Supabase Dashboard toggle -
- * this is the one thing we control end-to-end, unlike Supabase's own
- * experimental passkey feature which turned out to reject valid credentials
- * even with a correctly configured Relying Party. */
+/** Derived from `NEXT_PUBLIC_APP_URL`, not a Supabase Dashboard toggle - self-hosted so it's fully in our control. */
 function getConfiguredRpConfig() {
   const url = new URL(serverEnv.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
   return { rpID: url.hostname, origin: url.origin };
@@ -100,15 +97,8 @@ export async function buildRegistrationOptions(userId: string, username: string)
     excludeCredentials,
     authenticatorSelection: {
       residentKey: "preferred",
-      // "required", not "preferred": verifyRegistrationResponse/
-      // verifyAuthenticationResponse default to `requireUserVerification:
-      // true`. Asking the authenticator for anything less than "required"
-      // risks a ceremony that completes client-side (no browser error) but
-      // gets silently rejected server-side because the UV flag was never
-      // set - which is exactly the mismatch that caused the first real
-      // registration attempt to fail after switching to self-hosted
-      // WebAuthn. It also happens to be the property we actually want for a
-      // banking app (BCT circular 2020-11's "authentification forte").
+      // Must match verifyRegistrationResponse's default `requireUserVerification: true`,
+      // and is what a banking app wants anyway (BCT circular 2020-11).
       userVerification: "required",
     },
   });

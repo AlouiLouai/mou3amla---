@@ -5,16 +5,7 @@ import { useSerwist } from "@serwist/turbopack/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-/** Center modal for "a new version of the app is installed and waiting" -
- * see the comment on `skipWaiting` in src/app/sw.ts for why the worker
- * doesn't just activate itself silently. `serwist.addEventListener("waiting", ...)`
- * fires whenever a new worker finishes installing and is held back from
- * activating; `event.isUpdate` is false/undefined the very first time a
- * worker is ever installed for this origin (nothing to update from yet),
- * so only a genuine update opens this. Confirming sends
- * `{ type: "SKIP_WAITING" }` to the waiting worker (Serwist's core package
- * always listens for that message unless it was told to skip waiting
- * unconditionally, which it isn't here) and reloads once it takes control. */
+/** Center modal for "a new version is installed and waiting" (see `skipWaiting` in src/app/sw.ts). `event.isUpdate` is false on a worker's first-ever install, so only a genuine update opens this. */
 export function UpdatePrompt() {
   const { serwist } = useSerwist();
   const [updateAvailable, setUpdateAvailable] = useState(false);
