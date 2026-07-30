@@ -6,7 +6,7 @@ const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   // Optional: unset in dev/most environments, and PostHog itself no-ops
   // client-side when NEXT_PUBLIC_POSTHOG_KEY is absent - see
-  // src/components/analytics/posthog-provider.tsx.
+  // src/components/analytics/analytics-provider.tsx.
   NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
 });

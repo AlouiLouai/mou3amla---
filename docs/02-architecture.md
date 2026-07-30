@@ -101,6 +101,10 @@ src/
                            # that feature's own hooks/, not here.
   lib/
     supabase/             # SSR, admin, and proxy Supabase clients
+    logger.ts             # Structured, key-redacted server logger - every
+                           # call also ships to PostHog Logs when configured
+                           # (posthog-otel-logger.ts), never a separate path
+    posthog-otel-logger.ts
     utils.ts
 
   config/
@@ -108,6 +112,8 @@ src/
     env.ts
 
   proxy.ts                # Request interception + Supabase session refresh
+  instrumentation.ts      # Registers the PostHog OTel logger + onRequestError
+                           # (server-side errors Next.js itself intercepts)
 
 supabase/
   migrations/             # Source-controlled database schema changes

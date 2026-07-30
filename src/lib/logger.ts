@@ -1,4 +1,5 @@
 import "server-only";
+import { emitToPostHog } from "@/lib/posthog-otel-logger";
 
 type LogContext = Record<string, unknown>;
 
@@ -34,12 +35,8 @@ function redactContext(value: unknown, depth = 0): unknown {
 }
 
 function emit(level: "info" | "warn" | "error", message: string, context?: LogContext) {
-  const line = {
-    level,
-    message,
-    time: new Date().toISOString(),
-    ...(context ? (redactContext(context) as LogContext) : {}),
-  };
+  const redactedContext = context ? (redactContext(context) as LogContext) : {};
+  const line = { level, message, time: new Date().toISOString(), ...redactedContext };
 
   // Structured JSON so Vercel's log viewer (and any downstream log drain)
   // can filter/search by level, route, or user id instead of grepping free text.
@@ -47,6 +44,10 @@ function emit(level: "info" | "warn" | "error", message: string, context?: LogCo
   if (level === "error") console.error(serialized);
   else if (level === "warn") console.warn(serialized);
   else console.log(serialized);
+
+  // Same redacted context, never the raw one - a second logging path must
+  // not become a way to bypass the redaction above.
+  emitToPostHog(level, message, redactedContext);
 }
 
 /** Minimal structured server-side logger - not a full observability vendor, just enough to leave a greppable, contextual trace. */

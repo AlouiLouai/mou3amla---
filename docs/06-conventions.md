@@ -568,6 +568,44 @@ external API) follows the same `xUnsafe` + wrapper split - see
   feature-detected since iOS Safari has no Vibration API - never assume it's
   available.
 
+## Analytics and server-log conventions
+
+- **Entirely opt-in on `NEXT_PUBLIC_POSTHOG_KEY`, client and server alike.**
+  With no key set: `analytics-provider.tsx` renders children directly (zero
+  init, zero network calls), and `registerPostHogOtelLogger()`
+  (`src/lib/posthog-otel-logger.ts`) no-ops without even importing the OTel
+  SDK. Never make either path a hard requirement to run the app.
+- **`next.config.ts`'s CSP only widens to allow `https://*.posthog.com`
+  when `NEXT_PUBLIC_POSTHOG_KEY` is set.** Without this, posthog-js's own
+  capture/flags calls and session-replay recorder script are silently
+  blocked by the browser - this isn't cosmetic, it's the difference between
+  "configured" and "actually sends events". Follows PostHog's own CSP
+  guidance (the wildcard, not pinned subdomains - exact hosts rotate).
+- **Server-side logs go through one path only: `src/lib/logger.ts`.** Every
+  `logger.info/warn/error(...)` call is already redacted by
+  `redactContext()` (key-based - phone, RIB, credential, token, etc.) before
+  it's written to stdout, and that same redacted object is what
+  `emitToPostHog()` forwards to PostHog Logs (`posthog-otel-logger.ts`). Do
+  **not** add a second, direct call into the OTel logger from a route
+  handler or anywhere else - that would bypass redaction and ship raw PII to
+  a third-party vendor. If a call site needs to log something, it goes
+  through `logger`, full stop.
+- **`registerPostHogOtelLogger()` uses `SimpleLogRecordProcessor`
+  (synchronous per-record export), not `BatchLogRecordProcessor`.** A Vercel
+  serverless function can suspend immediately after responding with no
+  guaranteed flush window, so a batched/async exporter risks silently
+  dropping buffered logs. Only the already-uncommon warn/error paths pay the
+  small extra latency this costs - don't "optimize" this to Batch without
+  first wiring up an explicit flush (e.g. `waitUntil`) to replace the
+  guarantee it currently provides for free.
+- **`src/instrumentation.ts`'s `onRequestError`** catches server-side errors
+  (Route Handlers, Server Actions, RSC render) that Next.js itself
+  intercepts - distinct from `error.tsx`/`global-error.tsx`, which are
+  client component boundaries that only see errors that actually reach the
+  browser. All three ultimately reach PostHog (Logs for the former, explicit
+  `captureException` calls for the latter two) - don't assume one makes the
+  others redundant.
+
 ## Mocked vs. real boundaries in the `mou3amla` shell
 
 Read this before "fixing" something that looks incomplete:

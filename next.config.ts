@@ -16,6 +16,14 @@ import { withSerwist } from "@serwist/turbopack";
 // explicitly) - never used in production builds, so this stays dev-only.
 const isDev = process.env.NODE_ENV === "development";
 
+// Opt-in, same as AnalyticsProvider: only widen the CSP when PostHog is
+// actually configured. PostHog's own docs recommend the `*.posthog.com`
+// wildcard rather than pinning exact subdomains (api/assets hosts rotate) -
+// https://posthog.com/docs/advanced/content-security-policy. Without this,
+// posthog-js's capture/flags calls and session-replay recorder script are
+// silently blocked by the browser, not just unconfigured.
+const posthogEnabled = Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -24,9 +32,9 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "img-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-  "worker-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${posthogEnabled ? " https://*.posthog.com" : ""}`,
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${posthogEnabled ? " https://*.posthog.com" : ""}`,
+  `worker-src 'self'${posthogEnabled ? " blob: data:" : ""}`,
   "manifest-src 'self'",
 ].join("; ");
 
