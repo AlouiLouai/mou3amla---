@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import { toast } from "@/lib/toast";
 import { type CoarseLocation, getCoarseLocation } from "@/features/payments/lib/geolocation";
@@ -23,6 +23,7 @@ import { useWalletActions } from "@/features/mou3amla/hooks/use-wallet-actions";
  */
 export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
   const router = useRouter();
+  const pathname = usePathname();
   const [state, dispatch] = useReducer(reducer, initialState(initialUser));
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const stateRef = useRef(state);
@@ -59,10 +60,16 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
     };
   }, []);
 
+  // Scrubs /home's own "?screen=activity&payment_ref=X" query params off the
+  // URL once the reducer has consumed them into initialScreen/highlightedActivityId.
+  // Scoped to the /home pathname specifically - /pay/[username]/page.tsx also
+  // sets initialScreen (to "generate-intent"), and this must not drag that
+  // route back to /home too.
   useEffect(() => {
+    if (pathname !== "/home") return;
     if (!initialUser?.initialScreen && !initialUser?.highlightedActivityId) return;
     router.replace("/home", { scroll: false });
-  }, [initialUser?.highlightedActivityId, initialUser?.initialScreen, router]);
+  }, [pathname, initialUser?.highlightedActivityId, initialUser?.initialScreen, router]);
 
   // Delivers a "payment received" (or other) notification the instant it's
   // inserted, instead of on next page load - see use-realtime-notifications.ts.
@@ -91,6 +98,11 @@ export function useMou3amlaApp(initialUser?: InitialMou3amlaUser) {
             screen: "activity",
             highlightedActivityId: fallbackActivityId,
           }));
+        } else if (notification.type === "payment_failed") {
+          // Unlike payment_received, this doesn't force-navigate to Activity -
+          // a failure shouldn't yank either side away from whatever else
+          // they're doing, just tell them live instead of only on next open.
+          toast.error(notification.title, { description: notification.body });
         }
       },
       [dispatch],

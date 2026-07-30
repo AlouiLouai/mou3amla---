@@ -1,4 +1,4 @@
-import { Bell, CheckCheck, CreditCard, ShieldCheck, Sparkles } from "lucide-react";
+import { Bell, CheckCheck, CreditCard, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AppHeader } from "@/features/mou3amla/components/app-header";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
@@ -7,6 +7,7 @@ import { alpha, cardShadow, mou3amla } from "@/features/mou3amla/constants";
 import type { UseMou3amlaApp } from "@/features/mou3amla/hooks/use-mou3amla-app";
 
 function iconFor(type: string) {
+  if (type === "payment_failed") return TriangleAlert;
   if (type === "payment_received" || type === "payment_sent") return CreditCard;
   if (type === "verification_approved" || type === "verification_pending") return ShieldCheck;
   return Sparkles;
@@ -64,6 +65,8 @@ export function NotificationsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
           <div className="flex flex-col gap-2.5">
             {notifications.map((notification) => {
               const Icon = iconFor(notification.type);
+              const tone =
+                notification.type === "payment_failed" ? mou3amla.destructive : notification.type.includes("payment") ? mou3amla.accent : mou3amla.subtle;
 
               return (
                 <button
@@ -80,7 +83,7 @@ export function NotificationsScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
                   <div className="flex items-start gap-3">
                     <div
                       className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl"
-                      style={{ background: alpha(notification.type.includes("payment") ? mou3amla.accent : mou3amla.subtle, 0.12), color: notification.type.includes("payment") ? mou3amla.accent : mou3amla.subtle }}
+                      style={{ background: alpha(tone, 0.12), color: tone }}
                     >
                       <Icon className="size-4.5" />
                     </div>

@@ -73,6 +73,27 @@ function buildRecipientActivity(transaction: TransactionRow, sender: Counterpart
   };
 }
 
+async function hasNotification(
+  admin: ReturnType<typeof createAdminClient>,
+  transactionId: string,
+  userId: string,
+  type: NotificationItem["type"],
+): Promise<boolean> {
+  const { data } = await admin
+    .from("notifications")
+    .select("id")
+    .eq("transaction_id", transactionId)
+    .eq("user_id", userId)
+    .eq("type", type)
+    .maybeSingle<NotificationRow>();
+  return !!data;
+}
+
+async function loadProfile(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<CounterpartyRow | null> {
+  const { data, error } = await admin.from("profiles").select("id, username, display_name").eq("id", userId).maybeSingle<CounterpartyRow>();
+  return error || !data ? null : data;
+}
+
 export async function finalizePaymentTransaction(input: FinalizeTransactionInput): Promise<FinalizeTransactionResult> {
   const admin = createAdminClient();
   const { data: transaction, error: transactionError } = await admin
@@ -118,26 +139,14 @@ export async function finalizePaymentTransaction(input: FinalizeTransactionInput
   }
 
   if (input.resolvedStatus === "confirmed" && transaction.recipient_user_id) {
-    const { data: existingNotification } = await admin
-      .from("notifications")
-      .select("id")
-      .eq("transaction_id", transaction.id)
-      .eq("user_id", transaction.recipient_user_id)
-      .eq("type", "payment_received")
-      .maybeSingle<NotificationRow>();
+    if (!(await hasNotification(admin, transaction.id, transaction.recipient_user_id, "payment_received"))) {
+      const senderProfile = await loadProfile(admin, transaction.sender_user_id);
 
-    if (!existingNotification) {
-      const { data: senderProfile, error: senderError } = await admin
-        .from("profiles")
-        .select("id, username, display_name")
-        .eq("id", transaction.sender_user_id)
-        .maybeSingle<CounterpartyRow>();
-
-      if (senderError || !senderProfile) {
-        logger.error("Failed to load sender profile for payment notification", senderError, { refId: input.refId });
+      if (!senderProfile) {
+        logger.error("Failed to load sender profile for payment notification", undefined, { refId: input.refId });
       } else {
         const activity = buildRecipientActivity(transaction, senderProfile);
-        const notificationDraft = {
+        const { error: notificationError } = await admin.from("notifications").insert({
           user_id: transaction.recipient_user_id,
           actor_user_id: senderProfile.id,
           transaction_id: transaction.id,
@@ -146,11 +155,54 @@ export async function finalizePaymentTransaction(input: FinalizeTransactionInput
           body: `@${senderProfile.username} vous a envoye ${normalizeAmount(transaction.amount).toFixed(3)} DT via ${transaction.metadata?.provider_name ?? "Mou3amla"}.`,
           unread: true,
           metadata: { activity },
-        };
-
-        const { error: notificationError } = await admin.from("notifications").insert(notificationDraft);
+        });
         if (notificationError) {
           logger.error("Failed to insert confirmed payment notification", notificationError, { refId: input.refId });
+        }
+      }
+    }
+  }
+
+  // A failed payment is told to both sides, not just the sender - the
+  // recipient never got a "payment incoming" notice in the first place, so
+  // without this they'd have no way to know a transfer to them stalled.
+  if (input.resolvedStatus === "failed") {
+    const amountLabel = normalizeAmount(transaction.amount).toFixed(3);
+
+    if (!(await hasNotification(admin, transaction.id, transaction.sender_user_id, "payment_failed"))) {
+      const { error: notificationError } = await admin.from("notifications").insert({
+        user_id: transaction.sender_user_id,
+        actor_user_id: transaction.recipient_user_id,
+        transaction_id: transaction.id,
+        type: "payment_failed" as NotificationItem["type"],
+        title: "Paiement echoue",
+        body: `Votre paiement de ${amountLabel} DT vers @${transaction.recipient_username} n'a pas abouti. Reessayez ou choisissez une autre destination.`,
+        unread: true,
+        metadata: {},
+      });
+      if (notificationError) {
+        logger.error("Failed to insert sender payment-failed notification", notificationError, { refId: input.refId });
+      }
+    }
+
+    if (transaction.recipient_user_id && !(await hasNotification(admin, transaction.id, transaction.recipient_user_id, "payment_failed"))) {
+      const senderProfile = await loadProfile(admin, transaction.sender_user_id);
+
+      if (!senderProfile) {
+        logger.error("Failed to load sender profile for payment-failed notification", undefined, { refId: input.refId });
+      } else {
+        const { error: notificationError } = await admin.from("notifications").insert({
+          user_id: transaction.recipient_user_id,
+          actor_user_id: senderProfile.id,
+          transaction_id: transaction.id,
+          type: "payment_failed" as NotificationItem["type"],
+          title: "Paiement echoue",
+          body: `Un paiement de @${senderProfile.username} (${amountLabel} DT) n'a pas abouti - rien n'a ete envoye.`,
+          unread: true,
+          metadata: {},
+        });
+        if (notificationError) {
+          logger.error("Failed to insert recipient payment-failed notification", notificationError, { refId: input.refId });
         }
       }
     }

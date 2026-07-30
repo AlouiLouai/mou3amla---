@@ -52,6 +52,11 @@ export interface InitialMou3amlaUser {
   passkeyCount: number;
   initialScreen?: Screen;
   highlightedActivityId?: string | null;
+  /** Set by `/pay/[username]/page.tsx` to seed generate-intent-screen's
+   * recipient/amount - a UI convenience only, never authoritative (the real
+   * send still runs every check `createPaymentIntent` already does). */
+  prefillRecipient?: RecipientPreview | null;
+  prefillAmount?: number | null;
 }
 
 export type HandoffMode = "qr" | "nearby";

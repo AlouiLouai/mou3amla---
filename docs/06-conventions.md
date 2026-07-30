@@ -385,7 +385,20 @@ external API) follows the same `xUnsafe` + wrapper split - see
   notification is intentionally emitted only once the mock checkout is
   explicitly simulated as **success**, not at intent creation time, so the
   receiver only auto-jumps to Activity once the demo operator confirms the
-  payment. Requires
+  payment.
+- **A failed payment notifies both sides, not just the sender.**
+  `finalizePaymentTransaction` (`transaction-finalization.ts`) inserts a
+  `payment_failed` notification for the sender *and*, if
+  `recipient_user_id` is set, one for the recipient too - the recipient
+  never got a "payment incoming" notice in the first place, so without this
+  they'd have no way to know a transfer to them stalled. Each insert is
+  independently idempotency-checked the same way `payment_received` already
+  is (one row per `(transaction_id, user_id, type)`), so a retried
+  webhook/mock-checkout completion can't double-notify either side. Unlike
+  `payment_received`, a live `payment_failed` notification only triggers a
+  toast (`use-mou3amla-app.ts`), not a forced jump to Activity - a failure
+  shouldn't yank either party away from whatever else they're doing.
+  Requires
   `Mou3amlaState.profile.id` (threaded through from `requireCurrentAppUser()`
   via `InitialMou3amlaUser`/`UserProfile`) - if you see the subscription
   silently not firing, check that `id` actually made it into `initialUser` in
@@ -427,6 +440,40 @@ external API) follows the same `xUnsafe` + wrapper split - see
   browser never decides success/failure on its own from a query string alone;
   it always re-checks with the provider API before updating
   `payment_transactions.status`.
+
+## Payment-request link
+
+- **`/pay/[username]?amount=X` is a UI convenience only, never an
+  authorization to charge.** `resolvePaymentRequestPrefill`
+  (`src/features/payments/server/payment-request-link.ts`) resolves the
+  recipient via the existing `resolveRecipientPreview` and seeds
+  `recipientInput`/`recipientPreview`/`amount` on `generate-intent-screen.tsx`
+  through the same `InitialMou3amlaUser.prefillRecipient`/`prefillAmount` ->
+  `initialState()` path `initialScreen`/`highlightedActivityId` already use
+  for notification deep-links. The real send still runs every check
+  `createPaymentIntentUnsafe` already does (sender/recipient verification,
+  BCT cap, self-send block) - a tampered amount in the URL can't bypass
+  anything, it just fails the same validation manual entry would. Both
+  fields stay fully editable on the screen, same as PayPal.me/Venmo links -
+  this is not a locked invoice.
+- **A bad/missing amount silently falls back to no prefill, it's never a
+  hard failure** - `parsePrefillAmount` clamps to `(0, BCT_SANDBOX_TEST_LIMIT_TND]`
+  and returns `null` otherwise. A nonexistent recipient or a self-pay link
+  redirects to `/home` quietly (no error page, no "recipient not found"
+  signal) rather than leaking which usernames exist.
+- **Signed-out opens land on the normal landing page, deliberately, not a
+  bug.** `/pay/[username]/page.tsx` calls `requireCurrentAppUser()` exactly
+  like every other protected page - there is no "return to this link after
+  login" plumbing anywhere in the auth chain yet. A first-time invitee loses
+  the deep-link context and has to re-navigate to Send after signing up.
+  This was an explicit v1 scope cut (threading a return-to target through
+  `startPhoneAuthUnsafe`, the passkey cookie bridge, and both verify actions
+  is real, separate work), not an oversight - don't "fix" it as a bug without
+  discussing the auth-chain change it actually requires first.
+- **No persisted note/memo.** There's no `payment_transactions` column for
+  it - don't add a purely cosmetic, non-persisted "note" field to the link
+  or the sheet, since it would look like part of the permanent transaction
+  record without actually being one. A real one needs a migration first.
 
 ## Smart scan tab (send vs. receive)
 

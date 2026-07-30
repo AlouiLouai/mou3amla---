@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { BadgeCheck, Bell, BookOpen, ChevronRight, FileText, Globe, Landmark, LifeBuoy, LogOut, Moon, Plane, Share2, ShieldCheck } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import Link from "next/link";
+import { BadgeCheck, Bell, BookOpen, ChevronRight, FileText, Globe, Landmark, LifeBuoy, Loader2, LogOut, Moon, Plane, Share2, ShieldCheck } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { renderAppFooter } from "@/features/mou3amla/components/bottom-nav";
 import { ScreenFrame } from "@/features/mou3amla/components/screen-frame";
@@ -11,6 +13,7 @@ import { LanguageSheet } from "@/features/i18n/components/language-sheet";
 import { useTranslation } from "@/features/i18n/language-store";
 import { LANGUAGES } from "@/features/i18n/translations";
 import { InfoSheet } from "@/features/profile/components/info-sheet";
+import { PaymentRequestLinkSheet } from "@/features/profile/components/payment-request-link-sheet";
 
 function verificationTone(status: string, isDemoApproval: boolean) {
   if (status === "verified") {
@@ -29,7 +32,7 @@ function verificationTone(status: string, isDemoApproval: boolean) {
   return { bg: alpha(color, 0.1), color, label: "Not verified" };
 }
 
-type ActiveSheet = "language" | "support" | "terms" | "privacy" | null;
+type ActiveSheet = "language" | "support" | "terms" | "privacy" | "paymentRequest" | null;
 
 export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) {
   const { derived, actions } = mou3amlaApp;
@@ -45,14 +48,6 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
   const verification = verificationTone(account.profile.verificationStatus, account.profile.kycProviderStatus === "Demo Approved");
   const footer = renderAppFooter("profile", actions);
   const currentLanguageLabel = LANGUAGES.find((option) => option.id === language)?.nativeLabel ?? language;
-
-  const copyInviteLink = () => {
-    const link = `mou3amla.app/u/${account.profile.username}`;
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      void navigator.clipboard.writeText(link);
-    }
-    toast.success("Invite link copied", { description: link });
-  };
 
   // Personal card style (if picked in onboarding) drives the whole header
   // card's background instead of sitting as a second, redundant card below
@@ -203,8 +198,8 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
 
         <button
           type="button"
-          onClick={copyInviteLink}
-          className="mb-4 w-full rounded-[22px] p-[1.5px] text-left"
+          onClick={() => setActiveSheet("paymentRequest")}
+          className="mb-4 w-full rounded-[22px] p-[1.5px] text-left transition-transform active:scale-[0.98]"
           style={{ background: igGradient }}
         >
           <div className="flex items-center justify-between gap-3 rounded-[20.5px] px-4 py-3.5" style={{ background: mou3amla.card }}>
@@ -224,16 +219,7 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
         </button>
 
         <form action="/auth/logout" method="post">
-          <button
-            type="submit"
-            className="flex w-full items-center justify-between rounded-[22px] border px-4 py-3 text-left"
-            style={{ background: mou3amla.card, borderColor: alpha(mou3amla.destructive, 0.22), boxShadow: cardShadow }}
-          >
-            <span className="flex items-center gap-2.5 text-[13px] font-semibold" style={{ color: mou3amla.destructive }}>
-              <LogOut className="size-4" />
-              {t("profile.logout")}
-            </span>
-          </button>
+          <LogoutButton label={t("profile.logout")} />
         </form>
 
         <LanguageSheet open={activeSheet === "language"} onClose={() => setActiveSheet(null)} />
@@ -258,7 +244,33 @@ export function ProfileScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaApp }) 
           closeLabel={t("sheet.close")}
           onClose={() => setActiveSheet(null)}
         />
+        <PaymentRequestLinkSheet
+          open={activeSheet === "paymentRequest"}
+          username={account.profile.username}
+          onClose={() => setActiveSheet(null)}
+        />
     </ScreenFrame>
+  );
+}
+
+/** Reads the parent `<form>`'s pending state via `useFormStatus` so tapping
+ * Log out shows an immediate spinner instead of a dead tap while the POST
+ * navigation is in flight. */
+function LogoutButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="flex w-full items-center justify-between rounded-[22px] border px-4 py-3 text-left transition-transform active:scale-[0.98] disabled:opacity-60"
+      style={{ background: mou3amla.card, borderColor: alpha(mou3amla.destructive, 0.22), boxShadow: cardShadow }}
+    >
+      <span className="flex items-center gap-2.5 text-[13px] font-semibold" style={{ color: mou3amla.destructive }}>
+        {pending ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -282,9 +294,9 @@ function LinkCard({
   value: string;
 }) {
   return (
-    <a
+    <Link
       href={href}
-      className="flex items-center justify-between rounded-[22px] border px-4 py-3 text-left"
+      className="flex items-center justify-between rounded-[22px] border px-4 py-3 text-left transition-transform active:scale-[0.98]"
       style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
     >
       <span className="flex items-center gap-2.5 text-[13px] font-semibold">
@@ -294,7 +306,7 @@ function LinkCard({
       <span className="flex items-center gap-1 text-xs font-bold capitalize" style={{ color: mou3amla.textFaint }}>
         {value} <ChevronRight className="size-3.5" />
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -313,7 +325,7 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-between rounded-[22px] border px-4 py-3 text-left"
+      className="flex items-center justify-between rounded-[22px] border px-4 py-3 text-left transition-transform active:scale-[0.98]"
       style={{ background: mou3amla.card, borderColor: mou3amla.border, boxShadow: cardShadow }}
     >
       <span className="flex items-center gap-2.5 text-[13px] font-semibold">
