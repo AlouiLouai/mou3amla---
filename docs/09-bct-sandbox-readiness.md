@@ -241,10 +241,17 @@ What is missing:
 Current state:
 
 - Most send-money flows still use an internal mock checkout.
-- Konnect is now wired as a real hosted sandbox pay-in path, which is stronger
-  for demo credibility than a mock-only story.
-- This is better than a fully mocked payment layer, but it is still not the
-  same thing as a production-ready interoperable settlement partnership.
+- **Flouci is wired as a real hosted sandbox pay-in path** (test-app keys):
+  `createFlouciCheckout` calls Flouci's `generate_payment`, the payer is
+  redirected to Flouci's hosted sandbox checkout, and completion is
+  server-verified via `verify_payment/{payment_id}` before
+  `payment_transactions.status` moves off `initiated`. Konnect's equivalent
+  integration stays in place but dormant (`demoCheckoutStatus:
+  "service_down"`).
+- This is stronger for demo credibility than a mock-only story, but it is
+  still not the same thing as a production-ready interoperable settlement
+  partnership - Flouci production still needs KYB approval, and a hosted
+  pay-in is merchant collection, not SMT-style wallet-to-wallet settlement.
 
 What is missing:
 
@@ -477,9 +484,34 @@ By participating, you acknowledge that:
   regulatory testing purposes.
 ```
 
-## Flouci sandbox: what this means for Mou3amla
+## Flouci sandbox: wired as of 2026-09-02
 
-As of 2026-07-20, the official Flouci docs say:
+Mou3amla now holds Flouci **test-app** credentials and the hosted sandbox
+checkout is integrated end to end:
+
+- `FLOUCI_PUBLIC_KEY` / `FLOUCI_PRIVATE_KEY` are the Flouci dashboard's TEST
+  APP keys. Sandbox and production share the same base URL
+  (`https://developers.flouci.com/api/v2`); only the keys differ.
+  `FLOUCI_API_BASE_URL` is an optional override and normally left unset.
+- Flow: `createFlouciCheckout` → `POST /generate_payment` (amount in millimes
+  as a string, `accept_card: true`, `success_link`/`fail_link` →
+  `/payments/return/flouci`, `webhook` →
+  `/api/payments/providers/flouci/webhook`, `developer_tracking_id` = our
+  `ref_id`) → redirect payer to `result.link` → on return,
+  `verify_payment/{payment_id}` decides `confirmed`/`failed`/`initiated`.
+- Sandbox testing uses Flouci's published test cards (Visa
+  `4509 2111 1111 1119`, MC success `5440 2127 1111 1110`, MC failure
+  `5471 2511 1111 1116`). There is no sandbox path for wallet payments.
+- Sandbox verify data is retained by Flouci for ~20 minutes and is API-only
+  (no dashboard). For local testing, `NEXT_PUBLIC_APP_URL` must be a public
+  HTTPS URL (e.g. an ngrok tunnel) for the webhook to land - the browser
+  return page finalizes the transaction on its own even if the webhook can't
+  reach a localhost dev server.
+- **Production still requires KYB (RNE) approval.** Test keys are enough for
+  everything above; real settlement is not.
+
+For historical context (the pre-integration assessment), the official Flouci
+docs as of 2026-07-20 said:
 
 - Flouci Gateway is available for registered businesses in Tunisia, including
   auto-entrepreneurs and companies.

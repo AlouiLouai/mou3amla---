@@ -151,8 +151,10 @@ describe("createPaymentIntent", () => {
   });
 
   it("rejects when the selected source provider is temporarily down", async () => {
+    // Konnect is the provider pinned to demoCheckoutStatus "service_down"
+    // (Flouci now launches its real hosted sandbox checkout).
     const unsupportedSourceWalletRow = {
-      data: { ...sourceWalletRow.data, provider_id: "flouci", name: "Flouci" },
+      data: { ...sourceWalletRow.data, provider_id: "konnect", name: "Konnect" },
       error: null,
     };
     const { admin } = makeFakeAdmin([senderRow, unsupportedSourceWalletRow, recipientRow]);

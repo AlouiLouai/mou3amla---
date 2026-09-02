@@ -106,7 +106,7 @@ export function WalletRegistrySheet({ mou3amlaApp }: { mou3amlaApp: UseMou3amlaA
                         : serviceDown
                           ? `${provider.subtitle}. Keep this disabled in demos to avoid a broken third-party handoff.`
                           : hostedCheckout
-                            ? `${provider.subtitle}. Linked routes open Konnect's real sandbox checkout for demos.`
+                            ? `${provider.subtitle}. Linked routes open ${provider.name}'s real sandbox checkout for demos.`
                             : `${provider.subtitle}. Linked routes use Mou3amla's internal development checkout for demos.`}
                     </div>
                   </div>

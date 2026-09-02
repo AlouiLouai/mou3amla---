@@ -209,6 +209,75 @@ async function createKonnectCheckout(input: CreateCheckoutInput): Promise<Create
   };
 }
 
+async function createFlouciCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
+  const publicKey = serverEnv.FLOUCI_PUBLIC_KEY;
+  const privateKey = serverEnv.FLOUCI_PRIVATE_KEY;
+  if (!publicKey || !privateKey) {
+    return { ok: false, message: "Flouci sandbox keys are not configured yet for this demo." };
+  }
+
+  // Both success_link and fail_link point at the same return page - it
+  // re-verifies with Flouci's API and decides confirmed/failed itself,
+  // never trusting which link the browser landed on (same pattern as
+  // Konnect). Flouci appends its own `?payment_id=` on redirect; our page
+  // resolves by `ref`, so the extra param is harmless.
+  const returnUrl = buildAppRouteUrl(`/payments/return/flouci?ref=${encodeURIComponent(input.refId)}`);
+  const webhookUrl = buildAppRouteUrl(`/api/payments/providers/flouci/webhook?ref=${encodeURIComponent(input.refId)}`);
+  if (!returnUrl || !webhookUrl) {
+    return { ok: false, message: "Set NEXT_PUBLIC_APP_URL before using the Flouci sandbox checkout." };
+  }
+
+  type FlouciGeneratePaymentResponse = {
+    result?: {
+      success?: boolean;
+      payment_id?: string;
+      link?: string;
+    };
+  };
+
+  const payload = await readJson<FlouciGeneratePaymentResponse>(
+    `${serverEnv.FLOUCI_API_BASE_URL ?? DEFAULT_FLOUCI_BASE_URL}/generate_payment`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${publicKey}:${privateKey}`,
+      },
+      body: JSON.stringify({
+        // Flouci expects the amount as a string, in millimes.
+        amount: String(Math.round(input.amount * 1000)),
+        success_link: returnUrl,
+        fail_link: returnUrl,
+        webhook: webhookUrl,
+        developer_tracking_id: input.refId,
+        session_timeout_secs: 1200,
+        accept_card: true,
+      }),
+    },
+  );
+
+  if (!payload.result?.link || !payload.result?.payment_id) {
+    logger.warn("Flouci generate_payment response missing checkout fields", {
+      ref_id: input.refId,
+      provider_name: input.providerName,
+      response_body: payload,
+    });
+    return { ok: false, message: "Flouci didn't return a usable sandbox checkout link." };
+  }
+
+  return {
+    ok: true,
+    providerId: input.providerId,
+    providerName: input.providerName,
+    checkoutUrl: payload.result.link,
+    providerPaymentRef: payload.result.payment_id,
+    providerStatus: "PENDING",
+    returnUrl,
+    webhookUrl,
+    checkoutMode: "hosted",
+  };
+}
+
 export async function createProviderCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
   if (isCheckoutServiceDown(input.providerId)) {
     return { ok: false, message: `${input.providerName} is temporarily unavailable in this demo. Choose another linked route for now.` };
@@ -220,6 +289,10 @@ export async function createProviderCheckout(input: CreateCheckoutInput): Promis
 
   if (input.providerId === "konnect" && isEnabledHostedCheckoutProvider(input.providerId)) {
     return createKonnectCheckout(input);
+  }
+
+  if (input.providerId === "flouci" && isEnabledHostedCheckoutProvider(input.providerId)) {
+    return createFlouciCheckout(input);
   }
 
   if (!canLaunchProviderCheckout(input.providerId)) {
@@ -290,9 +363,15 @@ async function verifyFlouciPayment(providerPaymentRef: string): Promise<Provider
     },
   });
 
+  // Flouci status vocabulary: SUCCESS | PENDING | EXPIRED | FAILURE |
+  // PREAUTH_SUCCESS | SYSTEM_FAILURE (see docs.flouci.com verify-transaction).
   const providerStatus = payload.result?.status?.toUpperCase() ?? "PENDING";
   const resolvedStatus =
-    providerStatus === "SUCCESS" ? "confirmed" : providerStatus === "FAILURE" || providerStatus === "EXPIRED" ? "failed" : "initiated";
+    providerStatus === "SUCCESS" || providerStatus === "PREAUTH_SUCCESS"
+      ? "confirmed"
+      : providerStatus === "FAILURE" || providerStatus === "EXPIRED" || providerStatus === "SYSTEM_FAILURE"
+        ? "failed"
+        : "initiated";
 
   return {
     ok: true,

@@ -2,6 +2,7 @@ import { useCallback, type RefObject } from "react";
 import { toast } from "@/lib/toast";
 import { buildInvoice } from "@/features/invoices/lib/el-fatoora";
 import { createPaymentIntent } from "@/features/payments/server/actions";
+import { isHostedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 import { BCT_SANDBOX_TEST_LIMIT_TND } from "@/features/payments/constants";
 import type { Mou3amlaState } from "@/features/mou3amla/types";
 import type { Patch } from "@/features/mou3amla/hooks/reducer";
@@ -104,11 +105,11 @@ export function usePaymentActions({
         // verification_status === "verified" (see wallets/server/actions.ts).
         // Surfacing that here is reporting a real, enforced guarantee, not a
         // trust claim invented for the toast.
-        const isKonnectHostedCheckout = result.checkout.providerId === "konnect";
+        const isHostedCheckout = isHostedCheckoutProvider(result.checkout.providerId);
 
         toast.success(`Opening the ${result.checkout.providerName} checkout...`, {
-          description: isKonnectHostedCheckout
-            ? "Mou3amla saved the route first, then opened the real Konnect sandbox checkout."
+          description: isHostedCheckout
+            ? `Mou3amla saved the route first, then opened the real ${result.checkout.providerName} sandbox checkout.`
             : "Mou3amla saved the route first, then opened the in-app development payment demo.",
         });
 

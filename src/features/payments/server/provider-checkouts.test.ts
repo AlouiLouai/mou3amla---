@@ -11,9 +11,9 @@ vi.mock("@/config/env.server", () => ({
     KONNECT_API_KEY: "konnect-key",
     KONNECT_RECEIVER_WALLET_ID: "wallet_123",
     KONNECT_API_BASE_URL: "https://api.sandbox.konnect.network/api/v2",
-    FLOUCI_PUBLIC_KEY: undefined,
-    FLOUCI_PRIVATE_KEY: undefined,
-    FLOUCI_API_BASE_URL: undefined,
+    FLOUCI_PUBLIC_KEY: "flouci-public",
+    FLOUCI_PRIVATE_KEY: "flouci-private",
+    FLOUCI_API_BASE_URL: "https://developers.flouci.com/api/v2",
   },
 }));
 
@@ -107,6 +107,77 @@ describe("provider-checkouts", () => {
       providerStatus: "completed",
       resolvedStatus: "confirmed",
       providerPaymentRef: "pay_123",
+    });
+  });
+
+  it("creates a Flouci hosted sandbox checkout via generate_payment", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          result: { success: true, payment_id: "flouci_pay_1", link: "https://flouci.com/pay/flouci_pay_1" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const result = await createProviderCheckout({
+      providerId: "flouci",
+      providerName: "Flouci",
+      refId: "ref_flouci",
+      amount: 25,
+      payerPhone: "+21620123456",
+      recipientHandle: "@receiver",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      providerId: "flouci",
+      providerName: "Flouci",
+      checkoutUrl: "https://flouci.com/pay/flouci_pay_1",
+      providerPaymentRef: "flouci_pay_1",
+      providerStatus: "PENDING",
+      returnUrl: "https://mou3amla.vercel.app/payments/return/flouci?ref=ref_flouci",
+      webhookUrl: "https://mou3amla.vercel.app/api/payments/providers/flouci/webhook?ref=ref_flouci",
+      checkoutMode: "hosted",
+    });
+
+    const [calledUrl, calledInit] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toBe("https://developers.flouci.com/api/v2/generate_payment");
+    expect(calledInit.method).toBe("POST");
+    expect(JSON.parse(calledInit.body as string)).toMatchObject({
+      amount: "25000",
+      success_link: "https://mou3amla.vercel.app/payments/return/flouci?ref=ref_flouci",
+      fail_link: "https://mou3amla.vercel.app/payments/return/flouci?ref=ref_flouci",
+      webhook: "https://mou3amla.vercel.app/api/payments/providers/flouci/webhook?ref=ref_flouci",
+      developer_tracking_id: "ref_flouci",
+      accept_card: true,
+    });
+  });
+
+  it.each([
+    ["SUCCESS", "confirmed"],
+    ["PREAUTH_SUCCESS", "confirmed"],
+    ["PENDING", "initiated"],
+    ["FAILURE", "failed"],
+    ["EXPIRED", "failed"],
+    ["SYSTEM_FAILURE", "failed"],
+  ])("maps Flouci verify status %s to %s", async (providerStatus, resolvedStatus) => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ success: true, result: { status: providerStatus } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const result = await verifyProviderPayment("flouci", { provider_payment_ref: "flouci_pay_1" });
+
+    expect(result).toEqual({
+      ok: true,
+      providerId: "flouci",
+      providerStatus,
+      resolvedStatus,
+      providerPaymentRef: "flouci_pay_1",
+      ...(resolvedStatus === "failed" ? { failureReason: providerStatus } : {}),
     });
   });
 

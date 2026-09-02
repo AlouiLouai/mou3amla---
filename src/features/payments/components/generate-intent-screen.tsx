@@ -118,8 +118,8 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          Link one of the currently available wallets or bank routes to open Mou3amla&apos;s checkout flow. Flouci is waiting for business
-          approval and Konnect is down for the moment in this demo.
+          Link one of the currently available wallets or bank routes to open Mou3amla&apos;s checkout flow. Flouci opens its real hosted
+          sandbox checkout; Konnect is down for the moment in this demo.
         </div>
       ) : account.wallets.length > derived.supportedSendWallets.length ? (
         <div
@@ -130,8 +130,8 @@ export function GenerateIntentScreen({ mou3amlaApp }: { mou3amlaApp: UseMou3amla
             color: mou3amla.textMuted,
           }}
         >
-          Available rails open Mou3amla&apos;s internal TUNPAY-style mock checkout. Flouci (awaiting approval) and Konnect (down for the
-          moment) stay visible as reference-only routes.
+          Most rails open Mou3amla&apos;s internal TUNPAY-style mock checkout; Flouci opens its real hosted sandbox checkout. Konnect (down
+          for the moment) stays visible as a reference-only route.
         </div>
       ) : null}
 

@@ -403,18 +403,37 @@ external API) follows the same `xUnsafe` + wrapper split - see
   via `InitialMou3amlaUser`/`UserProfile`) - if you see the subscription
   silently not firing, check that `id` actually made it into `initialUser` in
   `src/app/home/page.tsx`.
-- **Send-money now supports two demo handoff shapes.**
-  `createPaymentIntent` still creates the durable Mou3amla transaction row
-  first, then chooses the checkout flow server-side for the selected source
-  rail. Flouci remains intentionally disabled with a visible service-down
-  state; most linked rails launch Mou3amla's own `/dev/mock-checkout`, while a
-  linked Konnect route launches the real Konnect hosted sandbox checkout
-  (`/payments/init-payment`) and verifies completion back through Mou3amla's
-  webhook/finalization path. The shell therefore tracks two separate concepts
-  on purpose: `sourceWalletId` remains the user's default *receive* route
-  (`linked_destinations.is_default` in Supabase), while the client-only
-  `sendSourceWalletId` is just the currently chosen source rail for the active
-  checkout flow.
+- **Send-money supports two checkout shapes: the internal mock, and a real
+  hosted-provider handoff.** `createPaymentIntent` still creates the durable
+  Mou3amla transaction row first, then chooses the checkout flow server-side
+  for the selected source rail (`createProviderCheckout` in
+  `payments/server/provider-checkouts.ts`). Most linked rails launch
+  Mou3amla's own `/dev/mock-checkout`; a linked **Flouci** route calls
+  Flouci's real `POST /generate_payment` (`developers.flouci.com/api/v2`,
+  `Authorization: Bearer <FLOUCI_PUBLIC_KEY>:<FLOUCI_PRIVATE_KEY>`, amount in
+  millimes as a string, `accept_card: true`) and redirects the payer to
+  Flouci's hosted sandbox checkout. Flouci's `demoCheckoutStatus` is
+  `"hosted"` in `wallets/constants.ts`; `createFlouciCheckout` still returns a
+  clean `{ ok: false, message }` if `FLOUCI_PUBLIC_KEY`/`FLOUCI_PRIVATE_KEY`
+  are unset, so a keyless deploy degrades gracefully rather than 500ing.
+  Konnect's hosted integration stays wired but pinned to
+  `demoCheckoutStatus: "service_down"` (dormant). The shell tracks two
+  separate concepts on purpose: `sourceWalletId` remains the user's default
+  *receive* route (`linked_destinations.is_default` in Supabase), while the
+  client-only `sendSourceWalletId` is just the currently chosen source rail
+  for the active checkout flow.
+- **Flouci provider return/webhook resolution accepts either key.** We put
+  our own `?ref=<refId>` on the `success_link`/`fail_link`/`webhook` URLs we
+  hand Flouci, but Flouci is documented to append its own `payment_id` on the
+  browser redirect, so `resolveRefIdFromProviderCallback`
+  (`payments/server/provider-returns.ts`) falls back to looking the
+  transaction up by `metadata->>provider_payment_ref` when `ref` is absent.
+  Both `/payments/return/[provider]` (browser) and
+  `/api/payments/providers/flouci/webhook` (server-to-server) go through it.
+  As with Konnect, the browser never decides success/failure from a query
+  string - it always re-calls `verify_payment/{payment_id}` server-side
+  (`SUCCESS`/`PREAUTH_SUCCESS` → confirmed; `FAILURE`/`EXPIRED`/
+  `SYSTEM_FAILURE` → failed; else still initiated).
 - **The mock checkout must stay obviously internal.** `/dev/mock-checkout`
   shows a persistent `DEVELOPMENT MOCK ENVIRONMENT - NO REAL MONEY MOVED`
   banner, Mou3amla-native styling, sender/receiver/amount details, and

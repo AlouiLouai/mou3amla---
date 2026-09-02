@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { ActivityItem } from "@/features/activity/types";
 import { getSessionIdentity } from "@/features/auth/server/dal";
 import type { NotificationItem } from "@/features/notifications/types";
-import { canLaunchProviderCheckout, isCheckoutServiceDown } from "@/features/payments/lib/provider-checkout";
+import { canLaunchProviderCheckout, isCheckoutServiceDown, isHostedCheckoutProvider } from "@/features/payments/lib/provider-checkout";
 import type { PaymentCheckoutLaunch, PaymentIntent } from "@/features/payments/types";
 import { createProviderCheckout } from "@/features/payments/server/provider-checkouts";
 import type { PaymentTransactionMetadata } from "@/features/payments/server/transaction-metadata";
@@ -308,15 +308,16 @@ async function createPaymentIntentUnsafe(input: CreatePaymentIntentInput): Promi
   }
 
   const senderNotificationRow = notificationRows.find((row) => row.user_id === senderProfile.id);
+  const checkoutIsHosted = isHostedCheckoutProvider(checkout.providerId);
   const senderNotification: NotificationItem = {
     id: senderNotificationRow?.id ?? transaction.id,
     type: senderNotificationRow?.type ?? "payment_sent",
     title:
       senderNotificationRow?.title ??
-      (checkout.providerId === "konnect" ? `${checkout.providerName} sandbox checkout pret` : `Mock checkout ${checkout.providerName} pret`),
+      (checkoutIsHosted ? `${checkout.providerName} sandbox checkout pret` : `Mock checkout ${checkout.providerName} pret`),
     body:
       senderNotificationRow?.body ??
-      (checkout.providerId === "konnect"
+      (checkoutIsHosted
         ? `Votre paiement vers @${recipient.username} attend validation dans le checkout sandbox ${checkout.providerName}.`
         : `Votre paiement vers @${recipient.username} attend validation dans le mock checkout ${checkout.providerName}.`),
     unread: senderNotificationRow?.unread ?? true,

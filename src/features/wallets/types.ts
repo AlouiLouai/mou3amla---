@@ -12,7 +12,7 @@ export interface Provider {
   network: string;
   subtitle: string;
   acceptedRoutingTypes: RoutingType[];
-  /** "service_down" = temporary sandbox outage (Konnect); "pending_approval" = waiting on business-registration/KYB (Flouci) - see docs/09-bct-sandbox-readiness.md. Both block linking/checkout. */
+  /** "mock" = internal /dev/mock-checkout; "hosted" = real provider hosted sandbox checkout (Flouci today - see docs/09-bct-sandbox-readiness.md); "service_down" = temporary sandbox outage, blocks linking/checkout (Konnect today); "pending_approval" = waiting on business-registration/KYB, also blocks linking/checkout (currently unused). */
   demoCheckoutStatus?: "mock" | "hosted" | "service_down" | "pending_approval";
   /** Overrides WalletRegistrySheet's default routing-type placeholder for this provider only. */
   routingPlaceholder?: string;

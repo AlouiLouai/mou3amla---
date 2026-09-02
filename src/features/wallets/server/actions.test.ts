@@ -113,7 +113,9 @@ describe("linkDestination", () => {
   });
 
   it("rejects a provider that is currently service down", async () => {
-    const result = await linkDestination({ providerId: "flouci", routingValue: "@demo" });
+    // Konnect is the provider pinned to demoCheckoutStatus "service_down" in
+    // wallets/constants.ts (Flouci now runs its real hosted sandbox checkout).
+    const result = await linkDestination({ providerId: "konnect", routingValue: "MERCH-00123" });
 
     expect(result).toEqual({ ok: false, message: expect.stringMatching(/temporarily unavailable/i) });
     expect(createAdminClient).not.toHaveBeenCalled();

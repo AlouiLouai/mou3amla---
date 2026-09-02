@@ -12,9 +12,9 @@ export const PROVIDERS: Provider[] = [
     initials: "FL",
     color: "#2FE6A3",
     network: "Flouci - TUNPAY",
-    subtitle: "Mobile Wallet - Awaiting business registration approval",
+    subtitle: "Mobile Wallet - Flouci hosted sandbox checkout",
     acceptedRoutingTypes: ["wallet_tag", "merchant_id"],
-    demoCheckoutStatus: "pending_approval",
+    demoCheckoutStatus: "hosted",
   },
   {
     id: "konnect",

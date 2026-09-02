@@ -8,17 +8,20 @@ credentials - it maps a public `@username` to a destination-only routing
 identifier (wallet tag / merchant id / RIB) for a real provider (Flouci, D17,
 walletii, BIAT, Amen Pay, etc.), and hands off the actual payment to the
 user's own banking rail. For the current demo build, every send-money flow
-creates a durable Mou3amla intent first, then opens an internal
-Mou3amla-branded, TUNPAY-styled development checkout at `/dev/mock-checkout` -
-there is no live third-party checkout redirect today. Flouci stays visible in
-the provider list as an explicit **waiting for approval** reference (pending
-the business-registration/RNE step - see
-[09-bct-sandbox-readiness.md](./09-bct-sandbox-readiness.md)) and Konnect as a
-**down for the moment** reference; neither is an active link/send option right
-now, though the real Konnect hosted-sandbox integration
-(`payments/server/provider-checkouts.ts`) stays in place, dormant, for when it
-gets re-enabled. The other rails remain linkable and route into the internal
-mock checkout. In practice, that means a user's public/default receive route
+creates a durable Mou3amla intent first, then chooses a checkout flow
+server-side for the selected source rail. **Flouci is now a live hosted
+sandbox path**: a linked Flouci route calls Flouci's real
+`generate_payment` API and redirects the payer to Flouci's hosted sandbox
+checkout, with completion server-verified back through Mou3amla's
+webhook/return path (`payments/server/provider-checkouts.ts`,
+`payments/server/provider-returns.ts` - see
+[09-bct-sandbox-readiness.md](./09-bct-sandbox-readiness.md)). It activates
+whenever `FLOUCI_PUBLIC_KEY`/`FLOUCI_PRIVATE_KEY` are set and degrades to a
+clean "not configured" error otherwise. Konnect stays a **down for the
+moment** reference - its hosted-sandbox integration stays in place, dormant,
+for when it gets re-enabled - and is not an active link/send option right
+now. Every other rail remains linkable and opens the internal
+Mou3amla-branded, TUNPAY-styled development checkout at `/dev/mock-checkout`. In practice, that means a user's public/default receive route
 can still be any linked wallet or bank account, while the send screen offers
 any linked non-disabled rail as the source for the in-app demo handoff.
 Linked destinations can also now be removed from the Accounts screen with a
